@@ -6,7 +6,9 @@ model\dao\TestDriveScheduleDAO.class
 model\dto\SpecialOrderDTO.class
 utils\DbUtils.class
 model\dto\ConfirmationDTO.class
+utils\ResponseUtils.class
 model\dao\PromotionDAO.class
+model\controller\LoginController.class
 model\dao\ConfirmationDAO.class
 model\dto\InventoryDTO.class
 model\dao\RoleDAO.class
