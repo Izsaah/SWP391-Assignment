@@ -42,4 +42,7 @@ public class DealerDAO {
         }
         return null;
     }
+    public DealerDTO GetDealerById(int id){
+        return retrieve("dealer_id=?",id).get(0);
+    }
 }

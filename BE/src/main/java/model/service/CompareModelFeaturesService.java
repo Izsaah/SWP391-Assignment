@@ -31,29 +31,5 @@ public class CompareModelFeaturesService {
         }
      return models;
     }
-//Ascending
-public List<VehicleModelDTO> HandlingCompareVehicleByPrice(String vehicleName) {
-    List<VehicleModelDTO> models = HandlingSearchVehicleByVehicleName(vehicleName);
-
-    if (models != null) {
-        for (VehicleModelDTO model : models) {
-            if (model.getLists() != null) {
-               
-                model.getLists().sort(Comparator.comparingDouble(VehicleVariantDTO::getPrice));
-            }
-        }
-
-        
-        models.sort(Comparator.comparingDouble(model -> {
-            if (model.getLists() != null && !model.getLists().isEmpty()) {
-                return model.getLists().get(0).getPrice();
-            } else {
-                return Double.MAX_VALUE;
-            }
-        }));
-    }
-
-    return models;
-}
-
+    
 }

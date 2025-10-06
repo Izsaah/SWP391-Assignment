@@ -10,24 +10,23 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import model.service.CompareModelFeaturesService;
-import model.service.ViewVehicleService;
+import model.service.ViewPromotionForDealerService;
 import utils.ResponseUtils;
 
 /**
  *
  * @author ACER
  */
-@WebServlet("/api/compareVehicle")
-public class CompareModelFeaturesController extends HttpServlet{
-      private final CompareModelFeaturesService service = new CompareModelFeaturesService();
-   
+@WebServlet("/api/viewPromotionDealerIdController")
+public class ViewPromotionByDealerIdController extends HttpServlet{
+    private final static ViewPromotionForDealerService service= new ViewPromotionForDealerService();
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) 
             throws ServletException, IOException {
         try {
-            String VehicleName=req.getParameter("vehicleName");
-            ResponseUtils.success(resp, "success", service.HandlingSearchVehicleByVehicleName(VehicleName));
+          int id = Integer.parseInt(req.getParameter("dealerId"));
+
+            ResponseUtils.success(resp, "success", service.HandlingViewPromotionForDealer(id));
         } catch (Exception e) {
             e.printStackTrace();
             ResponseUtils.error(resp, "An error occurred while retrieving vehicles: " + e.getMessage());
