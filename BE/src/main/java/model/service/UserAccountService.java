@@ -4,7 +4,9 @@
  */
 package model.service;
 
+import java.util.List;
 import model.dao.UserAccountDAO;
+import model.dto.RoleDTO;
 import model.dto.UserAccountDTO;
 
 /**
@@ -12,11 +14,22 @@ import model.dto.UserAccountDTO;
  * @author ACER
  */
 public class UserAccountService {
-     private UserAccountDAO UDao;
-     
-    public UserAccountDTO HandlingLogin(String username, String password) {
-    return UDao.login(username, password); // return user or null
-    }
 
+    private UserAccountDAO UDao = new UserAccountDAO();
+
+    public UserAccountDTO HandlingLogin(String username, String password) {
+        UserAccountDTO user = UDao.login(username, password);
+
+        // FIX: Check for null user immediately after the login attempt.
+        if (user == null) {
+            return null;
+        }
+
+        // Line 21 is now safe because user is guaranteed not to be null
+        List<RoleDTO> roles = UDao.getUserRoles(user.getUserId());
+        user.setRoles(roles);
+
+        return user;
+    }
 
 }
