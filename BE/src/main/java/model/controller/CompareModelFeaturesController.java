@@ -18,7 +18,7 @@ import utils.ResponseUtils;
  *
  * @author ACER
  */
-@WebServlet("/api/compareVehicle")
+@WebServlet("/api/public/compareVehicle")
 public class CompareModelFeaturesController extends HttpServlet{
       private final CompareModelFeaturesService service = new CompareModelFeaturesService();
    

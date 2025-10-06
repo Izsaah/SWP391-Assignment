@@ -16,7 +16,7 @@ import java.util.logging.Logger;
  */
 public class DbUtils {
     private static final String DB_NAME = "SWP391";
-    private static final String DB_USER_NAME = "Sa";
+    private static final String DB_USER_NAME = "sa";
     private static final String DB_PASSWORD = "123";
 
     public static Connection getConnection() throws ClassNotFoundException, SQLException {

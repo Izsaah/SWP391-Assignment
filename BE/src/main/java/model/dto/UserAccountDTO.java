@@ -1,5 +1,7 @@
 package model.dto;
 
+import java.util.List;
+
 /*
  * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
@@ -17,18 +19,33 @@ public class UserAccountDTO {
     private String email;
     private String username;
     private String phoneNumber;
+    private List<RoleDTO> roles;
 
-    public UserAccountDTO() {
-    }
-
-    public UserAccountDTO(int userId, Integer customerId, Integer dealerId, String password, String email, String username, String phoneNumber) {
+    public UserAccountDTO(int userId, int customerId, int dealerId, String email, String username, String phoneNumber, List<RoleDTO> roles) {
         this.userId = userId;
         this.customerId = customerId;
         this.dealerId = dealerId;
-        this.password = password;
         this.email = email;
         this.username = username;
         this.phoneNumber = phoneNumber;
+        this.roles = roles;
+    }
+
+    public UserAccountDTO(int userId, int customerId, int dealerId, String email, String username, String phoneNumber) {
+        this.userId = userId;
+        this.customerId = customerId;
+        this.dealerId = dealerId;
+        this.email = email;
+        this.username = username;
+        this.phoneNumber = phoneNumber;
+    }
+
+    public List<RoleDTO> getRoles() {
+        return roles;
+    }
+
+    public void setRoles(List<RoleDTO> roles) {
+        this.roles = roles;
     }
 
     public int getUserId() {
@@ -39,19 +56,19 @@ public class UserAccountDTO {
         this.userId = userId;
     }
 
-    public Integer getCustomerId() {
+    public int getCustomerId() {
         return customerId;
     }
 
-    public void setCustomerId(Integer customerId) {
+    public void setCustomerId(int customerId) {
         this.customerId = customerId;
     }
 
-    public Integer getDealerId() {
+    public int getDealerId() {
         return dealerId;
     }
 
-    public void setDealerId(Integer dealerId) {
+    public void setDealerId(int dealerId) {
         this.dealerId = dealerId;
     }
 
@@ -86,5 +103,6 @@ public class UserAccountDTO {
     public void setPhoneNumber(String phoneNumber) {
         this.phoneNumber = phoneNumber;
     }
+
 
 }
