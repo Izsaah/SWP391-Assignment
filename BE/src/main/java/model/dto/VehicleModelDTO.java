@@ -4,6 +4,8 @@
  */
 package model.dto;
 
+import java.util.List;
+
 /**
  *
  * @author Admin
@@ -13,6 +15,23 @@ public class VehicleModelDTO {
     private String modelName;
     private String description;
     private boolean isActive;
+    private List<VehicleVariantDTO> lists;
+
+    public VehicleModelDTO(int modelId, String modelName, String description, boolean isActive, List<VehicleVariantDTO> lists) {
+        this.modelId = modelId;
+        this.modelName = modelName;
+        this.description = description;
+        this.isActive = isActive;
+        this.lists = lists;
+    }
+
+    public List<VehicleVariantDTO> getLists() {
+        return lists;
+    }
+
+    public void setLists(List<VehicleVariantDTO> lists) {
+        this.lists = lists;
+    }
 
     public VehicleModelDTO() {
     }

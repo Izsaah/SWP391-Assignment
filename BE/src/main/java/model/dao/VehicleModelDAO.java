@@ -42,4 +42,9 @@ public class VehicleModelDAO {
         }
         return null;
     }
+    
+    public List<VehicleModelDTO> viewVehicleModelIsActive(){
+         return retrieve("is_active = 1");
+    }
+    
 }

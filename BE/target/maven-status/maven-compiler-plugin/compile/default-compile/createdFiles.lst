@@ -8,6 +8,7 @@ utils\DbUtils.class
 model\dto\ConfirmationDTO.class
 utils\ResponseUtils.class
 model\dao\PromotionDAO.class
+model\controller\ViewVehicleController.class
 model\controller\LoginController.class
 model\dao\ConfirmationDAO.class
 model\dto\InventoryDTO.class
@@ -24,6 +25,7 @@ model\dao\VehicleVariantDAO.class
 model\dto\OrderDetailDTO.class
 model\dto\OrderDTO.class
 model\dao\SaleRecordDAO.class
+model\service\ViewVehicleService.class
 model\dto\PaymentDTO.class
 model\dto\CustomerDTO.class
 model\dto\SaleRecordDTO.class

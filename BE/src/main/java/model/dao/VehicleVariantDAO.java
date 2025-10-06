@@ -46,4 +46,9 @@ public class VehicleVariantDAO {
         }
         return null;
     }
+    
+    public List<VehicleVariantDTO> viewVehicleVariantIsActive(String model_id){
+        return retrieve("model_id = ? and is_active = 1", model_id);
+    }
+    
 }
