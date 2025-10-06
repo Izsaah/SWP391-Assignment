@@ -14,6 +14,7 @@ C:\Users\ACER\OneDrive\Documents\GitHub\SWP391-Assignment\SWP391-Assignment\BE\s
 C:\Users\ACER\OneDrive\Documents\GitHub\SWP391-Assignment\SWP391-Assignment\BE\src\main\java\utils\DbUtils.java
 C:\Users\ACER\OneDrive\Documents\GitHub\SWP391-Assignment\SWP391-Assignment\BE\src\main\java\model\service\ViewVehicleService.java
 C:\Users\ACER\OneDrive\Documents\GitHub\SWP391-Assignment\SWP391-Assignment\BE\src\main\java\model\dto\PaymentDTO.java
+C:\Users\ACER\OneDrive\Documents\GitHub\SWP391-Assignment\SWP391-Assignment\BE\src\main\java\model\service\ViewPromotionForDealerService.java
 C:\Users\ACER\OneDrive\Documents\GitHub\SWP391-Assignment\SWP391-Assignment\BE\src\main\java\model\dto\SpecialOrderDTO.java
 C:\Users\ACER\OneDrive\Documents\GitHub\SWP391-Assignment\SWP391-Assignment\BE\src\main\java\model\controller\ViewVehicleController.java
 C:\Users\ACER\OneDrive\Documents\GitHub\SWP391-Assignment\SWP391-Assignment\BE\src\main\java\model\dao\InventoryDAO.java
@@ -41,4 +42,6 @@ C:\Users\ACER\OneDrive\Documents\GitHub\SWP391-Assignment\SWP391-Assignment\BE\s
 C:\Users\ACER\OneDrive\Documents\GitHub\SWP391-Assignment\SWP391-Assignment\BE\src\main\java\model\dao\FeedbackDAO.java
 C:\Users\ACER\OneDrive\Documents\GitHub\SWP391-Assignment\SWP391-Assignment\BE\src\main\java\utils\ResponseUtils.java
 C:\Users\ACER\OneDrive\Documents\GitHub\SWP391-Assignment\SWP391-Assignment\BE\src\main\java\model\dto\SaleRecordDTO.java
+C:\Users\ACER\OneDrive\Documents\GitHub\SWP391-Assignment\SWP391-Assignment\BE\src\main\java\model\dao\DealerPromotionDAO.java
+C:\Users\ACER\OneDrive\Documents\GitHub\SWP391-Assignment\SWP391-Assignment\BE\src\main\java\model\controller\ViewPromotionByDealerIdController.java
 C:\Users\ACER\OneDrive\Documents\GitHub\SWP391-Assignment\SWP391-Assignment\BE\src\main\java\model\dto\RoleDTO.java

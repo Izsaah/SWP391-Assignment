@@ -44,4 +44,7 @@ public class PromotionDAO {
         }
         return null;
     }
+  public List<PromotionDTO> GetAllPromotion(int id) {
+    return retrieve("promo_id = ?", id);
+}
 }

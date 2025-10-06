@@ -10,6 +10,7 @@ model\dto\ConfirmationDTO.class
 utils\ResponseUtils.class
 model\dao\PromotionDAO.class
 model\controller\ViewVehicleController.class
+model\service\ViewPromotionForDealerService.class
 model\service\CompareModelFeaturesService.class
 model\controller\LoginController.class
 model\dao\ConfirmationDAO.class
@@ -17,7 +18,9 @@ model\dto\InventoryDTO.class
 model\dao\RoleDAO.class
 model\controller\CompareModelFeaturesController.class
 model\dao\PaymentDAO.class
+model\dao\DealerPromotionDAO.class
 model\dto\VehicleVariantDTO.class
+model\controller\ViewPromotionByDealerIdController.class
 model\dao\FeedbackDAO.class
 model\dao\OrderDetailDAO.class
 model\dto\PromotionDTO.class
