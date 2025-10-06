@@ -46,5 +46,7 @@ public class VehicleModelDAO {
     public List<VehicleModelDTO> viewVehicleModelIsActive(){
          return retrieve("is_active = 1");
     }
-    
+    public List<VehicleModelDTO> SearchVehicleModel(String model_name){
+        return retrieve("model_name=?",model_name);
+    }
 }

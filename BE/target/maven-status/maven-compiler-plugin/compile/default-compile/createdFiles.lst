@@ -1,4 +1,5 @@
 model\dao\InventoryDAO.class
+model\controller\CreateOrderController.class
 model\dto\RoleDTO.class
 model\dao\SpecialOrderDAO.class
 model\dao\InstallmentPlanDAO.class
@@ -9,10 +10,12 @@ model\dto\ConfirmationDTO.class
 utils\ResponseUtils.class
 model\dao\PromotionDAO.class
 model\controller\ViewVehicleController.class
+model\service\CompareModelFeaturesService.class
 model\controller\LoginController.class
 model\dao\ConfirmationDAO.class
 model\dto\InventoryDTO.class
 model\dao\RoleDAO.class
+model\controller\CompareModelFeaturesController.class
 model\dao\PaymentDAO.class
 model\dto\VehicleVariantDTO.class
 model\dao\FeedbackDAO.class
