@@ -1,5 +1,7 @@
 package model.dto;
 
+import java.util.List;
+
 /*
  * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
@@ -16,6 +18,25 @@ public class OrderDTO {
     private int dealerStaffId;
     private String orderDate;
     private String status;
+    private OrderDetailDTO detail;
+
+    public OrderDTO(int orderId, int customerId, int dealerId, int dealerStaffId, String orderDate, String status, OrderDetailDTO detail) {
+        this.orderId = orderId;
+        this.customerId = customerId;
+        this.dealerId = dealerId;
+        this.dealerStaffId = dealerStaffId;
+        this.orderDate = orderDate;
+        this.status = status;
+        this.detail = detail;
+    }
+
+    public OrderDetailDTO getDetail() {
+        return detail;
+    }
+
+    public void setDetail(OrderDetailDTO detail) {
+        this.detail = detail;
+    }
 
     public OrderDTO() {
     }
