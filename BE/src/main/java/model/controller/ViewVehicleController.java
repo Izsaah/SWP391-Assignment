@@ -20,7 +20,7 @@ import utils.ResponseUtils;
  *
  * @author Admin
  */
-@WebServlet("/api/viewVehicle")
+@WebServlet("/api/staff/viewVehicle")
 public class ViewVehicleController extends HttpServlet {
     private final ViewVehicleService service = new ViewVehicleService();
    

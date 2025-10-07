@@ -51,24 +51,26 @@ public class UserAccountDAO {
         return null;
     }
 
-    public List<RoleDTO> getUserRoles(int userId) {
-        List<RoleDTO> roles = new ArrayList<>();
-        String sql = "SELECT r.role_id, r.role_name, ur.user_id FROM Role r JOIN UserRoles ur ON r.role_id = ur.role_id WHERE ur.user_id = ?";
-        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, userId);
-            ResultSet rs = ps.executeQuery();
-            while (rs.next()) {
-                roles.add(new RoleDTO(
+   public List<RoleDTO> getUserRoles(int userId) {
+    List<RoleDTO> roles = new ArrayList<>();
+    // CHANGE 'UserRoles' to 'UserRole' here:
+    String sql = "SELECT r.role_id, r.role_name, ur.user_id FROM Role r JOIN UserRole ur ON r.role_id = ur.role_id WHERE ur.user_id = ?";
+    try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+        ps.setInt(1, userId);
+        ResultSet rs = ps.executeQuery();
+        while (rs.next()) {
+            roles.add(new RoleDTO(
                         rs.getInt("role_id"),
                         rs.getString("role_name"),
                         rs.getInt("user_id")
                 ));
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
         }
-        return roles;
+    } catch (Exception e) {
+        // This is line 59, which prints the SQLServerException
+        e.printStackTrace(); 
     }
+    return roles;
+}
 
     public UserAccountDTO login(String username, String password) {
         List<UserAccountDTO> users = retrieve("username = ? AND password = ?", username, password);

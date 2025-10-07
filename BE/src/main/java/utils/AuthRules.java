@@ -21,7 +21,7 @@ public class AuthRules {
         map.put("/api/manager", Arrays.asList("MANAGER")); 
         map.put("/api/staff", Arrays.asList("MANAGER", "STAFF")); 
         map.put("/api/admin", Arrays.asList("ADMIN"));     
-        map.put("/api/EVM", Arrays.asList("EVM"));
+        map.put("/api/EVM", Arrays.asList("EVM","ADMIN"));
         ROLE_PATHS = Collections.unmodifiableMap(map);
     }
 

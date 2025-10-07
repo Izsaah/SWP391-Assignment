@@ -17,7 +17,7 @@ import utils.ResponseUtils;
  *
  * @author ACER
  */
-@WebServlet("/api/viewPromotionDealerIdController")
+@WebServlet("/api/staff/viewPromotionDealerIdController")
 public class ViewPromotionByDealerIdController extends HttpServlet{
     private final static ViewPromotionForDealerService service= new ViewPromotionForDealerService();
     @Override
