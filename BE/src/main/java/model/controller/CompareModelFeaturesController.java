@@ -11,7 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
-import model.service.CompareModelFeaturesService;
+import model.service.CompareModelService;
 import model.service.ViewVehicleService;
 import utils.ResponseUtils;
 
@@ -22,7 +22,7 @@ import utils.ResponseUtils;
 @WebServlet("/api/public/compareVehicle")
 public class CompareModelFeaturesController extends HttpServlet {
 
-    private final CompareModelFeaturesService service = new CompareModelFeaturesService();
+    private final CompareModelService service = new CompareModelService();
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)

@@ -32,7 +32,9 @@ public class SpecialOrderDAO {
             rs.getString("quantity")
         );
     }
-    
+    public List<SpecialOrderDTO> GetSpeciallOrderByCustomerId(int id){
+    return retrieve("customer_id=?", id);
+    }
     public List<SpecialOrderDTO> retrieve(String condition, Object... params) {
         String sql = "SELECT * FROM " + TABLE_NAME + " WHERE " + condition;
         try (Connection conn = DbUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {

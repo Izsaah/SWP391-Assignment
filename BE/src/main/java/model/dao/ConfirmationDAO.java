@@ -43,4 +43,7 @@ public class ConfirmationDAO {
         }
         return null;
     }
+    public List<ConfirmationDTO> GetConfirmationBySpecialOrderId(int id){
+    return retrieve("special_order_id=?", id);
+    }
 }

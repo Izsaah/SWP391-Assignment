@@ -1,5 +1,7 @@
 package model.dto;
 
+import java.util.List;
+
 /*
  * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
@@ -15,7 +17,25 @@ public class CustomerDTO {
     private String address;
     private String email;
     private String phoneNumber;
+    private List<SpecialOrderDTO> specialOrderList;
 
+    public CustomerDTO(int customerId, String name, String address, String email, String phoneNumber, List<SpecialOrderDTO> specialOrderList) {
+        this.customerId = customerId;
+        this.name = name;
+        this.address = address;
+        this.email = email;
+        this.phoneNumber = phoneNumber;
+        this.specialOrderList = specialOrderList;
+    }
+
+    public List<SpecialOrderDTO> getSpecialOrderList() {
+        return specialOrderList;
+    }
+
+    public void setSpecialOrderList(List<SpecialOrderDTO> specialOrderList) {
+        this.specialOrderList = specialOrderList;
+    }
+    
     public CustomerDTO() {
     }
 
