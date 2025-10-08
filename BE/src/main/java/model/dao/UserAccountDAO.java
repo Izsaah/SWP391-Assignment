@@ -51,7 +51,9 @@ public class UserAccountDAO {
         }
         return null;
     }
-
+   public UserAccountDTO getUserById(int userId){
+   return retrieve("user_id=?", userId).get(0);
+   }
    public List<RoleDTO> getUserRoles(int userId) {
     List<RoleDTO> roles = new ArrayList<>();
     // CHANGE 'UserRoles' to 'UserRole' here:

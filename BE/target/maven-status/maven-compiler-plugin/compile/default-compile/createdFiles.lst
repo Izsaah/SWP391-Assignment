@@ -11,9 +11,12 @@ model\dto\InventoryDTO.class
 model\dao\RoleDAO.class
 model\dao\PaymentDAO.class
 model\dao\DealerPromotionDAO.class
+model\service\CreateSpecialOrderService.class
+model\controller\CreateSpecialOrderController.class
 model\dto\DealerDTO.class
 model\dto\LoginResponseDTO.class
 utils\JwtUtil.class
+model\controller\DealerSearchController.class
 model\dao\SaleRecordDAO.class
 model\service\ViewVehicleService.class
 model\dto\SaleRecordDTO.class
@@ -49,6 +52,7 @@ model\service\CreateCustomerService.class
 model\dto\PaymentDTO.class
 model\dto\CustomerDTO.class
 model\dto\VehicleModelDTO.class
+model\controller\CustomerSearchController.class
 model\dao\OrderDAO.class
 model\dto\UserAccountDTO.class
 model\dto\InstallmentPlanDTO.class
@@ -56,3 +60,4 @@ model\service\UserAccountService.class
 model\dto\FeedbackDTO.class
 model\dao\VehicleSerialDAO.class
 json\ApiResponse.class
+model\controller\DealerStaffSearchController.class

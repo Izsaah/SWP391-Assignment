@@ -7,6 +7,7 @@ package utils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.function.Consumer;
 
 import json.ApiResponse;
 
@@ -15,8 +16,9 @@ import json.ApiResponse;
  * @author ACER
  */
 public class ResponseUtils {
+
     private static final ObjectMapper mapper = new ObjectMapper();
-    
+
     public static <T> void success(HttpServletResponse resp, String message, T data) throws IOException {
         resp.setContentType("application/json");
         resp.setCharacterEncoding("UTF-8");
@@ -31,4 +33,17 @@ public class ResponseUtils {
         ApiResponse<Object> response = new ApiResponse<>("error", message, null);
         mapper.writeValue(resp.getWriter(), response);
     }
+    //Helper For Update
+    public <T> void updateIfNotNull(Consumer<T> setter, T newValue) {
+        if (newValue != null) {
+            setter.accept(newValue);
+        }
+    }
+
+    public void updateIfNotBlank(Consumer<String> setter, String newValue) {
+        if (newValue != null && !newValue.trim().isEmpty()) {
+            setter.accept(newValue);
+        }
+    }
+
 }

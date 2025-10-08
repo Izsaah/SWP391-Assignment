@@ -4,7 +4,9 @@
  */
 package model.service;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 import model.dao.UserAccountDAO;
 import model.dto.RoleDTO;
 import model.dto.UserAccountDTO;
@@ -30,6 +32,22 @@ public class UserAccountService {
         user.setRoles(roles);
 
         return user;
+    }
+
+ 
+
+    public List<String> getAllRoles(UserAccountDTO user) {
+        if (user == null) {
+            throw new IllegalArgumentException("User cannot be null");
+        }
+
+        if (user.getRoles() == null || user.getRoles().isEmpty()) {
+            return Collections.singletonList("USER"); 
+        }
+
+        return user.getRoles().stream()
+                .map(r -> r.getRoleName())
+                .collect(Collectors.toList());  
     }
 
 }
