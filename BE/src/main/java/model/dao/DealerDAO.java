@@ -45,4 +45,7 @@ public class DealerDAO {
     public DealerDTO GetDealerById(int id){
         return retrieve("dealer_id=?",id).get(0);
     }
+    public List<DealerDTO> findByName(String name) {
+        return retrieve("dealer_name = ?", name);
+    }
 }

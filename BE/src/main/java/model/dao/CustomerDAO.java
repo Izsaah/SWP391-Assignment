@@ -69,4 +69,7 @@ public class CustomerDAO {
             }
         }
     }
+    public List<CustomerDTO> findByName(String name) {
+        return retrieve("name = ?", name);
+    }
 }

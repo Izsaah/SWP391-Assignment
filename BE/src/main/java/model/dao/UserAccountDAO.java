@@ -21,6 +21,7 @@ import utils.DbUtils;
 public class UserAccountDAO {
 
     private static final String TABLE_NAME = "[UserAccount]";
+    String sql = "SELECT u.user_id, u.dealer_id, u.username, u.email, u.phone_number FROM UserAccount u JOIN UserRole ur ON u.user_id = ur.user_id WHERE ur.role_id in (1,2) AND u.username LIKE ?";
 
     private UserAccountDTO mapToUser(ResultSet rs) throws SQLException {
         return new UserAccountDTO(
@@ -77,6 +78,26 @@ public class UserAccountDAO {
             return users.get(0);
         }
         return null;
+    }
+    
+    public List<UserAccountDTO> searchDealerStaffAndManagerByName(String name) {
+        List<UserAccountDTO> list = new ArrayList<>();
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, "%" + name.trim() + "%");
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                UserAccountDTO user = new UserAccountDTO();
+                user.setUserId(rs.getInt("user_id"));
+                user.setDealerId(rs.getInt("dealer_id"));
+                user.setUsername(rs.getString("username"));
+                user.setEmail(rs.getString("email"));
+                user.setPhoneNumber(rs.getString("phone_number"));
+                list.add(user);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
     }
 
 }
