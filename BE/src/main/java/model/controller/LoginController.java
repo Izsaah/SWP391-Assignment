@@ -23,9 +23,9 @@ public class LoginController extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
-        UserAccountDTO user = service.HandlingLogin(req.getParameter("username"), req.getParameter("password"));
+        UserAccountDTO user = service.HandlingLogin(req.getParameter("email"), req.getParameter("password"));
         if (user == null) {
-            ResponseUtils.error(resp, "Invalid username or password");
+            ResponseUtils.error(resp, "Invalid email or password");
             return;
         }
         String role = (user.getRoles() != null && !user.getRoles().isEmpty())

@@ -12,15 +12,15 @@ package model.dto;
 public class RoleDTO {
     private int roleId;
     private String roleName;
-    private int userId;
+
 
     public RoleDTO() {
     }
 
-    public RoleDTO(int roleId, String roleName, int userId) {
+    public RoleDTO(int roleId, String roleName) {
         this.roleId = roleId;
         this.roleName = roleName;
-        this.userId = userId;
+
     }
 
     public int getRoleId() {
@@ -39,11 +39,5 @@ public class RoleDTO {
         this.roleName = roleName;
     }
 
-    public int getUserId() {
-        return userId;
-    }
-
-    public void setUserId(int userId) {
-        this.userId = userId;
-    }
+    
 }

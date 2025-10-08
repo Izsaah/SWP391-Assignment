@@ -61,8 +61,7 @@ public class UserAccountDAO {
         while (rs.next()) {
             roles.add(new RoleDTO(
                         rs.getInt("role_id"),
-                        rs.getString("role_name"),
-                        rs.getInt("user_id")
+                        rs.getString("role_name")
                 ));
         }
     } catch (Exception e) {
@@ -72,8 +71,8 @@ public class UserAccountDAO {
     return roles;
 }
 
-    public UserAccountDTO login(String username, String password) {
-        List<UserAccountDTO> users = retrieve("username = ? AND password = ?", username, password);
+    public UserAccountDTO login(String email, String password) {
+        List<UserAccountDTO> users = retrieve("email = ? AND password = ?", email, password);
         if (users != null && !users.isEmpty()) {
             return users.get(0);
         }

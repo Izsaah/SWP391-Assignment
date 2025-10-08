@@ -17,8 +17,8 @@ public class UserAccountService {
 
     private UserAccountDAO UDao = new UserAccountDAO();
 
-    public UserAccountDTO HandlingLogin(String username, String password) {
-        UserAccountDTO user = UDao.login(username, password);
+    public UserAccountDTO HandlingLogin(String email, String password) {
+        UserAccountDTO user = UDao.login(email, password);
 
         // FIX: Check for null user immediately after the login attempt.
         if (user == null) {

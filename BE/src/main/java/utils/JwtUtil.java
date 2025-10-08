@@ -3,13 +3,9 @@ package utils;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import java.security.Key;
-import java.sql.Array;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
-import java.util.stream.Collectors;
-
 import model.dto.UserAccountDTO;
 import model.dto.RoleDTO;
 

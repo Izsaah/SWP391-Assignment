@@ -23,8 +23,7 @@ public class RoleDAO {
     private RoleDTO mapToRole(ResultSet rs) throws SQLException {
         return new RoleDTO(
             rs.getInt("role_id"),
-            rs.getString("role_name"),
-            rs.getInt("user_id")
+            rs.getString("role_name")
         );
     }
 
