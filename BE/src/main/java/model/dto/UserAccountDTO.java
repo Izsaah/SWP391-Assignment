@@ -24,6 +24,9 @@ public class UserAccountDTO {
     private String phoneNumber;
     private List<RoleDTO> roles;
 
+    public UserAccountDTO() {
+    }
+
     public UserAccountDTO(int userId, int customerId, int dealerId, String email, String username, String phoneNumber, List<RoleDTO> roles) {
         this.userId = userId;
         this.customerId = customerId;
@@ -37,6 +40,13 @@ public class UserAccountDTO {
     public UserAccountDTO(int userId, int customerId, int dealerId, String email, String username, String phoneNumber) {
         this.userId = userId;
         this.customerId = customerId;
+        this.dealerId = dealerId;
+        this.email = email;
+        this.username = username;
+        this.phoneNumber = phoneNumber;
+    }
+    public UserAccountDTO(int userId, int dealerId, String email, String username, String phoneNumber) {
+        this.userId = userId;
         this.dealerId = dealerId;
         this.email = email;
         this.username = username;
