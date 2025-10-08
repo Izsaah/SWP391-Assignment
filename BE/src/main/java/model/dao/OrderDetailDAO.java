@@ -19,6 +19,9 @@ import utils.DbUtils;
  */
 public class OrderDetailDAO {
     private static final String TABLE_NAME = "OrderDetail";
+    private static final String INSERT_ORDER_DETAIL = "INSERT INTO " + TABLE_NAME
+            + " (order_id, variant_id, quantity, unit_price) VALUES (?, ?, ?, ?)";
+
     
     private OrderDetailDTO mapToOrderDetail(ResultSet rs) throws SQLException {
         return new OrderDetailDTO(
@@ -42,5 +45,20 @@ public class OrderDetailDAO {
             e.printStackTrace();
         }
         return null;
+    }
+    
+    public int create(Connection conn, OrderDetailDTO detail) throws SQLException {
+        try ( PreparedStatement ps = conn.prepareStatement(INSERT_ORDER_DETAIL)) {
+            ps.setInt(1, detail.getOrderId());       // use orderId from Order
+            ps.setInt(2, detail.getVariantId());     // variantId
+            ps.setInt(3, Integer.parseInt(detail.getQuantity())); // quantity as int
+            ps.setDouble(4, detail.getUnitPrice());  // unit price
+
+            int affectedRows = ps.executeUpdate();
+            if (affectedRows == 0) {
+                throw new SQLException("Creating order detail failed, no rows affected.");
+            }
+            return affectedRows;
+        }
     }
 }

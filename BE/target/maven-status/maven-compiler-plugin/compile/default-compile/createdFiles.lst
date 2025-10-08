@@ -20,7 +20,9 @@ model\dto\SaleRecordDTO.class
 model\dao\CustomerDAO.class
 model\dao\DealerDAO.class
 utils\AuthRules.class
+model\service\CreateOrderService.class
 model\dao\UserAccountDAO.class
+ExceptionLoggingFilter.class
 model\controller\CreateOrderController.class
 model\dao\TestDriveScheduleDAO.class
 model\dto\SpecialOrderDTO.class
@@ -43,7 +45,6 @@ model\dto\OrderDetailDTO.class
 model\dto\OrderDTO.class
 model\dto\PaymentDTO.class
 model\dto\CustomerDTO.class
-model\filter\ExceptionLoggingFilter.class
 model\dto\VehicleModelDTO.class
 model\dao\OrderDAO.class
 model\dto\UserAccountDTO.class

@@ -29,6 +29,14 @@ public class OrderDTO {
         this.status = status;
         this.detail = detail;
     }
+    
+    public OrderDTO(int customerId, int dealerId, int dealerStaffId, String orderDate, String status) {
+        this.customerId = customerId;
+        this.dealerId = dealerId;
+        this.dealerStaffId = dealerStaffId;
+        this.orderDate = orderDate;
+        this.status = status;;
+    }
 
     public OrderDetailDTO getDetail() {
         return detail;
