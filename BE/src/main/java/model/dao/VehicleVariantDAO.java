@@ -28,7 +28,6 @@ public class VehicleVariantDAO {
             rs.getString("color"),
             rs.getString("image"),
             rs.getDouble("price"),
-            rs.getString("serial_id"),
             rs.getBoolean("is_active")
         );
     }

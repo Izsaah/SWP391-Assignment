@@ -12,8 +12,10 @@ C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\mode
 C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\model\dto\VehicleVariantDTO.java
 C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\utils\JwtUtil.java
 C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\model\controller\ViewPromotionByDealerIdController.java
+C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\model\controller\CreateCustomerController.java
 C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\model\dao\VehicleVariantDAO.java
 C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\model\dao\PaymentDAO.java
+C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\model\dao\VehicleSerialDAO.java
 C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\model\dto\UserAccountDTO.java
 C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\model\dto\SpecialOrderDTO.java
 C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\filter\JwtFilter.java
@@ -31,9 +33,11 @@ C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\mode
 C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\model\service\CompareModelFeaturesService.java
 C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\model\service\ViewVehicleService.java
 C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\model\dao\VehicleModelDAO.java
+C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\model\service\CreateCustomerService.java
 C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\model\dao\InventoryDAO.java
 C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\model\dao\OrderDetailDAO.java
 C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\model\dao\ConfirmationDAO.java
+C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\model\dto\VehicleSerialDTO.java
 C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\model\controller\ViewVehicleController.java
 C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\utils\ResponseUtils.java
 C:\Users\Admin\OneDrive\Documents\GitHub\SWP391-Assignment\BE\src\main\java\json\ApiResponse.java

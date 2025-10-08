@@ -8,6 +8,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import model.dto.CustomerDTO;
@@ -19,6 +20,9 @@ import utils.DbUtils;
  */
 public class CustomerDAO {
     private static final String TABLE_NAME = "Customer";
+    private static final String INSERT_CUSTOMER = "INSERT INTO " + TABLE_NAME
+            + " (name, address, email, phone_number) VALUES (?, ?, ?, ?)";
+
 
     private CustomerDTO mapToCustomer(ResultSet rs) throws SQLException {
         return new CustomerDTO(
@@ -42,5 +46,27 @@ public class CustomerDAO {
             e.printStackTrace();
         }
         return null;
+    }
+    
+    public int create(Connection conn, CustomerDTO customer) throws SQLException {
+        try ( PreparedStatement ps = conn.prepareStatement(INSERT_CUSTOMER, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, customer.getName());
+            ps.setString(2, customer.getAddress());
+            ps.setString(3, customer.getEmail());
+            ps.setString(4, customer.getPhoneNumber());
+
+            int affectedRows = ps.executeUpdate();
+            if (affectedRows == 0) {
+                throw new SQLException("Creating customer failed, no rows affected.");
+            }
+
+            try ( ResultSet generatedKeys = ps.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    return generatedKeys.getInt(1); // return generated customer_id
+                } else {
+                    throw new SQLException("Creating customer failed, no ID obtained.");
+                }
+            }
+        }
     }
 }

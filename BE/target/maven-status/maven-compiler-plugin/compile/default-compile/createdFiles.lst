@@ -26,9 +26,11 @@ ExceptionLoggingFilter.class
 model\controller\CreateOrderController.class
 model\dao\TestDriveScheduleDAO.class
 model\dto\SpecialOrderDTO.class
+model\dto\VehicleSerialDTO.class
 model\dto\ConfirmationDTO.class
 utils\ResponseUtils.class
 model\dao\PromotionDAO.class
+model\controller\CreateCustomerController.class
 model\controller\ViewVehicleController.class
 model\service\ViewPromotionForDealerService.class
 model\service\CompareModelFeaturesService.class
@@ -43,6 +45,7 @@ model\dto\TestDriveScheduleDTO.class
 model\dao\VehicleVariantDAO.class
 model\dto\OrderDetailDTO.class
 model\dto\OrderDTO.class
+model\service\CreateCustomerService.class
 model\dto\PaymentDTO.class
 model\dto\CustomerDTO.class
 model\dto\VehicleModelDTO.class
@@ -51,4 +54,5 @@ model\dto\UserAccountDTO.class
 model\dto\InstallmentPlanDTO.class
 model\service\UserAccountService.class
 model\dto\FeedbackDTO.class
+model\dao\VehicleSerialDAO.class
 json\ApiResponse.class
