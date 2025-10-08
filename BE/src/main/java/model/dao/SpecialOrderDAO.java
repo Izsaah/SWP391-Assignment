@@ -108,4 +108,7 @@ public class SpecialOrderDAO {
 
         return false;
     }
+    public SpecialOrderDTO getSpecialOrderBySpecialId(int id){
+    return retrieve("special_order_id=?", id).get(0);
+    }
 }

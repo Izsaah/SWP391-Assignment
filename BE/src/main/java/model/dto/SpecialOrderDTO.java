@@ -18,7 +18,28 @@ public class SpecialOrderDTO {
     private String orderDate;
     private String description;
     private String quantity;
+    private ConfirmationDTO confirmation;
 
+    public SpecialOrderDTO(int specialOrderId, int customerId, int dealerStaffId, int dealerId, int modelId, String orderDate, String description, String quantity, ConfirmationDTO confirmation) {
+        this.specialOrderId = specialOrderId;
+        this.customerId = customerId;
+        this.dealerStaffId = dealerStaffId;
+        this.dealerId = dealerId;
+        this.modelId = modelId;
+        this.orderDate = orderDate;
+        this.description = description;
+        this.quantity = quantity;
+        this.confirmation = confirmation;
+    }
+
+    public ConfirmationDTO getConfirmation() {
+        return confirmation;
+    }
+
+    public void setConfirmation(ConfirmationDTO confirmation) {
+        this.confirmation = confirmation;
+    }
+    
     public SpecialOrderDTO() {
     }
 
