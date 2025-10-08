@@ -16,20 +16,18 @@ public class VehicleVariantDTO {
     private String color;
     private String image;
     private double price;
-    private String serialId;
     private boolean isActive;
 
     public VehicleVariantDTO() {
     }
 
-    public VehicleVariantDTO(int variantId, int modelId, String versionName, String color, String image, double price, String serialId, boolean isActive) {
+    public VehicleVariantDTO(int variantId, int modelId, String versionName, String color, String image, double price, boolean isActive) {
         this.variantId = variantId;
         this.modelId = modelId;
         this.versionName = versionName;
         this.color = color;
         this.image = image;
         this.price = price;
-        this.serialId = serialId;
         this.isActive = isActive;
     }
 
@@ -79,14 +77,6 @@ public class VehicleVariantDTO {
 
     public void setPrice(double price) {
         this.price = price;
-    }
-
-    public String getSerialId() {
-        return serialId;
-    }
-
-    public void setSerialId(String serialId) {
-        this.serialId = serialId;
     }
 
     public boolean isIsActive() {
