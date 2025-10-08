@@ -1,1 +1,70 @@
-target/
+# -------------------------
+# GLOBAL / IDE IGNORES
+# -------------------------
+.DS_Store
+Thumbs.db
+*.iml
+.idea/
+.vscode/
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# -------------------------
+# BACKEND (BE/ - Maven/Java)
+# -------------------------
+
+# Maven build artifacts
+BE/target/
+BE/pom.xml.tag
+BE/pom.xml.releaseBackup
+BE/pom.xml.versionsBackup
+BE/release.properties
+BE/dependency-reduced-pom.xml
+BE/buildNumber.properties
+
+# Compiled class files, jars, etc.
+BE/**/*.class
+BE/*.jar
+BE/*.war
+BE/*.ear
+BE/*.zip
+BE/*.tar.gz
+BE/*.rar
+
+# Log files
+BE/*.log
+
+# Maven Wrapper (if you use it)
+# Keep the wrapper files but ignore the downloaded binary
+# BE/.mvn/wrapper/maven-wrapper.jar
+BE/.mvn/wrapper/maven-wrapper.jar
+
+# -------------------------
+# FRONTEND (FE/ - Node.js/etc.)
+# -------------------------
+
+# Node modules
+FE/node_modules/
+FE/package-lock.json
+
+# Build output directories
+# Replace 'dist' or 'build' with your actual frontend build folder name if different
+FE/dist/
+FE/build/
+
+# Logs
+FE/npm-debug.log*
+FE/yarn-debug.log*
+FE/yarn-error.log*
+FE/lerna-debug.log*
+
+# OS/Editor generated files that might appear in FE
+FE/.cache/
+FE/.temp/
+FE/.nuxt/ # Nuxt.js
+FE/.vuepress/dist # VuePress
+FE/.next/ # Next.js
+FE/out/ # Next.js export
