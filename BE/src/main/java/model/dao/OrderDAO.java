@@ -8,6 +8,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import model.dto.OrderDTO;
@@ -18,7 +19,9 @@ import utils.DbUtils;
  * @author Admin
  */
 public class OrderDAO {
-    private static final String TABLE_NAME = "Order";
+    private static final String TABLE_NAME = "[Order]";
+    private static final String INSERT_ORDER = "INSERT INTO " + TABLE_NAME + 
+        " (customer_id, dealer_id, dealer_staff_id, order_date, status) VALUES (?, ?, ?, ?, ?)";
     
     private OrderDTO mapToOrder(ResultSet rs) throws SQLException {
         return new OrderDTO(
@@ -45,5 +48,26 @@ public class OrderDAO {
         return null;
     }
     
-    
+    public int create(Connection conn, OrderDTO order) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(INSERT_ORDER, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setInt(1, order.getCustomerId());
+            ps.setInt(2, order.getDealerId());
+            ps.setInt(3, order.getDealerStaffId());
+            ps.setString(4, order.getOrderDate());
+            ps.setString(5, order.getStatus());
+            
+            int affectedRows = ps.executeUpdate();
+            if (affectedRows == 0) {
+                throw new SQLException("Creating order failed, no rows affected.");
+            }
+            
+            try (ResultSet generatedKeys = ps.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    return generatedKeys.getInt(1);
+                } else {
+                    throw new SQLException("Creating order failed, no ID obtained.");
+                }
+            }
+        }
+    }
 }

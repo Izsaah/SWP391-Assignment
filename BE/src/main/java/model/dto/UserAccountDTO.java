@@ -1,5 +1,6 @@
 package model.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.List;
 
 /*
@@ -13,8 +14,10 @@ import java.util.List;
  */
 public class UserAccountDTO {
     private int userId;
-    private int customerId;  
-    private int dealerId;    
+    @JsonIgnore
+    private int customerId;
+    private int dealerId;   
+    @JsonIgnore
     private String password;
     private String email;
     private String username;
