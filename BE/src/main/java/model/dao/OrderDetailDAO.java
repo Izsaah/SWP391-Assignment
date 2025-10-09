@@ -20,14 +20,14 @@ import utils.DbUtils;
 public class OrderDetailDAO {
     private static final String TABLE_NAME = "OrderDetail";
     private static final String INSERT_ORDER_DETAIL = "INSERT INTO " + TABLE_NAME
-            + " (order_id, variant_id, quantity, unit_price) VALUES (?, ?, ?, ?)";
+            + " (order_id, serial_id, quantity, unit_price) VALUES (?, ?, ?, ?)";
 
     
     private OrderDetailDTO mapToOrderDetail(ResultSet rs) throws SQLException {
         return new OrderDetailDTO(
             rs.getInt("order_detail_id"),
             rs.getInt("order_id"),
-            rs.getInt("variant_id"),
+            rs.getString("serial_id"),
             rs.getString("quantity"),
             rs.getDouble("unit_price")
         );
@@ -50,7 +50,7 @@ public class OrderDetailDAO {
     public int create(Connection conn, OrderDetailDTO detail) throws SQLException {
         try ( PreparedStatement ps = conn.prepareStatement(INSERT_ORDER_DETAIL)) {
             ps.setInt(1, detail.getOrderId());       // use orderId from Order
-            ps.setInt(2, detail.getVariantId());     // variantId
+            ps.setString(2, detail.getSerialId());     // variantId
             ps.setInt(3, Integer.parseInt(detail.getQuantity())); // quantity as int
             ps.setDouble(4, detail.getUnitPrice());  // unit price
 
@@ -59,6 +59,16 @@ public class OrderDetailDAO {
                 throw new SQLException("Creating order detail failed, no rows affected.");
             }
             return affectedRows;
+        }
+    }
+    
+    
+    public int updateSerialId(Connection conn, int orderDetailId, String serialId) throws SQLException {
+        String sql = "UPDATE OrderDetail SET serial_id = ? WHERE order_detail_id = ?";
+        try ( PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, serialId);
+            ps.setInt(2, orderDetailId);
+            return ps.executeUpdate();
         }
     }
 }

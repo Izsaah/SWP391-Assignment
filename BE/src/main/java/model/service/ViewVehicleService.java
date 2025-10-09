@@ -22,11 +22,11 @@ public class ViewVehicleService {
         List<VehicleModelDTO> models = modelDAO.viewVehicleModelIsActive();
         if (models != null) {
             for (VehicleModelDTO model : models) {
-                List<VehicleVariantDTO> variants = variantDAO.viewVehicleVariantIsActive(String.valueOf(model.getModelId()));
+                List<VehicleVariantDTO> variants = variantDAO.viewVehicleVariantIsActive(model.getModelId());
                 model.setLists(variants);
             }
         }
         return models;
     }
- 
+
 }

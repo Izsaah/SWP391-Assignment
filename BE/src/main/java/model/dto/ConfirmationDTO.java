@@ -12,19 +12,19 @@ package model.dto;
 public class ConfirmationDTO {
     private int confirmationId;
     private int userId;
-    private int specialOrderId;
+    private int orderDetailId;
     private String agreement;
-    private String status;
+    private String date;
 
     public ConfirmationDTO() {
     }
 
-    public ConfirmationDTO(int confirmationId, int userId, int specialOrderId, String agreement, String status) {
+    public ConfirmationDTO(int confirmationId, int userId, int orderDetailId, String agreement, String date) {
         this.confirmationId = confirmationId;
         this.userId = userId;
-        this.specialOrderId = specialOrderId;
+        this.orderDetailId = orderDetailId;
         this.agreement = agreement;
-        this.status = status;
+        this.date = date;
     }
 
     public int getConfirmationId() {
@@ -43,12 +43,12 @@ public class ConfirmationDTO {
         this.userId = userId;
     }
 
-    public int getSpecialOrderId() {
-        return specialOrderId;
+    public int getOrderDetailId() {
+        return orderDetailId;
     }
 
-    public void setSpecialOrderId(int specialOrderId) {
-        this.specialOrderId = specialOrderId;
+    public void setOrderDetailId(int orderDetailId) {
+        this.orderDetailId = orderDetailId;
     }
 
     public String getAgreement() {
@@ -59,11 +59,13 @@ public class ConfirmationDTO {
         this.agreement = agreement;
     }
 
-    public String getStatus() {
-        return status;
+    public String getDate() {
+        return date;
     }
 
-    public void setStatus(String status) {
-        this.status = status;
+    public void setDate(String date) {
+        this.date = date;
     }
+
+    
 }

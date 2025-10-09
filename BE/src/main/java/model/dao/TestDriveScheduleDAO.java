@@ -11,7 +11,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
-import model.dto.ConfirmationDTO;
 import model.dto.TestDriveScheduleDTO;
 import utils.DbUtils;
 
@@ -27,7 +26,7 @@ public class TestDriveScheduleDAO {
         return new TestDriveScheduleDTO(
                 rs.getInt("appointment_id"),
                 rs.getInt("customer_id"),
-                rs.getInt("model_id"),
+                rs.getString("serial_id"),
                 rs.getString("scheduled_id"),
                 rs.getString("date"),
                 rs.getString("status")
@@ -57,17 +56,17 @@ public class TestDriveScheduleDAO {
     public TestDriveScheduleDTO create(
    // This parameter will now be ignored for the generated key logic
             int customer_id,
-            int model_id,
+            String serial_id,
             String schedule_id,
             String date,
             String status) {
 
         // 1. Check for existing schedule with the same model_id and date
         // NOTE: Ensure TABLE_NAME is correctly defined (e.g., "TestDriveSchedule")
-        String checkSql = "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE model_id = ? AND date = ?";
+        String checkSql = "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE serial_id = ? AND date = ?";
         try ( Connection conn = DbUtils.getConnection();  PreparedStatement checkPs = conn.prepareStatement(checkSql)) {
 
-            checkPs.setInt(1, model_id);
+            checkPs.setString(1, serial_id);
             checkPs.setString(2, date);
 
             try ( ResultSet rs = checkPs.executeQuery()) {
@@ -86,7 +85,7 @@ public class TestDriveScheduleDAO {
         // 2. Proceed with insertion and retrieval of the generated key
         // Note: appointment_id is removed from the column list since it's auto-generated
         String insertSql = "INSERT INTO " + TABLE_NAME
-                + " (customer_id, model_id, scheduled_id, date, status)"
+                + " (customer_id, serial_id, scheduled_id, date, status)"
                 + " VALUES (?, ?, ?, ?, ?)"; // Only 5 placeholders now
 
         int generatedAppointmentId = -1; // Initialize a variable to hold the generated key
@@ -96,7 +95,7 @@ public class TestDriveScheduleDAO {
 
             // The parameters mapping should be checked against the SQL statement:
             insertPs.setInt(1, customer_id);
-            insertPs.setInt(2, model_id);
+            insertPs.setString(2, serial_id);
             insertPs.setString(3, schedule_id);
             insertPs.setString(4, date);
             insertPs.setString(5, status);
@@ -116,7 +115,7 @@ public class TestDriveScheduleDAO {
                     return new TestDriveScheduleDTO(
                             generatedAppointmentId, // Use the generated ID
                             customer_id,
-                            model_id,
+                            serial_id,
                             schedule_id,
                             date,
                             status

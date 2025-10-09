@@ -6,9 +6,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import model.dto.ConfirmationDTO;
 import model.dto.TestDriveScheduleDTO;
-import model.service.ConfirmationForSpecialOrder;
 import model.service.CreateTestDriveScheduleService;
 import utils.ResponseUtils;
 

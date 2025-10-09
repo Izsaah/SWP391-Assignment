@@ -12,7 +12,7 @@ package model.dto;
 public class TestDriveScheduleDTO {
     private int appointmentId;
     private int customerId;
-    private int modelId;
+    private String serialId;
     private String scheduledId;
     private String date;
     private String status;
@@ -20,10 +20,10 @@ public class TestDriveScheduleDTO {
     public TestDriveScheduleDTO() {
     }
 
-    public TestDriveScheduleDTO(int appointmentId, int customerId, int modelId, String scheduledId, String date, String status) {
+    public TestDriveScheduleDTO(int appointmentId, int customerId, String serialId, String scheduledId, String date, String status) {
         this.appointmentId = appointmentId;
         this.customerId = customerId;
-        this.modelId = modelId;
+        this.serialId = serialId;
         this.scheduledId = scheduledId;
         this.date = date;
         this.status = status;
@@ -45,12 +45,12 @@ public class TestDriveScheduleDTO {
         this.customerId = customerId;
     }
 
-    public int getModelId() {
-        return modelId;
+    public String getSerialId() {
+        return serialId;
     }
 
-    public void setModelId(int modelId) {
-        this.modelId = modelId;
+    public void setSerialId(String serialId) {
+        this.serialId = serialId;
     }
 
     public String getScheduledId() {

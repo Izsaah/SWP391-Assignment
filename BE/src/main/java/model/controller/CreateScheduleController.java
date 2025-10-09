@@ -10,11 +10,8 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import model.dto.SpecialOrderDTO;
 import model.dto.TestDriveScheduleDTO;
-import model.service.CreateSpecialOrderService;
 import model.service.CreateTestDriveScheduleService;
-import utils.JwtUtil;
 import utils.ResponseUtils;
 
 /**
@@ -30,12 +27,12 @@ public class CreateScheduleController extends HttpServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
               
         int customerId = Integer.parseInt(req.getParameter("customer_id"));
-        int modelId = Integer.parseInt(req.getParameter("model_id"));
+        String serial_id = req.getParameter("serial_id");
 
         String schedule_id = req.getParameter("schedule_id");// Write a schedule id gen
         String date = req.getParameter("date");
         String status=req.getParameter("status");
-        TestDriveScheduleDTO schedule = CTDService.createTestDriveSchedule( customerId, modelId, schedule_id, date, status);
+        TestDriveScheduleDTO schedule = CTDService.createTestDriveSchedule( customerId, serial_id, schedule_id, date, status);
         if (schedule == null) {
             ResponseUtils.error(resp, "Failed to create special order");
         } else {

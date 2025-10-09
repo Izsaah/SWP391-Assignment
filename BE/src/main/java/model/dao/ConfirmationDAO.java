@@ -25,10 +25,10 @@ public class ConfirmationDAO {
     private ConfirmationDTO mapToConfirmation(ResultSet rs) throws SQLException {
         return new ConfirmationDTO(
                 rs.getInt("confirmation_id"),
-                rs.getInt("user_id"),
-                rs.getInt("special_order_id"),
+                rs.getInt("staff_admin"),
+                rs.getInt("order_detail_id"),
                 rs.getString("agreement"),
-                rs.getString("status")
+                rs.getString("date_time")
         );
     }
 
@@ -50,21 +50,21 @@ public class ConfirmationDAO {
         return null;
     }
 
-    public ConfirmationDTO insert(int special_order_id, String agreement, String status) throws ClassNotFoundException, SQLException {
+    public ConfirmationDTO insert(int order_detail_id, String agreement, String date) throws ClassNotFoundException, SQLException {
 
         ConfirmationDTO confirmation = new ConfirmationDTO();
 
-        confirmation.setSpecialOrderId(special_order_id);
+        confirmation.setOrderDetailId(order_detail_id);
         confirmation.setAgreement(agreement);
-        confirmation.setStatus(status);
+        confirmation.setDate(date);
 
-        String sql = "INSERT INTO " + TABLE_NAME + " (special_order_id,agreement,status) VALUES(?,?,?)";
+        String sql = "INSERT INTO " + TABLE_NAME + " (order_detail_id,agreement,date_time) VALUES(?,?,?)";
 
         try (Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
-            ps.setInt(1, special_order_id);
+            ps.setInt(1, order_detail_id);
             ps.setString(2, agreement);
-            ps.setString(3, status);
+            ps.setString(3, date);
 
             if (ps.executeUpdate() > 0) {
                 try (ResultSet rs = ps.getGeneratedKeys()) {
@@ -81,27 +81,22 @@ public class ConfirmationDAO {
         return null;
     }
 
-    public ConfirmationDTO getConfirmationBySpecialOrderId(int id) {
+    public ConfirmationDTO getConfirmationByOrderDetailId(int id) {
         // Corrected to safely handle no results
-        List<ConfirmationDTO> results = retrieve("special_order_id=?", id);
+        List<ConfirmationDTO> results = retrieve("order_detail_id =?", id);
         if (results != null && !results.isEmpty()) {
             return results.get(0);
         }
         return null;
     }
 
-    /**
-     * Updates only the status of a specific confirmation record and returns the updated DTO.
-     * @param confirmationId The unique ID of the confirmation to update.
-     * @param newStatus The new status value (e.g., "APPROVED", "DENIED", "COMPLETED").
-     * @return The updated ConfirmationDTO object, or null if the update failed.
-     */
-    public ConfirmationDTO updateStatus(int confirmationId, String newStatus) {
+    
+    public ConfirmationDTO updateStatus(int confirmationId, String agreement) {
         String updateSql = "UPDATE " + TABLE_NAME + " SET status = ? WHERE confirmation_id = ?";
 
         try (Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(updateSql)) {
 
-            ps.setString(1, newStatus);
+            ps.setString(1, agreement);
             ps.setInt(2, confirmationId);
 
             // 1. Execute the update

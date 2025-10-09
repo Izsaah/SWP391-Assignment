@@ -26,13 +26,14 @@ public class CreateOrderController extends HttpServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         try {
             // Parse parameters manually
-            int customerId = parseInt(req.getParameter("customerId"));
-            int dealerId = parseInt(req.getParameter("dealerId"));
-            int dealerStaffId = parseInt(req.getParameter("dealerStaffId"));
-            int variantId = parseInt(req.getParameter("variantId"));
-            int quantity = parseInt(req.getParameter("quantity"));
-            double unitPrice = parseDouble(req.getParameter("unitPrice"));
+            int customerId = Integer.parseInt(req.getParameter("customerId"));
+            int dealerId = Integer.parseInt(req.getParameter("dealerId"));
+            int modelId = Integer.parseInt(req.getParameter("modelId"));
+            int variantId = Integer.parseInt(req.getParameter("variantId"));
+            int quantity = Integer.parseInt(req.getParameter("quantity"));
+            double unitPrice = Double.parseDouble(req.getParameter("unitPrice"));
             String status = "Pending";
+            boolean isCustom = Boolean.parseBoolean(req.getParameter("isCustom"));
 
             // Validate required fields
             if (status == null || status.trim().isEmpty()) {
@@ -41,8 +42,8 @@ public class CreateOrderController extends HttpServlet {
             }
 
             // Call service
-            int orderId = service.HandlingCreateOrder(customerId, dealerId, dealerStaffId,
-                                             status, variantId, quantity, unitPrice);
+            int orderId = service.HandlingCreateOrder(customerId, dealerId, modelId,
+                                             status, variantId, quantity, unitPrice, isCustom);
 
             if (orderId > 0) {
                 ResponseUtils.success(resp, "Order created successfully", "Order ID: " + orderId);
@@ -58,18 +59,5 @@ public class CreateOrderController extends HttpServlet {
         }
     }
 
-    private int parseInt(String value) {
-        if (value == null || value.trim().isEmpty()) {
-            throw new NumberFormatException();
-        }
-        return Integer.parseInt(value.trim());
-    }
-
-    private double parseDouble(String value) {
-        if (value == null || value.trim().isEmpty()) {
-            throw new NumberFormatException();
-        }
-        return Double.parseDouble(value.trim());
-    }
 
 }

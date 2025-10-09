@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.List;
 import model.dao.CustomerDAO;
 import model.dao.TestDriveScheduleDAO;
-import model.dto.ConfirmationDTO;
 import model.dto.CustomerDTO;
 import model.dto.TestDriveScheduleDTO;
 
@@ -22,11 +21,11 @@ public class CreateTestDriveScheduleService {
     private final CustomerDAO CDAO = new CustomerDAO();
     private final CreateCustomerService CCS = new CreateCustomerService();
 
-    public TestDriveScheduleDTO createTestDriveSchedule( int customer_id, int model_id, String schedule_id, String date, String status) {
+    public TestDriveScheduleDTO createTestDriveSchedule( int customer_id, String serial_id, String schedule_id, String date, String status) {
         if (status == null || !status.equalsIgnoreCase("APPROVED")) {
             status = "PENDING";
         }
-        return TDDAO.create( customer_id, model_id, schedule_id, date, status);
+        return TDDAO.create( customer_id, serial_id, schedule_id, date, status);
     }
 
     public List<CustomerDTO> getTestDriveScheduleByCustomer(String name) {

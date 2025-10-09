@@ -21,14 +21,14 @@ import utils.DbUtils;
 public class OrderDAO {
     private static final String TABLE_NAME = "[Order]";
     private static final String INSERT_ORDER = "INSERT INTO " + TABLE_NAME + 
-        " (customer_id, dealer_id, dealer_staff_id, order_date, status) VALUES (?, ?, ?, ?, ?)";
+        " (customer_id, dealer_id, model_id, order_date, status) VALUES (?, ?, ?, ?, ?)";
     
     private OrderDTO mapToOrder(ResultSet rs) throws SQLException {
         return new OrderDTO(
             rs.getInt("order_id"),
             rs.getInt("customer_id"),
             rs.getInt("dealer_id"),
-            rs.getInt("dealer_staff_id"),
+            rs.getInt("model_id"),
             rs.getString("order_date"),
             rs.getString("status")
         );
@@ -52,7 +52,7 @@ public class OrderDAO {
         try (PreparedStatement ps = conn.prepareStatement(INSERT_ORDER, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, order.getCustomerId());
             ps.setInt(2, order.getDealerId());
-            ps.setInt(3, order.getDealerStaffId());
+            ps.setInt(3, order.getModelId());
             ps.setString(4, order.getOrderDate());
             ps.setString(5, order.getStatus());
             

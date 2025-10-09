@@ -12,17 +12,17 @@ package model.dto;
 public class OrderDetailDTO {
     private int orderDetailId;
     private int orderId;
-    private int variantId;
+    private String serialId;
     private String quantity;
     private double unitPrice;
 
     public OrderDetailDTO() {
     }
 
-    public OrderDetailDTO(int orderDetailId, int orderId, int variantId, String quantity, double unitPrice) {
+    public OrderDetailDTO(int orderDetailId, int orderId, String serialId, String quantity, double unitPrice) {
         this.orderDetailId = orderDetailId;
         this.orderId = orderId;
-        this.variantId = variantId;
+        this.serialId = serialId;
         this.quantity = quantity;
         this.unitPrice = unitPrice;
     }
@@ -43,12 +43,12 @@ public class OrderDetailDTO {
         this.orderId = orderId;
     }
 
-    public int getVariantId() {
-        return variantId;
+    public String getSerialId() {
+        return serialId;
     }
 
-    public void setVariantId(int variantId) {
-        this.variantId = variantId;
+    public void setSerialId(String serialId) {
+        this.serialId = serialId;
     }
 
     public String getQuantity() {

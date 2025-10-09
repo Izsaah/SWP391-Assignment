@@ -4,11 +4,7 @@
  */
 package model.service;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
-import javafx.print.Collation;
 import model.dao.VehicleModelDAO;
 import model.dao.VehicleVariantDAO;
 import model.dto.VehicleModelDTO;
@@ -25,7 +21,7 @@ public class CompareModelFeaturesService {
         List<VehicleModelDTO> models=modelDAO.SearchVehicleModel(VehicleName);
      if (models != null) {
             for (VehicleModelDTO model : models) {
-                List<VehicleVariantDTO> variants = variantDAO.viewVehicleVariantIsActive(String.valueOf(model.getModelId()));
+                List<VehicleVariantDTO> variants = variantDAO.viewVehicleVariantIsActive(model.getModelId());
                 model.setLists(variants);
             }
         }
