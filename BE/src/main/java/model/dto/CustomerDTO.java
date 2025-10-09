@@ -1,5 +1,7 @@
 package model.dto;
 
+import java.util.List;
+
 /*
  * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
@@ -15,7 +17,44 @@ public class CustomerDTO {
     private String address;
     private String email;
     private String phoneNumber;
+    private TestDriveScheduleDTO testDriveSchedule;
+    private List<FeedbackDTO> feedBackList;
 
+    public CustomerDTO(int customerId, String name, String address, String email, String phoneNumber, TestDriveScheduleDTO testDriveSchedule, List<FeedbackDTO> feedBackList) {
+        this.customerId = customerId;
+        this.name = name;
+        this.address = address;
+        this.email = email;
+        this.phoneNumber = phoneNumber;
+        this.testDriveSchedule = testDriveSchedule;
+        this.feedBackList = feedBackList;
+    }
+
+    public List<FeedbackDTO> getFeedBackList() {
+        return feedBackList;
+    }
+
+    public void setFeedBackList(List<FeedbackDTO> feedBackList) {
+        this.feedBackList = feedBackList;
+    }
+    
+    public CustomerDTO(int customerId, String name, String address, String email, String phoneNumber, TestDriveScheduleDTO testDriveSchedule) {
+        this.customerId = customerId;
+        this.name = name;
+        this.address = address;
+        this.email = email;
+        this.phoneNumber = phoneNumber;
+        this.testDriveSchedule = testDriveSchedule;
+    }
+
+    public TestDriveScheduleDTO getTestDriveSchedule() {
+        return testDriveSchedule;
+    }
+
+    public void setTestDriveSchedule(TestDriveScheduleDTO testDriveSchedule) {
+        this.testDriveSchedule = testDriveSchedule;
+    }
+    
     public CustomerDTO() {
     }
 

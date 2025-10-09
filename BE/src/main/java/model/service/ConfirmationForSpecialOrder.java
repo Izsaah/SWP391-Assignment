@@ -32,25 +32,18 @@ public class ConfirmationForSpecialOrder {
         return CDAO.insert(special_order_id, agreement, status);
     }
     
-    /**
-     * Updates the confirmation status only if the newStatus is not blank.
-     * @param confirmationId The ID of the confirmation.
-     * @param newStatus The status to set.
-     * @return The updated ConfirmationDTO, or null if update failed or status was blank.
-     */
+   
     public ConfirmationDTO UpdateConfirmation(int confirmationId, String newStatus) {
         
-        // Use the same logic as your updateIfNotBlank helper, 
-        // as the helper itself requires a DTO to set the value on.
+       
         
         if (newStatus != null && !newStatus.trim().isEmpty()) {
             
-            // The check passed, now call the DAO to perform the update.
-            // The CDAO.updateStatus method already returns the updated DTO.
+           
             return CDAO.updateStatus(confirmationId, newStatus);
         }
         
-        // The newStatus was null or blank, so no update was performed.
+
         return null;
     }
 }
