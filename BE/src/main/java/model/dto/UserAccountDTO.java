@@ -27,9 +27,8 @@ public class UserAccountDTO {
     public UserAccountDTO() {
     }
 
-    public UserAccountDTO(int userId, int customerId, int dealerId, String email, String username, String phoneNumber, List<RoleDTO> roles) {
+    public UserAccountDTO(int userId, int dealerId, String email, String username, String phoneNumber, List<RoleDTO> roles) {
         this.userId = userId;
-        this.customerId = customerId;
         this.dealerId = dealerId;
         this.email = email;
         this.username = username;

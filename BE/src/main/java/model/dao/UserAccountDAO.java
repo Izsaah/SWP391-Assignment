@@ -26,7 +26,6 @@ public class UserAccountDAO {
     private UserAccountDTO mapToUser(ResultSet rs) throws SQLException {
         return new UserAccountDTO(
                 rs.getInt("user_id"),
-                rs.getInt("customer_id"),
                 rs.getInt("dealer_id"),
                 rs.getString("email"),
                 rs.getString("username"),
