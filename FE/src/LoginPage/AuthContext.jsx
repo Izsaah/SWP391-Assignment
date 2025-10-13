@@ -1,43 +1,74 @@
-import React, { useEffect , createContext , useState , useContext } from 'react';
-import { auth } from '../firebase/Firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import React, { createContext , useState , useContext, useEffect } from 'react';
+import axios from 'axios';
 
-
- const AuthContext = createContext();
- export function useAuth() {
+const AuthContext = createContext();
+export function useAuth() {
   return useContext(AuthContext);
 }
 
 export function AuthProvider({ children }) {
     const [currentUser, setCurrentUser] = useState(null);
-    const [userLoggingIn, setUserLoggingIn] = useState(false);
-    const [isEmailUser, setIsEmailUser] = useState(false);
-    const [loading, setLoading] = useState(true);
+    const [token , setToken] = useState(null);
+    const [loading , setLoading] = useState(true);
+    const [isAuthenticated , setIsAuthenticated] = useState(false);
 
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, initializeUser)
-        return unsubscribe;
-    }, []);
+    
+        useEffect(() => {
+            const savedToken= localStorage.getItem('token');
+            const savedUser = localStorage.getItem('user');
+            if (savedToken && savedUser) {
+                setToken(savedToken);
+                setCurrentUser(JSON.parse(savedUser));
+                setIsAuthenticated(true);
 
-    async function initializeUser(user) {
-        if (user) {
-            setCurrentUser({...user});
-            const isEmail = user.providerData.some((provider) => provider.providerId === 'password');
-            setIsEmailUser(isEmail);
-            setUserLoggingIn(true);
-        } else {
-            setCurrentUser(null);
-            setUserLoggingIn(false);
+                
+            }
+            setLoading(false);
+        }, []);
+
+    // Mock login function - replace with your actual authentication logic
+    const login = async (email, password) => {
+        try{
+
+            const res = await axios.post(`${import.meta.env.VITE_API_URL}/login`, { email, password });
+            if (res.data.token) {
+                localStorage.setItem('token', res.data.token);
+                localStorage.setItem('user', JSON.stringify(res.data.user));
+                setToken(res.data.token);
+                setCurrentUser(res.data.user);
+                setIsAuthenticated(true);
+
+                return {success : true};
+            }
+        } catch (error) {
+            console.error("Login failed:", error);
         }
-        setLoading(false);
-    }
-    const value = { currentUser, userLoggingIn ,isEmailUser, loading};
+    };
+
+  
+
+    // Mock logout function
+    const logout = () => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setToken(null);
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+    };
+
+    const value = { 
+        currentUser, 
+        login,
+        token,
+        loading,
+        isAuthenticated,
+        logout
+    };
+    
     return (
         <AuthContext.Provider value={value}>
-            {!loading && children}
+            {children}
         </AuthContext.Provider>
     );
-
 }
 
- 

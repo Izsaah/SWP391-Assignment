@@ -1,54 +1,43 @@
 import React, { useState } from 'react';
-import { Navigate } from 'react-router';
+import { Navigate, useNavigate } from 'react-router';
 import ReactImg from '../assets/car2.jpg'
 import { FaGoogle } from "react-icons/fa";
-import { doSignInWithEmailAndPassword, doSignInWithGoogle } from '../firebase/auth';
 import { useAuth } from './AuthContext';
 
 
 export default function LoginPage() {
-  const { userLoggingIn } = useAuth();
+        const { login } = useAuth();
+        const [email, setEmail] = useState('');
+        const [password, setPassword] = useState('');
+        const navigate = useNavigate();
+        const [error, setError] = useState('');
+        const [loading, setLoading] = useState(false);
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isSignIn, setIsSignIn] = useState(false);
-  const [error, setError] = useState(null);
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
 
-  const onSubmit = async (e) => {
-    e.preventDefault();
-    if (!isSignIn) {
-      setIsSignIn(true);
-      try{
-        await doSignInWithEmailAndPassword(email, password);
-        setError(null);
-      } catch(error) {
-        if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password") {
-        setError("Email hoặc mật khẩu không chính xác!");
-     } else {
-        setError("Đăng nhập thất bại. Vui lòng thử lại!");
-  }
-        setIsSignIn(false);
-      }
-    }
-  };
+        // Call the login function from AuthContext
+        try {
+          const res = await login(email, password);
+          if (res.success) {
+            navigate('/dashboard');
+          } else {
+            setError(res.message || 'Login failed. Please check your credentials.');
+          }
+        } catch (err) {
+          console.error('Login failed:', err);
+          setError('An error occurred. Please try again later.');
+        }
+        setLoading(false);
+      };
 
-
-    const onGoogleSignIn = async (e) => {
-      e.preventDefault();
-      if (!isSignIn) {
-        setIsSignIn(true);
-        doSignInWithGoogle().catch((error) => {
-          setError(error.message || "Google sign-in failed");
-          setIsSignIn(false);
-        });
-      }
-    }
 
 
   return (
     <div className="flex justify-center items-center min-h-screen bg-gradient-to-r from-gray-100 to-gray-200">
-      {userLoggingIn && (<Navigate to="/dashboard" replace ={true} />)}
-      {console.log(userLoggingIn)}
+      
       <div className="flex w-[1400px] h-[700px] bg-white shadow-2xl rounded-2xl overflow-hidden">
         
         {/* Left - Sign In */}
@@ -58,12 +47,12 @@ export default function LoginPage() {
           <p className="text-gray-500 mb-4">or use your email password</p>
           <button
             className="flex items-center justify-center bg-white w-full border p-2 mb-4 rounded-md hover:bg-gray-100"
-            onClick={onGoogleSignIn}
+            onClick={() => alert('Google Sign-In not implemented')}
           >
             <FaGoogle className="mr-2" /> Sign in with Google
           </button>
           {/* Form */}
-          <form onSubmit={onSubmit} className="w-full">
+          <form onSubmit={handleSubmit} className="w-full">
             <input
               type="email"
               value={email}
@@ -88,10 +77,10 @@ export default function LoginPage() {
             )}
             <button
               type="submit"
-              disabled={isSignIn}
-              className={`w-full px-4 py-2 mt-4 my-2 text-white font-medium rounded-lg ${isSignIn ? 'bg-gray-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-xl transition duration-300'}`}
+              disabled={loading}
+              className={`w-full px-4 py-2 mt-4 my-2 text-white font-medium rounded-lg ${loading ? 'bg-gray-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-xl transition duration-300'}`}
             >
-              {isSignIn ? 'Signing In...' : 'Sign In'}
+              {loading ? 'Signing In...' : 'Sign In'}
             </button>
           </form>
         </div>
