@@ -18,7 +18,7 @@ import json.ApiResponse;
 public class ResponseUtils {
 
     private static final ObjectMapper mapper = new ObjectMapper();
-
+    
     public static <T> void success(HttpServletResponse resp, String message, T data) throws IOException {
         resp.setContentType("application/json");
         resp.setCharacterEncoding("UTF-8");
