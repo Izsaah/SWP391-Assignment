@@ -17,24 +17,17 @@ public class CustomerDTO {
     private String address;
     private String email;
     private String phoneNumber;
-<<<<<<< HEAD
-    private TestDriveScheduleDTO testDriveSchedule;
-    private List<FeedbackDTO> feedBackList;
+    private TestDriveScheduleDTO testDriveSchedule; // Kept from BE
+    private List<FeedbackDTO> feedBackList;         // Kept from BE
 
     public CustomerDTO(int customerId, String name, String address, String email, String phoneNumber, TestDriveScheduleDTO testDriveSchedule, List<FeedbackDTO> feedBackList) {
-=======
-    private List<SpecialOrderDTO> specialOrderList;
-
-    public CustomerDTO(int customerId, String name, String address, String email, String phoneNumber, List<SpecialOrderDTO> specialOrderList) {
->>>>>>> master
         this.customerId = customerId;
         this.name = name;
         this.address = address;
         this.email = email;
         this.phoneNumber = phoneNumber;
-<<<<<<< HEAD
-        this.testDriveSchedule = testDriveSchedule;
-        this.feedBackList = feedBackList;
+        this.testDriveSchedule = testDriveSchedule; // Kept from BE
+        this.feedBackList = feedBackList;           // Kept from BE
     }
 
     public List<FeedbackDTO> getFeedBackList() {
@@ -59,18 +52,7 @@ public class CustomerDTO {
     }
 
     public void setTestDriveSchedule(TestDriveScheduleDTO testDriveSchedule) {
-        this.testDriveSchedule = testDriveSchedule;
-=======
-        this.specialOrderList = specialOrderList;
-    }
-
-    public List<SpecialOrderDTO> getSpecialOrderList() {
-        return specialOrderList;
-    }
-
-    public void setSpecialOrderList(List<SpecialOrderDTO> specialOrderList) {
-        this.specialOrderList = specialOrderList;
->>>>>>> master
+        this.testDriveSchedule = testDriveSchedule; // Kept from BE
     }
     
     public CustomerDTO() {

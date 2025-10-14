@@ -7,28 +7,26 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
-<<<<<<< HEAD
 import java.util.Map;
-import model.service.CompareModelFeaturesService;
+import model.service.CompareModelService; // <--- CHANGED FROM CompareModelFeaturesService
 import utils.RequestUtils;
-=======
-import model.service.CompareModelService;
-import model.service.ViewVehicleService;
->>>>>>> master
 import utils.ResponseUtils;
 
 @WebServlet("/api/public/compareVehicle")
 public class CompareModelFeaturesController extends HttpServlet {
 
-    private final CompareModelService service = new CompareModelService();
+    // IMPORTANT: Assuming CompareModelService is the correct, final class name.
+    private final CompareModelService service = new CompareModelService(); // <--- CHANGED
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
         try {
+            // Using RequestUtils from BE to parse parameters
             Map<String, Object> params = RequestUtils.extractParams(req);
             String vehicleName = String.valueOf(params.get("vehicleName"));
-            Object searchResult = service.HandlingSearchVehicleByVehicleName(vehicleName);
+            // Corrected service method call based on BE service class
+            Object searchResult = service.HandlingSearchVehicleByVehicleName(vehicleName); 
 
             if (searchResult != null && !((List<?>) searchResult).isEmpty()) {
                 ResponseUtils.success(resp, "success", searchResult);
