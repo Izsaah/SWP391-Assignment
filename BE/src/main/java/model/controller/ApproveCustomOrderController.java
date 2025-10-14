@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/JSP_Servlet/Servlet.java to edit this template
- */
 package model.controller;
 
 import jakarta.servlet.ServletException;
@@ -10,13 +6,11 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Map;
 import model.service.CreateOrderService;
+import utils.RequestUtils;
 import utils.ResponseUtils;
 
-/**
- *
- * @author Admin
- */
 @WebServlet("/api/staff/approveCustomOrder")
 public class ApproveCustomOrderController extends HttpServlet {
 
@@ -25,14 +19,16 @@ public class ApproveCustomOrderController extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         try {
-            int orderId = Integer.parseInt(req.getParameter("orderId"));
-            boolean isAgree = Boolean.parseBoolean(req.getParameter("isAgree"));
-            double unitPrice = Double.parseDouble(req.getParameter("unitPrice"));
+            Map<String, Object> params = RequestUtils.extractParams(req);
+
+            int orderId = Integer.parseInt(params.get("orderId").toString());
+            boolean isAgree = Boolean.parseBoolean(params.get("isAgree").toString());
+            double unitPrice = Double.parseDouble(params.get("unitPrice").toString());
 
             boolean result = service.approveCustomOrder(orderId, isAgree, unitPrice);
 
             if (result) {
-                ResponseUtils.success(resp, "Custom order processed successfully", 
+                ResponseUtils.success(resp, "Custom order processed successfully",
                         isAgree ? "Approved" : "Disagreed");
             } else {
                 ResponseUtils.error(resp, "Failed to process custom order");

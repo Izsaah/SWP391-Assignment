@@ -14,7 +14,7 @@ import model.dto.VehicleVariantDTO;
  *
  * @author ACER
  */
-public class CompareModelFeaturesService {
+public class CompareModelService {
      private VehicleModelDAO modelDAO = new VehicleModelDAO();
      private VehicleVariantDAO variantDAO = new VehicleVariantDAO();
     public List<VehicleModelDTO> HandlingSearchVehicleByVehicleName(String VehicleName){

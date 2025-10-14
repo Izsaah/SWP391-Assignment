@@ -17,8 +17,8 @@ public class CustomerDTO {
     private String address;
     private String email;
     private String phoneNumber;
-    private TestDriveScheduleDTO testDriveSchedule;
-    private List<FeedbackDTO> feedBackList;
+    private TestDriveScheduleDTO testDriveSchedule; // Kept from BE
+    private List<FeedbackDTO> feedBackList;         // Kept from BE
 
     public CustomerDTO(int customerId, String name, String address, String email, String phoneNumber, TestDriveScheduleDTO testDriveSchedule, List<FeedbackDTO> feedBackList) {
         this.customerId = customerId;
@@ -26,8 +26,8 @@ public class CustomerDTO {
         this.address = address;
         this.email = email;
         this.phoneNumber = phoneNumber;
-        this.testDriveSchedule = testDriveSchedule;
-        this.feedBackList = feedBackList;
+        this.testDriveSchedule = testDriveSchedule; // Kept from BE
+        this.feedBackList = feedBackList;           // Kept from BE
     }
 
     public List<FeedbackDTO> getFeedBackList() {
@@ -52,7 +52,7 @@ public class CustomerDTO {
     }
 
     public void setTestDriveSchedule(TestDriveScheduleDTO testDriveSchedule) {
-        this.testDriveSchedule = testDriveSchedule;
+        this.testDriveSchedule = testDriveSchedule; // Kept from BE
     }
     
     public CustomerDTO() {

@@ -34,7 +34,7 @@ public class ConfirmationDAO {
 
     public List<ConfirmationDTO> retrieve(String condition, Object... params) {
         String sql = "SELECT * FROM " + TABLE_NAME + " WHERE " + condition;
-        try (Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = DbUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             for (int i = 0; i < params.length; i++) {
                 ps.setObject(i + 1, params[i]);
             }
@@ -50,6 +50,8 @@ public class ConfirmationDAO {
         return null;
     }
 
+    // --- Methods from the BE branch (HEAD) ---
+
     public ConfirmationDTO insert(int order_detail_id, String agreement, String date) throws ClassNotFoundException, SQLException {
 
         ConfirmationDTO confirmation = new ConfirmationDTO();
@@ -60,7 +62,7 @@ public class ConfirmationDAO {
 
         String sql = "INSERT INTO " + TABLE_NAME + " (order_detail_id,agreement,date_time) VALUES(?,?,?)";
 
-        try (Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (Connection conn = DbUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             ps.setInt(1, order_detail_id);
             ps.setString(2, agreement);
@@ -94,7 +96,7 @@ public class ConfirmationDAO {
     public ConfirmationDTO updateStatus(int confirmationId, String agreement) {
         String updateSql = "UPDATE " + TABLE_NAME + " SET status = ? WHERE confirmation_id = ?";
 
-        try (Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(updateSql)) {
+        try (Connection conn = DbUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(updateSql)) {
 
             ps.setString(1, agreement);
             ps.setInt(2, confirmationId);
@@ -117,5 +119,11 @@ public class ConfirmationDAO {
 
         // Return null if the update failed or the record couldn't be retrieved
         return null;
+    }
+    
+    // --- Method from the master branch ---
+    
+    public List<ConfirmationDTO> GetConfirmationBySpecialOrderId(int id){
+        return retrieve("special_order_id=?", id);
     }
 }
