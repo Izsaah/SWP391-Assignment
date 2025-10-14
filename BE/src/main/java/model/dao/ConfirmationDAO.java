@@ -49,6 +49,7 @@ public class ConfirmationDAO {
         }
         return null;
     }
+<<<<<<< HEAD
 
     public ConfirmationDTO insert(int order_detail_id, String agreement, String date) throws ClassNotFoundException, SQLException {
 
@@ -119,3 +120,9 @@ public class ConfirmationDAO {
         return null;
     }
 }
+=======
+    public List<ConfirmationDTO> GetConfirmationBySpecialOrderId(int id){
+    return retrieve("special_order_id=?", id);
+    }
+}
+>>>>>>> master

@@ -17,15 +17,22 @@ public class CustomerDTO {
     private String address;
     private String email;
     private String phoneNumber;
+<<<<<<< HEAD
     private TestDriveScheduleDTO testDriveSchedule;
     private List<FeedbackDTO> feedBackList;
 
     public CustomerDTO(int customerId, String name, String address, String email, String phoneNumber, TestDriveScheduleDTO testDriveSchedule, List<FeedbackDTO> feedBackList) {
+=======
+    private List<SpecialOrderDTO> specialOrderList;
+
+    public CustomerDTO(int customerId, String name, String address, String email, String phoneNumber, List<SpecialOrderDTO> specialOrderList) {
+>>>>>>> master
         this.customerId = customerId;
         this.name = name;
         this.address = address;
         this.email = email;
         this.phoneNumber = phoneNumber;
+<<<<<<< HEAD
         this.testDriveSchedule = testDriveSchedule;
         this.feedBackList = feedBackList;
     }
@@ -53,6 +60,17 @@ public class CustomerDTO {
 
     public void setTestDriveSchedule(TestDriveScheduleDTO testDriveSchedule) {
         this.testDriveSchedule = testDriveSchedule;
+=======
+        this.specialOrderList = specialOrderList;
+    }
+
+    public List<SpecialOrderDTO> getSpecialOrderList() {
+        return specialOrderList;
+    }
+
+    public void setSpecialOrderList(List<SpecialOrderDTO> specialOrderList) {
+        this.specialOrderList = specialOrderList;
+>>>>>>> master
     }
     
     public CustomerDTO() {
