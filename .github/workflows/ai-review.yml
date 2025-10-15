@@ -1,12 +1,19 @@
 name: AI Code Review (Claude)
 
 on:
-  pull_request:
+   push:
+    branches:
+      - demologin         # Tự động chạy khi đẩy code lên nhánh demologin
+    paths:
+      - "FE/**"           # Giới hạn vùng FE
+
+pull_request:
     branches: [master]
     paths:
       - "FE/**"
     types: [opened, synchronize, reopened]
-  workflow_dispatch:
+
+ workflow_dispatch:
 
 permissions:
   contents: read
@@ -33,7 +40,7 @@ jobs:
       - name: Run Gemini review
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          CLAUDE_MODEL: claude-sonnet-4-5
+          CLAUDE_MODEL: gemini-2.5-flash
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |

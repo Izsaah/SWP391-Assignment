@@ -3,7 +3,7 @@ import { execSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { fetch } from "undici";
 
-const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-5";
+const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const API_KEY = process.env.ANTHROPIC_API_KEY;
 if (!API_KEY) {
   console.error("Missing ANTHROPIC_API_KEY");
@@ -73,7 +73,7 @@ Repo context:
 \`\`\`
 `;
 
-async function callClaude(content) {
+async function callGemini(content) {
   const body = {
     model: MODEL,
     max_tokens: 2000,
@@ -88,18 +88,16 @@ async function callClaude(content) {
     ],
   };
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`, {
     method: "POST",
     headers: {
-      "x-api-key": API_KEY,
-      "anthropic-version": "2023-06-01",
       "content-type": "application/json",
     },
     body: JSON.stringify(body),
   });
 
   if (!res.ok) {
-    throw new Error(`Claude API error: ${res.status} ${await res.text()}`);
+    throw new Error(`Gemini API error: ${res.status} ${await res.text()}`);
   }
   const json = await res.json();
   // Anthropic trả về mảng content blocks; lấy text của block đầu
@@ -132,7 +130,7 @@ function extractSections(text) {
 }
 
 const MAX_CHARS = 80_000;
-let reviewAll = `# AI Code Review (Claude)\n\n> Base: \`${BASE}\` → Head: \`${HEAD}\`\n\n`;
+let reviewAll = `# AI Code Review (Gemini)\n\n> Base: \`${BASE}\` → Head: \`${HEAD}\`\n\n`;
 let allIssues = [];
 
 (async () => {
