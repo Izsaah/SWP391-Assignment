@@ -25,7 +25,7 @@ public class CustomerSearchController extends HttpServlet {
     private final CustomerDAO customerDAO = new CustomerDAO();
 
     @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
         String name = req.getParameter("name");
 
