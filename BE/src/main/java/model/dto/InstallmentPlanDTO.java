@@ -14,18 +14,26 @@ public class InstallmentPlanDTO {
     private int paymentId;
     private String interestRate;
     private String termMonth;
-    private String monthlyRate;
+    private String monthlyPay;
     private String status;
 
     public InstallmentPlanDTO() {
     }
 
-    public InstallmentPlanDTO(int planId, int paymentId, String interestRate, String termMonth, String monthlyRate, String status) {
+    public InstallmentPlanDTO(int paymentId, String interestRate, String termMonth, String monthlyPay, String status) {
+        this.paymentId = paymentId;
+        this.interestRate = interestRate;
+        this.termMonth = "12";
+        this.monthlyPay = monthlyPay;
+        this.status = status;
+    }
+
+    public InstallmentPlanDTO(int planId, int paymentId, String interestRate, String termMonth, String monthlyPay, String status) {
         this.planId = planId;
         this.paymentId = paymentId;
         this.interestRate = interestRate;
-        this.termMonth = termMonth;
-        this.monthlyRate = monthlyRate;
+        this.termMonth = "12";
+        this.monthlyPay = monthlyPay;
         this.status = status;
     }
 
@@ -54,19 +62,19 @@ public class InstallmentPlanDTO {
     }
 
     public String getTermMonth() {
-        return termMonth;
+        return termMonth = "12";
     }
 
     public void setTermMonth(String termMonth) {
         this.termMonth = termMonth;
     }
 
-    public String getMonthlyRate() {
-        return monthlyRate;
+    public String getMonthlyPay() {
+        return monthlyPay;
     }
 
-    public void setMonthlyRate(String monthlyRate) {
-        this.monthlyRate = monthlyRate;
+    public void setMonthlyPay(String monthlyPay) {
+        this.monthlyPay = monthlyPay;
     }
 
     public String getStatus() {
