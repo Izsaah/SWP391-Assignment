@@ -43,5 +43,8 @@ public class PaymentDAO {
         }
         return null;
     }
- 
+    public List<PaymentDTO> getPayMentsByOrderId(int OrderId){
+    return retrieve("order_id=?", OrderId);
+    }
+
 }

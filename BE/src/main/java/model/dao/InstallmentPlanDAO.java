@@ -44,4 +44,7 @@ public class InstallmentPlanDAO {
         }
         return null;
     }
+    public List<InstallmentPlanDTO> getInstallmentPlansListByPayMentId(int paymentId){
+    return retrieve("payment_id=?", paymentId);
+    }
 }
