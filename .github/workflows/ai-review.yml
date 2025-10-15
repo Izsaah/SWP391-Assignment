@@ -1,19 +1,18 @@
 name: AI Code Review (Claude)
 
 on:
-   push:
+  
+  push:
     branches:
-      - demologin         # Tự động chạy khi đẩy code lên nhánh demologin
+      - demologin
     paths:
-      - "FE/**"           # Giới hạn vùng FE
-
-pull_request:
+      - "FE/**"
+  pull_request:
     branches: [master]
     paths:
       - "FE/**"
     types: [opened, synchronize, reopened]
-
- workflow_dispatch:
+  workflow_dispatch:
 
 permissions:
   contents: read

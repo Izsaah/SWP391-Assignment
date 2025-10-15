@@ -18,7 +18,7 @@ export default function LoginPage() {
         setLoading(true);
         setError('');
 
-        // Call the login function from AuthContext
+        // gọi hàm login từ AuthContext
         try {
           const res = await login(email, password);
           if (res.success) {
