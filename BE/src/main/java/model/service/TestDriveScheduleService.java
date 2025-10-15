@@ -15,11 +15,11 @@ import model.dto.TestDriveScheduleDTO;
  *
  * @author ACER
  */
-public class CreateTestDriveScheduleService {
+public class TestDriveScheduleService {
 
     private final TestDriveScheduleDAO TDDAO = new TestDriveScheduleDAO();
     private final CustomerDAO CDAO = new CustomerDAO();
-    private final CreateCustomerService CCS = new CreateCustomerService();
+    private final CustomerService CCS = new CustomerService();
 
     public TestDriveScheduleDTO createTestDriveSchedule( int customer_id, String serial_id, String schedule_id, String date, String status) {
         if (status == null || !status.equalsIgnoreCase("APPROVED")) {

@@ -17,7 +17,7 @@ import model.dto.FeedbackDTO;
  *
  * @author ACER
  */
-public class CreateFeedBackService {
+public class FeedBackService {
 
     private final FeedbackDAO FDAO = new FeedbackDAO();
     private final CustomerDAO CDAO = new CustomerDAO();

@@ -11,7 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import model.dto.TestDriveScheduleDTO;
-import model.service.CreateTestDriveScheduleService;
+import model.service.TestDriveScheduleService;
 import utils.ResponseUtils;
 
 /**
@@ -21,7 +21,7 @@ import utils.ResponseUtils;
 @WebServlet("/api/staff/createSchedule")
 public class CreateScheduleController extends HttpServlet {
 
-    private final CreateTestDriveScheduleService CTDService = new CreateTestDriveScheduleService();
+    private final TestDriveScheduleService CTDService = new TestDriveScheduleService();
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {

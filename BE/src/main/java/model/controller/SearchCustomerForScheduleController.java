@@ -9,14 +9,14 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import model.dto.CustomerDTO;
-import model.service.CreateTestDriveScheduleService;
+import model.service.TestDriveScheduleService;
 import utils.RequestUtils;
 import utils.ResponseUtils;
 
 @WebServlet("/api/staff/searchCustomerForSchedule")
 public class SearchCustomerForScheduleController extends HttpServlet {
 
-    private final CreateTestDriveScheduleService service = new CreateTestDriveScheduleService();
+    private final TestDriveScheduleService service = new TestDriveScheduleService();
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)

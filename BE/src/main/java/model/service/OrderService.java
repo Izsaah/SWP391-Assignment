@@ -24,7 +24,7 @@ import utils.DbUtils;
  *
  * @author Admin
  */
-public class CreateOrderService {
+public class OrderService {
 
     ConfirmationDAO confirmationDAO = new ConfirmationDAO();
     OrderDAO orderDAO = new OrderDAO();

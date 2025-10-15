@@ -7,7 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import model.dto.TestDriveScheduleDTO;
-import model.service.CreateTestDriveScheduleService;
+import model.service.TestDriveScheduleService;
 import utils.ResponseUtils;
 
 /**
@@ -17,7 +17,7 @@ import utils.ResponseUtils;
 @WebServlet("/api/staff/updateScheduleStatus")
 public class UpdateScheduleController extends HttpServlet {
 
-    private final CreateTestDriveScheduleService scheduleService = new CreateTestDriveScheduleService();
+    private final TestDriveScheduleService scheduleService = new TestDriveScheduleService();
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {

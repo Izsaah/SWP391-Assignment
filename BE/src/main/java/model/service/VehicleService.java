@@ -14,7 +14,7 @@ import model.dto.VehicleVariantDTO;
  *
  * @author Admin
  */
-public class ViewVehicleService {
+public class VehicleService {
     private VehicleModelDAO modelDAO = new VehicleModelDAO();
     private VehicleVariantDAO variantDAO = new VehicleVariantDAO();
     

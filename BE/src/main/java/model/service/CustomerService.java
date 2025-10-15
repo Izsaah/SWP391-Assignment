@@ -14,7 +14,7 @@ import utils.DbUtils;
  *
  * @author Admin
  */
-public class CreateCustomerService {
+public class CustomerService {
     private CustomerDAO customerDAO = new CustomerDAO();
     
     public int HandlingCreateCustomer(String name, String address, String email, String phoneNumber){

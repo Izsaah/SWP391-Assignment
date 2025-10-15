@@ -10,7 +10,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import model.service.CreateOrderService;
+import model.service.OrderService;
 import utils.ResponseUtils;
 
 /**
@@ -20,7 +20,7 @@ import utils.ResponseUtils;
 @WebServlet("/api/staff/createOrder")
 public class CreateOrderController extends HttpServlet {
 
-    private final CreateOrderService service = new CreateOrderService();
+    private final OrderService service = new OrderService();
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {

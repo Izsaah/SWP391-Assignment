@@ -17,7 +17,7 @@ import model.dto.VehicleVariantDTO;
  *
  * @author ACER
  */
-public class ViewPromotionForDealerService {
+public class PromotionForDealerService {
    private DealerDAO dealerDAO = new DealerDAO();
     private DealerPromotionDAO dealerPromotionDAO = new DealerPromotionDAO();
 

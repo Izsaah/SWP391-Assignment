@@ -11,7 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Map;
-import model.service.CreateCustomerService;
+import model.service.CustomerService;
 import utils.RequestUtils;
 import utils.ResponseUtils;
 
@@ -23,7 +23,7 @@ import utils.ResponseUtils;
 @WebServlet("/api/staff/createCustomer")
 public class CreateCustomerController extends HttpServlet {
 
-    private final CreateCustomerService service = new CreateCustomerService();
+    private final CustomerService service = new CustomerService();
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
