@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package model.dao;
 
 import java.sql.Connection;
@@ -14,10 +10,6 @@ import java.util.List;
 import model.dto.ConfirmationDTO;
 import utils.DbUtils;
 
-/**
- *
- * @author Admin
- */
 public class ConfirmationDAO {
 
     private static final String TABLE_NAME = "Confirmation";
@@ -32,9 +24,10 @@ public class ConfirmationDAO {
         );
     }
 
-    public List<ConfirmationDTO> retrieve(String condition, Object... params) {
+    public List<ConfirmationDTO> retrieve(String condition, Object... params) throws SQLException, ClassNotFoundException {
         String sql = "SELECT * FROM " + TABLE_NAME + " WHERE " + condition;
-        try (Connection conn = DbUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = DbUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             for (int i = 0; i < params.length; i++) {
                 ps.setObject(i + 1, params[i]);
             }
@@ -44,86 +37,81 @@ public class ConfirmationDAO {
                 list.add(mapToConfirmation(rs));
             }
             return list;
-        } catch (Exception e) {
-            e.printStackTrace();
         }
-        return null;
     }
 
-    // --- Methods from the BE branch (HEAD) ---
-
-    public ConfirmationDTO insert(int order_detail_id, String agreement, String date) throws ClassNotFoundException, SQLException {
-
+    // Transaction-aware insert method using Connection parameter
+    public ConfirmationDTO insert(Connection conn, int orderDetailId, String agreement, String date) throws SQLException {
         ConfirmationDTO confirmation = new ConfirmationDTO();
-
-        confirmation.setOrderDetailId(order_detail_id);
+        confirmation.setOrderDetailId(orderDetailId);
         confirmation.setAgreement(agreement);
         confirmation.setDate(date);
 
-        String sql = "INSERT INTO " + TABLE_NAME + " (order_detail_id,agreement,date_time) VALUES(?,?,?)";
+        String sql = "INSERT INTO " + TABLE_NAME + " (order_detail_id, agreement, date_time) VALUES(?,?,?)";
 
-        try (Connection conn = DbUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-
-            ps.setInt(1, order_detail_id);
+        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setInt(1, orderDetailId);
             ps.setString(2, agreement);
             ps.setString(3, date);
 
             if (ps.executeUpdate() > 0) {
                 try (ResultSet rs = ps.getGeneratedKeys()) {
                     if (rs.next()) {
-
                         confirmation.setConfirmationId(rs.getInt(1));
                     }
                 }
                 return confirmation;
             }
-        } catch (Exception e) {
-            e.printStackTrace();
         }
-        return null;
+        throw new SQLException("Failed to insert confirmation");
     }
 
-    public ConfirmationDTO getConfirmationByOrderDetailId(int id) {
-        // Corrected to safely handle no results
-        List<ConfirmationDTO> results = retrieve("order_detail_id =?", id);
+    // Legacy method - creates its own connection
+    public ConfirmationDTO insert(int orderDetailId, String agreement, String date) throws ClassNotFoundException, SQLException {
+        try (Connection conn = DbUtils.getConnection()) {
+            return insert(conn, orderDetailId, agreement, date);
+        }
+    }
+
+    public ConfirmationDTO getConfirmationByOrderDetailId(int id) throws SQLException, ClassNotFoundException {
+        List<ConfirmationDTO> results = retrieve("order_detail_id = ?", id);
         if (results != null && !results.isEmpty()) {
             return results.get(0);
         }
         return null;
     }
 
-    
-    public ConfirmationDTO updateStatus(int confirmationId, String agreement) {
-        String updateSql = "UPDATE " + TABLE_NAME + " SET status = ? WHERE confirmation_id = ?";
+    // Transaction-aware update method using Connection parameter
+    public ConfirmationDTO updateStatus(Connection conn, int confirmationId, String agreement) throws SQLException {
+        String updateSql = "UPDATE " + TABLE_NAME + " SET agreement = ? WHERE confirmation_id = ?";
 
-        try (Connection conn = DbUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(updateSql)) {
-
+        try (PreparedStatement ps = conn.prepareStatement(updateSql)) {
             ps.setString(1, agreement);
             ps.setInt(2, confirmationId);
 
-            // 1. Execute the update
             if (ps.executeUpdate() > 0) {
-
-                // 2. If successful, retrieve the fully updated record
-                List<ConfirmationDTO> results = retrieve("confirmation_id=?", confirmationId);
-
-                if (results != null && !results.isEmpty()) {
-                    // 3. Return the updated DTO
-                    return results.get(0);
+                // Retrieve within the same connection/transaction
+                String selectSql = "SELECT * FROM " + TABLE_NAME + " WHERE confirmation_id = ?";
+                try (PreparedStatement selectPs = conn.prepareStatement(selectSql)) {
+                    selectPs.setInt(1, confirmationId);
+                    ResultSet rs = selectPs.executeQuery();
+                    if (rs.next()) {
+                        return mapToConfirmation(rs);
+                    }
                 }
             }
-
-        } catch (Exception e) {
-            e.printStackTrace();
         }
-
-        // Return null if the update failed or the record couldn't be retrieved
-        return null;
+        throw new SQLException("Failed to update confirmation status");
     }
-    
-    // --- Method from the master branch ---
-    
-    public List<ConfirmationDTO> GetConfirmationBySpecialOrderId(int id){
+
+    // Legacy method - creates its own connection
+    public ConfirmationDTO updateStatus(int confirmationId, String agreement) throws SQLException, ClassNotFoundException {
+        try (Connection conn = DbUtils.getConnection()) {
+            return updateStatus(conn, confirmationId, agreement);
+        }
+    }
+
+    public List<ConfirmationDTO> GetConfirmationBySpecialOrderId(int id) throws SQLException, ClassNotFoundException {
         return retrieve("special_order_id=?", id);
     }
 }
