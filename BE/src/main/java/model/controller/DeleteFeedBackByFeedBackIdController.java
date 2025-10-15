@@ -7,14 +7,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Map;
-import model.service.CreateFeedBackService;
+import model.service.FeedBackService;
 import utils.RequestUtils;
 import utils.ResponseUtils;
 
 @WebServlet("/api/staff/deleteFeedBackByFeedBackId")
 public class DeleteFeedBackByFeedBackIdController extends HttpServlet {
 
-    private final CreateFeedBackService service = new CreateFeedBackService();
+    private final FeedBackService service = new FeedBackService();
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)

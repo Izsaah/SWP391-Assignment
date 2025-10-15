@@ -10,7 +10,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import model.service.ViewPromotionForDealerService;
+import model.service.PromotionForDealerService;
 import utils.ResponseUtils;
 
 /**
@@ -19,7 +19,7 @@ import utils.ResponseUtils;
  */
 @WebServlet("/api/staff/viewPromotionDealerIdController")
 public class ViewPromotionByDealerIdController extends HttpServlet{
-    private final static ViewPromotionForDealerService service= new ViewPromotionForDealerService();
+    private final static PromotionForDealerService service= new PromotionForDealerService();
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) 
             throws ServletException, IOException {

@@ -11,7 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import model.dto.FeedbackDTO;
-import model.service.CreateFeedBackService;
+import model.service.FeedBackService;
 import utils.ResponseUtils;
 
 /**
@@ -21,7 +21,7 @@ import utils.ResponseUtils;
 @WebServlet("/api/staff/createFeedBack")
 public class CreateFeedBackController extends HttpServlet {
 
-    private final CreateFeedBackService CFBService = new CreateFeedBackService();
+    private final FeedBackService CFBService = new FeedBackService();
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {

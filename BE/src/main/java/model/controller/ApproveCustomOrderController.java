@@ -7,14 +7,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Map;
-import model.service.CreateOrderService;
+import model.service.OrderService;
 import utils.RequestUtils;
 import utils.ResponseUtils;
 
 @WebServlet("/api/staff/approveCustomOrder")
 public class ApproveCustomOrderController extends HttpServlet {
 
-    private final CreateOrderService service = new CreateOrderService();
+    private final OrderService service = new OrderService();
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
