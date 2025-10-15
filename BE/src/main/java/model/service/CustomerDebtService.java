@@ -49,7 +49,7 @@ public class CustomerDebtService {
                 }
 
                 // Get payments made for this order
-                List<PaymentDTO> payments = paymentDAO.findPaymentByOrderId(order.getOrderId());
+                List<PaymentDTO> payments = paymentDAO.getPayMentsByOrderId(order.getOrderId());
                 double totalPaid = 0.0;
                 if (payments != null && !payments.isEmpty()) {
                     totalPaid = payments.stream()

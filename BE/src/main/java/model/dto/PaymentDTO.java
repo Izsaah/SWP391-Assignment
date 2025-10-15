@@ -12,27 +12,17 @@ package model.dto;
 public class PaymentDTO {
     private int paymentId;
     private int orderId;
-    private String method;
+    private String paymentType;
     private double amount;
     private String paymentDate;
-    private InstallmentPlanDTO installmentPlan;
 
     public PaymentDTO() {
-    
     }
 
-    public PaymentDTO(int orderId, String method, double amount, String paymentDate) {
-        this.orderId = orderId;
-        this.method = method;
-        this.amount = amount;
-        this.paymentDate = paymentDate;
-    }
-    
-
-    public PaymentDTO(int paymentId, int orderId, String method, double amount, String paymentDate) {
+    public PaymentDTO(int paymentId, int orderId, String paymentType, double amount, String paymentDate) {
         this.paymentId = paymentId;
         this.orderId = orderId;
-        this.method = method;
+        this.paymentType = paymentType;
         this.amount = amount;
         this.paymentDate = paymentDate;
     }
@@ -53,12 +43,12 @@ public class PaymentDTO {
         this.orderId = orderId;
     }
 
-    public String getMethod() {
-        return method;
+    public String getPaymentType() {
+        return paymentType;
     }
 
-    public void setMethod(String method) {
-        this.method = method;
+    public void setPaymentType(String paymentType) {
+        this.paymentType = paymentType;
     }
 
     public double getAmount() {
@@ -75,13 +65,5 @@ public class PaymentDTO {
 
     public void setPaymentDate(String paymentDate) {
         this.paymentDate = paymentDate;
-    }
-
-    public InstallmentPlanDTO getInstallmentPlan() {
-        return installmentPlan;
-    }
-
-    public void setInstallmentPlan(InstallmentPlanDTO installmentPlan) {
-        this.installmentPlan = installmentPlan;
     }
 }

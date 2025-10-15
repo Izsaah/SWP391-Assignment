@@ -10,41 +10,42 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
-import model.dto.InstallmentPlanDTO;
+import model.dto.SpecialOrderDTO;
 import utils.DbUtils;
 
 /**
  *
  * @author Admin
  */
-public class InstallmentPlanDAO {
-    private static final String TABLE_NAME = "InstallmentPlan";
+public class SpecialOrderDAO {
+    private static final String TABLE_NAME = "SpecialOrder";
     
-    private InstallmentPlanDTO mapToInstallmentPlan(ResultSet rs) throws SQLException {
-        return new InstallmentPlanDTO(
-            rs.getInt("plan_id"),
-            rs.getInt("payment_id"),
-            rs.getString("interest_rate"),
-            rs.getString("term_month"),
-            rs.getString("monthly_rate"),
-            rs.getString("status")
+    private SpecialOrderDTO mapToSpecialOrder(ResultSet rs) throws SQLException {
+        return new SpecialOrderDTO(
+            rs.getInt("special_order_id"),
+            rs.getInt("customer_id"),
+            rs.getInt("dealer_staff_id"),
+            rs.getInt("dealer_id"),
+            rs.getInt("model_id"),
+            rs.getString("order_date"),
+            rs.getString("description"),
+            rs.getString("quantity")
         );
     }
-    
-    public List<InstallmentPlanDTO> retrieve(String condition, Object... params) {
+    public List<SpecialOrderDTO> GetSpeciallOrderByCustomerId(int id){
+    return retrieve("customer_id=?", id);
+    }
+    public List<SpecialOrderDTO> retrieve(String condition, Object... params) {
         String sql = "SELECT * FROM " + TABLE_NAME + " WHERE " + condition;
         try (Connection conn = DbUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             for (int i = 0; i < params.length; i++) ps.setObject(i + 1, params[i]);
             ResultSet rs = ps.executeQuery();
-            List<InstallmentPlanDTO> list = new ArrayList<>();
-            while (rs.next()) list.add(mapToInstallmentPlan(rs));
+            List<SpecialOrderDTO> list = new ArrayList<>();
+            while (rs.next()) list.add(mapToSpecialOrder(rs));
             return list;
         } catch (Exception e) {
             e.printStackTrace();
         }
         return null;
-    }
-    public List<InstallmentPlanDTO> getInstallmentPlansListByPayMentId(int paymentId){
-    return retrieve("payment_id=?", paymentId);
     }
 }
