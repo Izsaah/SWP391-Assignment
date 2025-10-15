@@ -18,7 +18,7 @@ import json.ApiResponse;
 public class ResponseUtils {
 
     private static final ObjectMapper mapper = new ObjectMapper();
-    
+
     public static <T> void success(HttpServletResponse resp, String message, T data) throws IOException {
         resp.setContentType("application/json");
         resp.setCharacterEncoding("UTF-8");
@@ -33,6 +33,7 @@ public class ResponseUtils {
         ApiResponse<Object> response = new ApiResponse<>("error", message, null);
         mapper.writeValue(resp.getWriter(), response);
     }
+
     //Helper For Update
     public <T> void updateIfNotNull(Consumer<T> setter, T newValue) {
         if (newValue != null) {
@@ -46,4 +47,7 @@ public class ResponseUtils {
         }
     }
 
+    public static boolean isNullOrEmpty(String s) {
+        return s == null || s.trim().isEmpty();
+    }
 }

@@ -12,7 +12,6 @@ package model.dto;
 public class SaleRecordDTO {
     private int saleId;
     private int customerId;
-    private int dealerId;
     private int dealerStaffId;
     private String saleDate;
     private double saleAmount;
@@ -20,15 +19,15 @@ public class SaleRecordDTO {
     public SaleRecordDTO() {
     }
 
-    public SaleRecordDTO(int saleId, int customerId, int dealerId, int dealerStaffId, String saleDate, double saleAmount) {
+    public SaleRecordDTO(int saleId, int customerId, int dealerStaffId, String saleDate, double saleAmount) {
         this.saleId = saleId;
         this.customerId = customerId;
-        this.dealerId = dealerId;
         this.dealerStaffId = dealerStaffId;
         this.saleDate = saleDate;
         this.saleAmount = saleAmount;
     }
 
+   
     public int getSaleId() {
         return saleId;
     }
@@ -45,13 +44,6 @@ public class SaleRecordDTO {
         this.customerId = customerId;
     }
 
-    public int getDealerId() {
-        return dealerId;
-    }
-
-    public void setDealerId(int dealerId) {
-        this.dealerId = dealerId;
-    }
 
     public int getDealerStaffId() {
         return dealerStaffId;
