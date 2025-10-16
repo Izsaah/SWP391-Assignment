@@ -13,21 +13,21 @@ public class TestDriveScheduleDTO {
     private int appointmentId;
     private int customerId;
     private String serialId;
-    private String scheduledId;
     private String date;
     private String status;
 
     public TestDriveScheduleDTO() {
     }
 
-    public TestDriveScheduleDTO(int appointmentId, int customerId, String serialId, String scheduledId, String date, String status) {
+    public TestDriveScheduleDTO(int appointmentId, int customerId, String serialId, String date, String status) {
         this.appointmentId = appointmentId;
         this.customerId = customerId;
         this.serialId = serialId;
-        this.scheduledId = scheduledId;
         this.date = date;
         this.status = status;
     }
+
+   
 
     public int getAppointmentId() {
         return appointmentId;
@@ -53,13 +53,7 @@ public class TestDriveScheduleDTO {
         this.serialId = serialId;
     }
 
-    public String getScheduledId() {
-        return scheduledId;
-    }
-
-    public void setScheduledId(String scheduledId) {
-        this.scheduledId = scheduledId;
-    }
+    
 
     public String getDate() {
         return date;

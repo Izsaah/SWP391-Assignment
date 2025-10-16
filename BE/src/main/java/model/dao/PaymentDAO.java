@@ -48,6 +48,47 @@ public class PaymentDAO {
         }
         return null;
     }
+<<<<<<< Updated upstream
+=======
+    
+    public boolean create(PaymentDTO payment) throws ClassNotFoundException {
+        if (payment.getMethod()== null || payment.getMethod().isEmpty()) {
+            payment.setMethod("TT");
+        }
+
+        String sql = "INSERT INTO " + TABLE_NAME + " (order_id, amount, payment_date, method) VALUES (?, ?, ?, ?)";
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+            ps.setInt(1, payment.getOrderId());
+            ps.setDouble(2, payment.getAmount());
+            ps.setString(3, payment.getPaymentDate());
+            ps.setString(4, payment.getMethod());
+
+            int rows = ps.executeUpdate();
+
+            if (rows > 0) {
+                ResultSet rs = ps.getGeneratedKeys();
+                if (rs.next()) {
+                    payment.setPaymentId(rs.getInt(1));
+                }
+                return true;
+            }
+        } catch (SQLException e) {
+            System.out.println("Error creating payment: " + e.getMessage());
+        }
+        return false;
+    }
+     public PaymentDTO findPaymentById(int paymentId){
+        List<PaymentDTO> list = retrieve("payment_id = ?", paymentId);
+        return list.get(0);
+    }
+    public List<PaymentDTO> getPayMentsByOrderId(int OrderId){
+    return retrieve("order_id=?", OrderId);
+    }
+      public List<PaymentDTO> getAllPayment(){
+        return retrieve("1 = 1");
+    }
+>>>>>>> Stashed changes
 
     public boolean create(PaymentDTO payment) throws ClassNotFoundException {
         if (payment.getMethod()== null || payment.getMethod().isEmpty()) {

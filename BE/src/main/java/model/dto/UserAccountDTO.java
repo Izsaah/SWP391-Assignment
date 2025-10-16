@@ -15,7 +15,6 @@ import java.util.List;
 public class UserAccountDTO {
     private int userId;
     @JsonIgnore
-    private int customerId;
     private int dealerId;   
     @JsonIgnore
     private String password;
@@ -38,7 +37,6 @@ public class UserAccountDTO {
 
     public UserAccountDTO(int userId, int customerId, int dealerId, String email, String username, String phoneNumber) {
         this.userId = userId;
-        this.customerId = customerId;
         this.dealerId = dealerId;
         this.email = email;
         this.username = username;
@@ -66,14 +64,6 @@ public class UserAccountDTO {
 
     public void setUserId(int userId) {
         this.userId = userId;
-    }
-
-    public int getCustomerId() {
-        return customerId;
-    }
-
-    public void setCustomerId(int customerId) {
-        this.customerId = customerId;
     }
 
     public int getDealerId() {

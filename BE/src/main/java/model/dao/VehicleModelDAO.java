@@ -49,4 +49,8 @@ public class VehicleModelDAO {
     public List<VehicleModelDTO> SearchVehicleModel(String model_name){
         return retrieve("model_name=?",model_name);
     }
+
+    public List<VehicleModelDTO> viewVehicleModelById(int modelId) {
+        return retrieve("model_id=?", modelId);
+    }
 }

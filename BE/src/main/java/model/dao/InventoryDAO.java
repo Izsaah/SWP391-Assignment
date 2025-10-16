@@ -41,4 +41,7 @@ public class InventoryDAO {
         }
         return null;
     }
+     public List<InventoryDTO> viewAllInventory() {
+        return retrieve("1 = 1");
+    }
 }

@@ -11,8 +11,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import model.dao.DealerDAO;
 import model.dto.DealerDTO;
+import utils.RequestUtils;
 import utils.ResponseUtils;
 
 
@@ -26,19 +28,30 @@ public class DealerSearchController extends HttpServlet {
     private final DealerDAO dealerDAO = new DealerDAO();
 
     @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        String name = req.getParameter("name");
-        if (name == null || name.trim().isEmpty()) {
-            ResponseUtils.error(resp, "Dealer name is required");
-            return;
-        }
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        try {
+            Map<String, Object> params = RequestUtils.extractParams(req);
+            
+            Object nameObj = params.get("name");
+            String name = (nameObj == null) ? null : nameObj.toString();
 
-        List<DealerDTO> dealer = dealerDAO.findByName(name.trim());
-        if (dealer != null) {
-            ResponseUtils.success(resp, "Dealer found", dealer);
-        } else {
-            ResponseUtils.error(resp, "Dealer not found");
+            if (name == null || name.trim().isEmpty()) {
+                ResponseUtils.error(resp, "Dealer name is required");
+                return;
+            }
+
+            List<DealerDTO> dealers = dealerDAO.findByName(name.trim());
+            
+            if (dealers != null && !dealers.isEmpty()) {
+                ResponseUtils.success(resp, "Dealers found", dealers);
+            } else {
+                // Return success with empty list if not found, or an error message.
+                // Sticking closer to the original's success/error pattern for consistency.
+                ResponseUtils.error(resp, "Dealer not found with name: " + name); 
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            ResponseUtils.error(resp, "Error searching for dealer: " + e.getMessage());
         }
     }
 }
-

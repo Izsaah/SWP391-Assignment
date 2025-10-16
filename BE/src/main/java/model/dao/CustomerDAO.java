@@ -73,8 +73,12 @@ public class CustomerDAO {
     public List<CustomerDTO> findByName(String name) {
         return retrieve("name = ?", name);
     }
+<<<<<<< Updated upstream
     
     public List<CustomerDTO> findById(int customerId){
+=======
+     public List<CustomerDTO> findById(int customerId){
+>>>>>>> Stashed changes
         return retrieve("customer_id = ?", customerId);
     }
 }

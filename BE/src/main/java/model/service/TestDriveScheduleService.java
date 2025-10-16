@@ -21,11 +21,9 @@ public class TestDriveScheduleService {
     private final CustomerDAO CDAO = new CustomerDAO();
     private final CustomerService CCS = new CustomerService();
 
-    public TestDriveScheduleDTO createTestDriveSchedule( int customer_id, String serial_id, String schedule_id, String date, String status) {
-        if (status == null || !status.equalsIgnoreCase("APPROVED")) {
-            status = "PENDING";
-        }
-        return TDDAO.create( customer_id, serial_id, schedule_id, date, status);
+    public TestDriveScheduleDTO createTestDriveSchedule(int customer_id, String serial_id, String date) {
+
+        return TDDAO.create(customer_id, serial_id, date, "PENDING");
     }
 
     public List<CustomerDTO> getTestDriveScheduleByCustomer(String name) {
@@ -48,19 +46,15 @@ public class TestDriveScheduleService {
 
         return customerWithSchedule;
     }
-    
+
     public TestDriveScheduleDTO UpdateTestDriveSchedule(int appointmentId, String newStatus) {
-        
-       
-        
+
         if (newStatus != null && !newStatus.trim().isEmpty()) {
-            
-           
+
             return TDDAO.updateStatus(appointmentId, newStatus);
         }
-        
 
         return null;
     }
-    
+
 }

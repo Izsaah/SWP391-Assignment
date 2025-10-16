@@ -24,14 +24,41 @@ public class InstallmentPlanDAO {
 
     private InstallmentPlanDTO mapToInstallmentPlan(ResultSet rs) throws SQLException {
         return new InstallmentPlanDTO(
+<<<<<<< Updated upstream
                 rs.getInt("payment_id"),
                 rs.getString("interest_rate"),
                 rs.getString("term_month"),
                 rs.getString("monthly_pay"),
+=======
+                rs.getInt("plan_id"),
+                rs.getInt("payment_id"),
+                rs.getString("interest_rate"),
+                rs.getString("term_month"),
+                rs.getString("monthly_rate"),
+>>>>>>> Stashed changes
                 rs.getString("status")
         );
     }
 
+<<<<<<< Updated upstream
+=======
+    public boolean updateStatus(InstallmentPlanDTO plan) throws ClassNotFoundException {
+        String sql = "UPDATE " + TABLE_NAME + " SET status = ? WHERE plan_id = ?";
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, plan.getStatus());
+            ps.setInt(2, plan.getPlanId());
+
+            int affected = ps.executeUpdate();
+            return affected > 0;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+>>>>>>> Stashed changes
     public List<InstallmentPlanDTO> retrieve(String condition, Object... params) {
         String sql = "SELECT * FROM " + TABLE_NAME + " WHERE " + condition;
         try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -50,6 +77,13 @@ public class InstallmentPlanDAO {
         return null;
     }
 
+<<<<<<< Updated upstream
+=======
+    public List<InstallmentPlanDTO> getInstallmentPlansListByPayMentId(int paymentId) {
+        return retrieve("payment_id=?", paymentId);
+    }
+
+>>>>>>> Stashed changes
     public InstallmentPlanDTO create(InstallmentPlanDTO plan) throws ClassNotFoundException {
         String sql = "INSERT INTO " + TABLE_NAME
                 + " (payment_id, interest_rate, term_month, monthly_pay, status) VALUES (?, ?, ?, ?, ?)";

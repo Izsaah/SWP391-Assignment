@@ -1,3 +1,7 @@
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/JSP_Servlet/Servlet.java to edit this template
+ */
 package model.controller;
 
 import jakarta.servlet.ServletException;
@@ -11,7 +15,7 @@ import model.service.CustomerDebtService;
 import utils.RequestUtils;
 import utils.ResponseUtils;
 
-@WebServlet("/api/customer/debt")
+@WebServlet("/api/staff/debt")
 public class CustomerDebtController extends HttpServlet {
 
     private final CustomerDebtService service = new CustomerDebtService();
@@ -22,9 +26,12 @@ public class CustomerDebtController extends HttpServlet {
 
         try {
             Map<String, Object> params = RequestUtils.extractParams(req);
-            String customerIdParam = (String) params.get("customerId");
+            
+            // Extract and ensure it's treated as a String for initial check
+            Object customerIdObj = params.get("customerId");
+            String customerIdParam = (customerIdObj == null) ? null : customerIdObj.toString();
 
-            if (ResponseUtils.isNullOrEmpty(customerIdParam)) {
+            if (customerIdParam == null || customerIdParam.trim().isEmpty()) {
                 ResponseUtils.error(resp, "Missing required field: customerId");
                 return;
             }

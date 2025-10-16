@@ -11,8 +11,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import model.dao.VehicleModelDAO;
 import model.dto.VehicleModelDTO;
+import utils.RequestUtils;
 import utils.ResponseUtils;
 
 
@@ -25,21 +27,29 @@ public class VehicleModelSearchController extends HttpServlet {
     private final VehicleModelDAO vdao = new VehicleModelDAO();
     
     @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
-        String name = req.getParameter("name");
+        try {
+            Map<String, Object> params = RequestUtils.extractParams(req);
+            
+            Object nameObj = params.get("name");
+            String name = (nameObj == null) ? null : nameObj.toString();
 
-        if (name == null || name.trim().isEmpty()) {
-            ResponseUtils.error(resp, "Model name is required");
-            return;
-        }
+            if (name == null || name.trim().isEmpty()) {
+                ResponseUtils.error(resp, "Model name is required");
+                return;
+            }
 
-        List<VehicleModelDTO> model = vdao.SearchVehicleModel(name.trim());
+            List<VehicleModelDTO> model = vdao.SearchVehicleModel(name.trim());
 
-        if (model != null && !model.isEmpty()) {
-            ResponseUtils.success(resp, "Model found", model);
-        } else {
-            ResponseUtils.error(resp, "No model found with name: " + name);
+            if (model != null && !model.isEmpty()) {
+                ResponseUtils.success(resp, "Model found", model);
+            } else {
+                ResponseUtils.error(resp, "No model found with name: " + name);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            ResponseUtils.error(resp, "Error searching for vehicle model: " + e.getMessage());
         }
     }
 }

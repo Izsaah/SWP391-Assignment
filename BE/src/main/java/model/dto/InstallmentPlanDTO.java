@@ -17,6 +17,7 @@ public class InstallmentPlanDTO {
     private String monthlyPay;
     private String status;
 
+<<<<<<< Updated upstream
     public InstallmentPlanDTO() {
     }
 
@@ -28,14 +29,24 @@ public class InstallmentPlanDTO {
         this.status = status;
     }
 
+=======
+>>>>>>> Stashed changes
     public InstallmentPlanDTO(int planId, int paymentId, String interestRate, String termMonth, String monthlyPay, String status) {
         this.planId = planId;
         this.paymentId = paymentId;
         this.interestRate = interestRate;
+<<<<<<< Updated upstream
         this.termMonth = "12";
+=======
+        this.termMonth = termMonth;
+>>>>>>> Stashed changes
         this.monthlyPay = monthlyPay;
         this.status = status;
     }
+
+    public InstallmentPlanDTO() {
+    }
+
 
     public int getPlanId() {
         return planId;

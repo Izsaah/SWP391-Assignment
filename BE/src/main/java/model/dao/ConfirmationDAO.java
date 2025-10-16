@@ -17,7 +17,7 @@ public class ConfirmationDAO {
     private ConfirmationDTO mapToConfirmation(ResultSet rs) throws SQLException {
         return new ConfirmationDTO(
                 rs.getInt("confirmation_id"),
-                rs.getInt("staff_admin"),
+                rs.getInt("staff_admin_id"),
                 rs.getInt("order_detail_id"),
                 rs.getString("agreement"),
                 rs.getString("date_time")

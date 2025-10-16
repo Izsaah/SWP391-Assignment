@@ -58,26 +58,40 @@ public class SaleRecordService {
     public List<SaleRecordDTO> getCombinedSaleRecordsForStaffByDateRange(
             int dealerStaffId, String startDate, String endDate) {
         
+        System.out.println("DEBUG: Processing sales for Staff ID: " + dealerStaffId);
+        
         try {
             List<OrderDTO> allOrders = orderDAO.getByStaffId(dealerStaffId);
+            
             if (allOrders == null || allOrders.isEmpty()) {
+                System.out.println("DEBUG: Staff ID " + dealerStaffId + " has no orders in the database.");
                 return Collections.emptyList();
             }
+            System.out.println("DEBUG: Staff ID " + dealerStaffId + " retrieved " + allOrders.size() + " total orders.");
 
             Map<Integer, Double> totalSalesByCustomer = new HashMap<>();
             Map<Integer, Integer> totalOrdersByCustomer = new HashMap<>();
             Map<Integer, String> latestOrderDateByCustomer = new HashMap<>();
+            
+            int processedCount = 0;
 
             for (OrderDTO order : allOrders) {
                 if (!isOrderInRange(order, startDate, endDate)) {
+                    System.out.println("DEBUG: Skipping Order ID " + order.getOrderId() + ". Date " + order.getOrderDate() + " is outside range " + startDate + " to " + endDate);
                     continue;
                 }
+                
                 processOrder(order, totalSalesByCustomer, totalOrdersByCustomer, latestOrderDateByCustomer);
+                processedCount++;
             }
+            
+            System.out.println("DEBUG: Staff ID " + dealerStaffId + " finished processing. Orders processed/attempted: " + processedCount + ". Customers aggregated: " + totalSalesByCustomer.size());
 
             return buildSaleRecordList(totalSalesByCustomer, totalOrdersByCustomer, latestOrderDateByCustomer, dealerStaffId);
+            
         } catch (Exception e) {
             e.printStackTrace();
+            System.err.println("ERROR: Top-level error in getCombinedSaleRecordsForStaffByDateRange for Staff ID " + dealerStaffId + ": " + e.getMessage());
             return Collections.emptyList();
         }
     }
