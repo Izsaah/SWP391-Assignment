@@ -26,16 +26,21 @@ public class SaleRecordController extends HttpServlet {
         try {
             Map<String, Object> params = RequestUtils.extractParams(req);
 
-            String staffIdParam = (String) params.get("dealerStaffId");
-            String startDate = (String) params.get("startDate");
-            String endDate = (String) params.get("endDate");
+            Object staffIdObj = params.get("dealerStaffId");
+            String staffIdParam = (staffIdObj == null) ? null : staffIdObj.toString();
+            
+            Object startDateObj = params.get("startDate");
+            String startDate = (startDateObj == null) ? null : startDateObj.toString();
+            
+            Object endDateObj = params.get("endDate");
+            String endDate = (endDateObj == null) ? null : endDateObj.toString();
 
-            if (ResponseUtils.isNullOrEmpty(staffIdParam)) {
+            if (staffIdParam == null || staffIdParam.trim().isEmpty()) {
                 ResponseUtils.error(resp, "Missing required field: dealerStaffId");
                 return;
             }
 
-            if (ResponseUtils.isNullOrEmpty(startDate) || ResponseUtils.isNullOrEmpty(endDate)) {
+            if (startDate == null || startDate.trim().isEmpty() || endDate == null || endDate.trim().isEmpty()) {
                 ResponseUtils.error(resp, "Both 'startDate' and 'endDate' are required.");
                 return;
             }

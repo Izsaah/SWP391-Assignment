@@ -19,7 +19,21 @@ public class OrderDTO {
     private String orderDate;
     private String status;
     private OrderDetailDTO detail;
+    private ConfirmationDTO confirmation;
+    private boolean isCustom;
 
+    public OrderDTO(int orderId, int customerId, int dealerStaffId, int modelId, String orderDate, String status, OrderDetailDTO detail, ConfirmationDTO confirmation, boolean isCustom) {
+        this.orderId = orderId;
+        this.customerId = customerId;
+        this.dealerStaffId = dealerStaffId;
+        this.modelId = modelId;
+        this.orderDate = orderDate;
+        this.status = status;
+        this.detail = detail;
+        this.confirmation = confirmation;
+        this.isCustom = isCustom;
+    }
+    
     public OrderDTO(int orderId, int customerId, int dealerStaffId, int modelId, String orderDate, String status, OrderDetailDTO detail) {
         this.orderId = orderId;
         this.customerId = customerId;
@@ -102,4 +116,21 @@ public class OrderDTO {
     public void setStatus(String status) {
         this.status = status;
     }
+
+    public ConfirmationDTO getConfirmation() {
+        return confirmation;
+    }
+
+    public void setConfirmation(ConfirmationDTO confirmation) {
+        this.confirmation = confirmation;
+    }
+
+    public boolean isIsCustom() {
+        return isCustom;
+    }
+
+    public void setIsCustom(boolean isCustom) {
+        this.isCustom = isCustom;
+    }
+    
 }

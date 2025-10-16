@@ -1,3 +1,4 @@
+package model.controller;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -25,16 +26,22 @@ public class DealerSaleRecordController extends HttpServlet {
         try {
             Map<String, Object> params = RequestUtils.extractParams(req);
 
-            String dealerIdParam = (String) params.get("dealerId");
-            String startDate = (String) params.get("startDate");
-            String endDate = (String) params.get("endDate");
+            Object dealerIdObj = params.get("dealerId");
+            String dealerIdParam = (dealerIdObj == null) ? null : dealerIdObj.toString();
+            
+            Object startDateObj = params.get("startDate");
+            String startDate = (startDateObj == null) ? null : startDateObj.toString();
+            
+            Object endDateObj = params.get("endDate");
+            String endDate = (endDateObj == null) ? null : endDateObj.toString();
 
-            if (ResponseUtils.isNullOrEmpty(dealerIdParam)) {
+
+            if (dealerIdParam == null || dealerIdParam.trim().isEmpty()) {
                 ResponseUtils.error(resp, "Missing required field: dealerId");
                 return;
             }
 
-            if (ResponseUtils.isNullOrEmpty(startDate) || ResponseUtils.isNullOrEmpty(endDate)) {
+            if (startDate == null || startDate.trim().isEmpty() || endDate == null || endDate.trim().isEmpty()) {
                 ResponseUtils.error(resp, "Both 'startDate' and 'endDate' are required.");
                 return;
             }

@@ -14,6 +14,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import model.dto.UserAccountDTO;
 import model.service.UserAccountService;
 import utils.JwtUtil;
+import utils.RequestUtils;
 import utils.ResponseUtils;
 
 @WebServlet("/api/login")
@@ -25,28 +26,40 @@ public class LoginController extends HttpServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
         
-        String email = req.getParameter("email");
-        String password = req.getParameter("password");
+        try {
+            Map<String, Object> params = RequestUtils.extractParams(req);
+            
+            Object emailObj = params.get("email");
+            String email = (emailObj == null) ? null : emailObj.toString();
+            
+            Object passwordObj = params.get("password");
+            String password = (passwordObj == null) ? null : passwordObj.toString();
 
-        if (email == null || password == null) {
-            ResponseUtils.error(resp, "Email and password are required");
-            return;
+
+            if (email == null || email.trim().isEmpty() || password == null || password.trim().isEmpty()) {
+                ResponseUtils.error(resp, "Email and password are required");
+                return;
+            }
+
+            UserAccountDTO user = service.HandlingLogin(email, password);
+            if (user == null) {
+                ResponseUtils.error(resp, "Invalid email or password");
+                return;
+            }
+
+
+            String token = JwtUtil.generateToken(user);
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("token", token);
+            data.put("user", user);
+
+            ResponseUtils.success(resp, "Login successful", data);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            ResponseUtils.error(resp, "Error during login process: " + e.getMessage());
         }
-
-        UserAccountDTO user = service.HandlingLogin(email, password);
-        if (user == null) {
-            ResponseUtils.error(resp, "Invalid email or password");
-            return;
-        }
-
-
-        String token = JwtUtil.generateToken(user);
-
-        Map<String, Object> data = new HashMap<>();
-        data.put("token", token);
-        data.put("user", user);
-
-        ResponseUtils.success(resp, "Login successful", data);
     }
 
     @Override

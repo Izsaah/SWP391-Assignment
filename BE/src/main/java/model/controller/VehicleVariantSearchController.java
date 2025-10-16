@@ -19,34 +19,37 @@ public class VehicleVariantSearchController extends HttpServlet {
     private final VehicleVariantDAO vdao = new VehicleVariantDAO();
 
     @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
-
-        Map<String, Object> data = RequestUtils.extractParams(req);
-        Object idObj = data.get("id");
-
-        if (idObj == null) {
-            ResponseUtils.error(resp, "Model ID is required");
-            return;
-        }
-
-        int modelId;
         try {
-            modelId = Integer.parseInt(idObj.toString());
+            Map<String, Object> params = RequestUtils.extractParams(req);
+            
+            Object idObj = params.get("id");
+            String idParam = (idObj == null) ? null : idObj.toString();
+
+
+            if (idParam == null || idParam.trim().isEmpty()) {
+                ResponseUtils.error(resp, "Model ID is required");
+                return;
+            }
+
+            int modelId = Integer.parseInt(idParam);
+
+            List<VehicleVariantDTO> variants = vdao.viewVehicleVariantIsActive(modelId);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("variants", variants);
+
+            if (variants != null && !variants.isEmpty()) {
+                ResponseUtils.success(resp, "Variant(s) found", result);
+            } else {
+                ResponseUtils.error(resp, "No variant found with id: " + modelId);
+            }
         } catch (NumberFormatException e) {
             ResponseUtils.error(resp, "Invalid model ID format");
-            return;
-        }
-
-        List<VehicleVariantDTO> variants = vdao.viewVehicleVariantIsActive(modelId);
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("variants", variants);
-
-        if (variants != null && !variants.isEmpty()) {
-            ResponseUtils.success(resp, "Variant(s) found", result);
-        } else {
-            ResponseUtils.error(resp, "No variant found with id: " + modelId);
+        } catch (Exception e) {
+            e.printStackTrace();
+            ResponseUtils.error(resp, "Error searching for vehicle variant: " + e.getMessage());
         }
     }
 }

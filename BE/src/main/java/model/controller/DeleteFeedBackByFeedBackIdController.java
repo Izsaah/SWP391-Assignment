@@ -20,15 +20,18 @@ public class DeleteFeedBackByFeedBackIdController extends HttpServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
-        Map<String, Object> params = RequestUtils.extractParams(req);
-        String idParam = params.get("id").toString();
-
-        if (idParam == null || idParam.trim().isEmpty()) {
-            ResponseUtils.error(resp, "Feedback ID is required");
-            return;
-        }
-
         try {
+            Map<String, Object> params = RequestUtils.extractParams(req);
+            
+            Object idObj = params.get("id");
+            String idParam = (idObj == null) ? null : idObj.toString();
+
+
+            if (idParam == null || idParam.trim().isEmpty()) {
+                ResponseUtils.error(resp, "Feedback ID is required");
+                return;
+            }
+
             int feedbackId = Integer.parseInt(idParam);
             boolean isDeleted = service.deleteFeedBack(feedbackId);
 
@@ -43,11 +46,5 @@ public class DeleteFeedBackByFeedBackIdController extends HttpServlet {
             e.printStackTrace();
             ResponseUtils.error(resp, "Error deleting feedback: " + e.getMessage());
         }
-    }
-
-    @Override
-    protected void doDelete(HttpServletRequest req, HttpServletResponse resp)
-            throws ServletException, IOException {
-        doPost(req, resp);
     }
 }

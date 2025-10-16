@@ -23,7 +23,9 @@ public class SearchCustomerForFeedBackController extends HttpServlet {
             throws ServletException, IOException {
         try {
             Map<String, Object> params = RequestUtils.extractParams(req);
-            String name = params.get("name") != null ? params.get("name").toString().trim() : null;
+            
+            Object nameObj = params.get("name");
+            String name = (nameObj == null) ? null : nameObj.toString().trim();
 
             if (name == null || name.isEmpty()) {
                 ResponseUtils.error(resp, "Customer name is required");
