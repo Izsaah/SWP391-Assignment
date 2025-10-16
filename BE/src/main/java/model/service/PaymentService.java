@@ -163,9 +163,15 @@ public class PaymentService {
         try {
             boolean updated = installDAO.updateStatus(plan);
             if (updated) {
+<<<<<<< HEAD
                 return plan; 
             } else {
                 return null; 
+=======
+                return plan; // return the DTO if update succeeded
+            } else {
+                return null; // update failed
+>>>>>>> e45e7c6 (Apply local fixes after updating main)
             }
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
@@ -175,7 +181,11 @@ public class PaymentService {
 
     public PaymentDTO getPaymentByOrderId(int orderId) {
         try {
+<<<<<<< HEAD
             return (PaymentDTO) paymentDAO.findPaymentByOrderId(orderId);
+=======
+            return paymentDAO.findPaymentById(orderId);
+>>>>>>> e45e7c6 (Apply local fixes after updating main)
         } catch (IndexOutOfBoundsException e) {
             System.out.println("No payment found for Order ID " + orderId + ". Returning null.");
             return null;
