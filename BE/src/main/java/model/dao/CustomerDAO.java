@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package model.dao;
 
 import java.sql.Connection;
@@ -14,15 +10,10 @@ import java.util.List;
 import model.dto.CustomerDTO;
 import utils.DbUtils;
 
-/**
- *
- * @author Admin
- */
 public class CustomerDAO {
     private static final String TABLE_NAME = "Customer";
     private static final String INSERT_CUSTOMER = "INSERT INTO " + TABLE_NAME
             + " (name, address, email, phone_number) VALUES (?, ?, ?, ?)";
-
 
     private CustomerDTO mapToCustomer(ResultSet rs) throws SQLException {
         return new CustomerDTO(
@@ -49,7 +40,7 @@ public class CustomerDAO {
     }
     
     public int create(Connection conn, CustomerDTO customer) throws SQLException {
-        try ( PreparedStatement ps = conn.prepareStatement(INSERT_CUSTOMER, Statement.RETURN_GENERATED_KEYS)) {
+        try (PreparedStatement ps = conn.prepareStatement(INSERT_CUSTOMER, Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, customer.getName());
             ps.setString(2, customer.getAddress());
             ps.setString(3, customer.getEmail());
@@ -60,7 +51,7 @@ public class CustomerDAO {
                 throw new SQLException("Creating customer failed, no rows affected.");
             }
 
-            try ( ResultSet generatedKeys = ps.getGeneratedKeys()) {
+            try (ResultSet generatedKeys = ps.getGeneratedKeys()) {
                 if (generatedKeys.next()) {
                     return generatedKeys.getInt(1); // return generated customer_id
                 } else {
@@ -73,12 +64,8 @@ public class CustomerDAO {
     public List<CustomerDTO> findByName(String name) {
         return retrieve("name = ?", name);
     }
-<<<<<<< Updated upstream
-    
+
     public List<CustomerDTO> findById(int customerId){
-=======
-     public List<CustomerDTO> findById(int customerId){
->>>>>>> Stashed changes
         return retrieve("customer_id = ?", customerId);
     }
 }

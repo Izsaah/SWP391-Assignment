@@ -1,67 +1,29 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package model.dao;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import model.dto.InstallmentPlanDTO;
 import utils.DbUtils;
 
-/**
- *
- * @author Admin
- */
 public class InstallmentPlanDAO {
 
     private static final String TABLE_NAME = "InstallmentPlan";
 
     private InstallmentPlanDTO mapToInstallmentPlan(ResultSet rs) throws SQLException {
         return new InstallmentPlanDTO(
-<<<<<<< Updated upstream
-                rs.getInt("payment_id"),
-                rs.getString("interest_rate"),
-                rs.getString("term_month"),
-                rs.getString("monthly_pay"),
-=======
                 rs.getInt("plan_id"),
                 rs.getInt("payment_id"),
                 rs.getString("interest_rate"),
                 rs.getString("term_month"),
                 rs.getString("monthly_rate"),
->>>>>>> Stashed changes
                 rs.getString("status")
         );
     }
 
-<<<<<<< Updated upstream
-=======
-    public boolean updateStatus(InstallmentPlanDTO plan) throws ClassNotFoundException {
-        String sql = "UPDATE " + TABLE_NAME + " SET status = ? WHERE plan_id = ?";
-        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
-
-            ps.setString(1, plan.getStatus());
-            ps.setInt(2, plan.getPlanId());
-
-            int affected = ps.executeUpdate();
-            return affected > 0;
-
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
-
->>>>>>> Stashed changes
     public List<InstallmentPlanDTO> retrieve(String condition, Object... params) {
         String sql = "SELECT * FROM " + TABLE_NAME + " WHERE " + condition;
-        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = DbUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             for (int i = 0; i < params.length; i++) {
                 ps.setObject(i + 1, params[i]);
             }
@@ -77,17 +39,10 @@ public class InstallmentPlanDAO {
         return null;
     }
 
-<<<<<<< Updated upstream
-=======
-    public List<InstallmentPlanDTO> getInstallmentPlansListByPayMentId(int paymentId) {
-        return retrieve("payment_id=?", paymentId);
-    }
-
->>>>>>> Stashed changes
     public InstallmentPlanDTO create(InstallmentPlanDTO plan) throws ClassNotFoundException {
         String sql = "INSERT INTO " + TABLE_NAME
                 + " (payment_id, interest_rate, term_month, monthly_pay, status) VALUES (?, ?, ?, ?, ?)";
-        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (Connection conn = DbUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             ps.setInt(1, plan.getPaymentId());
             ps.setDouble(2, Double.parseDouble(plan.getInterestRate()));
@@ -100,7 +55,7 @@ public class InstallmentPlanDAO {
                 throw new SQLException("Creating installment plan failed, no rows affected.");
             }
 
-            try ( ResultSet rs = ps.getGeneratedKeys()) {
+            try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
                     plan.setPlanId(rs.getInt(1));
                 }
@@ -115,7 +70,7 @@ public class InstallmentPlanDAO {
 
     public boolean updateStatus(InstallmentPlanDTO plan) throws ClassNotFoundException {
         String sql = "UPDATE " + TABLE_NAME + " SET status = ? WHERE plan_id = ?";
-        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = DbUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setString(1, plan.getStatus());
             ps.setInt(2, plan.getPlanId());
@@ -129,6 +84,10 @@ public class InstallmentPlanDAO {
         }
     }
 
+    public List<InstallmentPlanDTO> getInstallmentPlansListByPayMentId(int paymentId) {
+        return retrieve("payment_id=?", paymentId);
+    }
+
     public List<InstallmentPlanDTO> getAllInstallmentPlans() {
         return retrieve("1 = 1");
     }
@@ -139,8 +98,7 @@ public class InstallmentPlanDAO {
     }
 
     public List<InstallmentPlanDTO> getActiveOrOverduePlans() {
-        List<InstallmentPlanDTO> plans = retrieve("status IN (?, ?)", "ACTIVE", "OVERDUE");
-        return plans;
+        return retrieve("status IN (?, ?)", "ACTIVE", "OVERDUE");
     }
 
 }
