@@ -1,14 +1,5 @@
 package model.dto;
 
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
-
-/**
- *
- * @author Admin
- */
 public class InstallmentPlanDTO {
     private int planId;
     private int paymentId;
@@ -17,37 +8,30 @@ public class InstallmentPlanDTO {
     private String monthlyPay;
     private String status;
 
-<<<<<<< Updated upstream
+    // Default constructor
     public InstallmentPlanDTO() {
     }
 
+    // Constructor without planId (for creating new plans)
     public InstallmentPlanDTO(int paymentId, String interestRate, String termMonth, String monthlyPay, String status) {
         this.paymentId = paymentId;
         this.interestRate = interestRate;
-        this.termMonth = "12";
+        this.termMonth = termMonth;
         this.monthlyPay = monthlyPay;
         this.status = status;
     }
 
-=======
->>>>>>> Stashed changes
+    // Constructor with planId (for existing plans)
     public InstallmentPlanDTO(int planId, int paymentId, String interestRate, String termMonth, String monthlyPay, String status) {
         this.planId = planId;
         this.paymentId = paymentId;
         this.interestRate = interestRate;
-<<<<<<< Updated upstream
-        this.termMonth = "12";
-=======
         this.termMonth = termMonth;
->>>>>>> Stashed changes
         this.monthlyPay = monthlyPay;
         this.status = status;
     }
 
-    public InstallmentPlanDTO() {
-    }
-
-
+    // Getters and setters
     public int getPlanId() {
         return planId;
     }
@@ -73,7 +57,7 @@ public class InstallmentPlanDTO {
     }
 
     public String getTermMonth() {
-        return termMonth = "12";
+        return termMonth;
     }
 
     public void setTermMonth(String termMonth) {
