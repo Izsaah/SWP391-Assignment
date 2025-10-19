@@ -10,7 +10,9 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import model.service.CreateCustomerService;
+import java.util.Map;
+import model.service.CustomerService;
+import utils.RequestUtils;
 import utils.ResponseUtils;
 
 
@@ -21,15 +23,16 @@ import utils.ResponseUtils;
 @WebServlet("/api/staff/createCustomer")
 public class CreateCustomerController extends HttpServlet {
 
-    private final CreateCustomerService service = new CreateCustomerService();
+    private final CustomerService service = new CustomerService();
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         try {
-            String name = req.getParameter("name");
-            String address = req.getParameter("address");
-            String email = req.getParameter("email");
-            String phoneNumber = req.getParameter("phoneNumber");
+             Map<String, Object> params = RequestUtils.extractParams(req);
+            String name = params.get("name").toString();
+            String address = params.get("address").toString();
+            String email = params.get("email").toString();
+            String phoneNumber = params.get("phoneNumber").toString();
 
             if (name == null || name.trim().isEmpty() || email == null || email.trim().isEmpty()) {
                 ResponseUtils.error(resp, "Name and Email are required");

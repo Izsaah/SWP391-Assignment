@@ -14,29 +14,53 @@ import java.util.List;
 public class OrderDTO {
     private int orderId;
     private int customerId;
-    private int dealerId;
     private int dealerStaffId;
+    private int modelId;
     private String orderDate;
     private String status;
     private OrderDetailDTO detail;
+    private ConfirmationDTO confirmation;
+    private boolean isCustom;
 
-    public OrderDTO(int orderId, int customerId, int dealerId, int dealerStaffId, String orderDate, String status, OrderDetailDTO detail) {
+    public OrderDTO(int orderId, int customerId, int dealerStaffId, int modelId, String orderDate, String status, OrderDetailDTO detail, ConfirmationDTO confirmation, boolean isCustom) {
         this.orderId = orderId;
         this.customerId = customerId;
-        this.dealerId = dealerId;
         this.dealerStaffId = dealerStaffId;
+        this.modelId = modelId;
+        this.orderDate = orderDate;
+        this.status = status;
+        this.detail = detail;
+        this.confirmation = confirmation;
+        this.isCustom = isCustom;
+    }
+    
+    public OrderDTO(int orderId, int customerId, int dealerStaffId, int modelId, String orderDate, String status, OrderDetailDTO detail) {
+        this.orderId = orderId;
+        this.customerId = customerId;
+        this.dealerStaffId = dealerStaffId;
+        this.modelId = modelId;
         this.orderDate = orderDate;
         this.status = status;
         this.detail = detail;
     }
-    
-    public OrderDTO(int customerId, int dealerId, int dealerStaffId, String orderDate, String status) {
+
+    public OrderDTO(int orderId, int customerId, int dealerStaffId, int modelId, String orderDate, String status) {
+        this.orderId = orderId;
         this.customerId = customerId;
-        this.dealerId = dealerId;
         this.dealerStaffId = dealerStaffId;
+        this.modelId = modelId;
         this.orderDate = orderDate;
-        this.status = status;;
+        this.status = status;
     }
+
+    public int getDealerStaffId() {
+        return dealerStaffId;
+    }
+
+    public void setDealerStaffId(int dealerStaffId) {
+        this.dealerStaffId = dealerStaffId;
+    }
+
 
     public OrderDetailDTO getDetail() {
         return detail;
@@ -49,14 +73,7 @@ public class OrderDTO {
     public OrderDTO() {
     }
 
-    public OrderDTO(int orderId, int customerId, int dealerId, int dealerStaffId, String orderDate, String status) {
-        this.orderId = orderId;
-        this.customerId = customerId;
-        this.dealerId = dealerId;
-        this.dealerStaffId = dealerStaffId;
-        this.orderDate = orderDate;
-        this.status = status;
-    }
+   
 
     public int getOrderId() {
         return orderId;
@@ -74,20 +91,14 @@ public class OrderDTO {
         this.customerId = customerId;
     }
 
-    public int getDealerId() {
-        return dealerId;
+  
+
+    public int getModelId() {
+        return modelId;
     }
 
-    public void setDealerId(int dealerId) {
-        this.dealerId = dealerId;
-    }
-
-    public int getDealerStaffId() {
-        return dealerStaffId;
-    }
-
-    public void setDealerStaffId(int dealerStaffId) {
-        this.dealerStaffId = dealerStaffId;
+    public void setModelId(int modelId) {
+        this.modelId = modelId;
     }
 
     public String getOrderDate() {
@@ -105,4 +116,21 @@ public class OrderDTO {
     public void setStatus(String status) {
         this.status = status;
     }
+
+    public ConfirmationDTO getConfirmation() {
+        return confirmation;
+    }
+
+    public void setConfirmation(ConfirmationDTO confirmation) {
+        this.confirmation = confirmation;
+    }
+
+    public boolean isIsCustom() {
+        return isCustom;
+    }
+
+    public void setIsCustom(boolean isCustom) {
+        this.isCustom = isCustom;
+    }
+    
 }

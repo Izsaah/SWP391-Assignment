@@ -68,3 +68,28 @@ FE/.nuxt/ # Nuxt.js
 FE/.vuepress/dist # VuePress
 FE/.next/ # Next.js
 FE/out/ # Next.js export
+BE/target/classes/model/controller/CompareModelFeaturesController.class
+BE/target/classes/model/dao/ConfirmationDAO.class
+BE/target/classes/model/dao/CustomerDAO.class
+BE/target/classes/model/dao/SpecialOrderDAO.class
+BE/target/classes/model/dto/CustomerDTO.class
+BE/target/classes/model/dto/SpecialOrderDTO.class
+BE/target/SWP391-Assignment-1.0-SNAPSHOT/WEB-INF/classes/model/controller/CompareModelFeaturesController.class
+BE/target/SWP391-Assignment-1.0-SNAPSHOT/WEB-INF/classes/model/dao/ConfirmationDAO.class
+BE/target/SWP391-Assignment-1.0-SNAPSHOT/WEB-INF/classes/model/dao/CustomerDAO.class
+BE/target/SWP391-Assignment-1.0-SNAPSHOT/WEB-INF/classes/model/dao/SpecialOrderDAO.class
+BE/target/SWP391-Assignment-1.0-SNAPSHOT/WEB-INF/classes/model/dto/CustomerDTO.class
+BE/target/SWP391-Assignment-1.0-SNAPSHOT/WEB-INF/classes/model/dto/SpecialOrderDTO.class
+BE/src/main/java/model/controller/CustomerSearchController.java
+BE/target/classes/model/controller/CompareModelFeaturesController.class
+BE/target/classes/model/dao/ConfirmationDAO.class
+BE/target/classes/model/dao/CustomerDAO.class
+BE/target/classes/model/dao/SpecialOrderDAO.class
+BE/target/classes/model/dto/CustomerDTO.class
+BE/target/classes/model/dto/SpecialOrderDTO.class
+BE/target/SWP391-Assignment-1.0-SNAPSHOT/WEB-INF/classes/model/controller/CompareModelFeaturesController.class
+BE/target/SWP391-Assignment-1.0-SNAPSHOT/WEB-INF/classes/model/dao/ConfirmationDAO.class
+BE/target/SWP391-Assignment-1.0-SNAPSHOT/WEB-INF/classes/model/dao/CustomerDAO.class
+BE/target/SWP391-Assignment-1.0-SNAPSHOT/WEB-INF/classes/model/dao/SpecialOrderDAO.class
+BE/target/SWP391-Assignment-1.0-SNAPSHOT/WEB-INF/classes/model/dto/CustomerDTO.class
+BE/target/SWP391-Assignment-1.0-SNAPSHOT/WEB-INF/classes/model/dto/SpecialOrderDTO.class

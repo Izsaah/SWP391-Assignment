@@ -1,48 +1,48 @@
 import React from 'react';
-import { Users, ShoppingCart, Truck, DollarSign } from 'lucide-react';
+import { Users, ShoppingCart, BarChart3, DollarSign } from 'lucide-react';
 import SummaryCard from './SummaryCard';
 
-const SummaryCards = ({ data, onViewDetails }) => {
+const SummaryCards = ({ onViewDetails }) => {
   const cards = [
     {
       id: 'customers',
-      title: 'Khách hàng đang phụ trách',
-      value: data?.customers || '0',
-      icon: Users,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100',
+      title: "Today's Money",
+      value: '$53k',
+      icon: DollarSign,
+      color: 'text-gray-600',
+      bgColor: 'bg-gray-100',
       trend: 'up',
-      trendValue: '+12%'
+      trendValue: '+55% than last week'
     },
     {
       id: 'orders',
-      title: 'Đơn hàng đang mở',
-      value: data?.orders || '0',
-      icon: ShoppingCart,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100',
+      title: "Today's Users",
+      value: '2300',
+      icon: Users,
+      color: 'text-gray-600',
+      bgColor: 'bg-gray-100',
       trend: 'up',
-      trendValue: '+8%'
+      trendValue: '+3% than last month'
     },
     {
       id: 'deliveries',
-      title: 'Xe đang chờ giao',
-      value: data?.deliveries || '0',
-      icon: Truck,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-100',
+      title: 'Ads Views',
+      value: '3,462',
+      icon: BarChart3,
+      color: 'text-gray-600',
+      bgColor: 'bg-gray-100',
       trend: 'down',
-      trendValue: '-3%'
+      trendValue: '-2% than yesterday'
     },
     {
       id: 'revenue',
-      title: 'Doanh thu tháng này',
-      value: data?.revenue || '0 VNĐ',
+      title: 'Sales',
+      value: '$103,430',
       icon: DollarSign,
-      color: 'text-red-600',
-      bgColor: 'bg-red-100',
+      color: 'text-gray-600',
+      bgColor: 'bg-gray-100',
       trend: 'up',
-      trendValue: '+15%'
+      trendValue: '+5% than yesterday'
     }
   ];
 

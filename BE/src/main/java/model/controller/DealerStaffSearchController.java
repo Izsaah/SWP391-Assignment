@@ -11,8 +11,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import model.dao.UserAccountDAO;
 import model.dto.UserAccountDTO;
+import utils.RequestUtils;
 import utils.ResponseUtils;
 
 /**
@@ -25,31 +27,29 @@ public class DealerStaffSearchController extends HttpServlet {
     private final UserAccountDAO userDAO = new UserAccountDAO();
 
     @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-
-        String name = req.getParameter("username");
-
-        if (name == null || name.trim().isEmpty()) {
-            ResponseUtils.error(resp, "Dealer staff name is required");
-            return;
-        }
-
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         try {
-            // Search dealer staff by username (partial match)
-            List<UserAccountDTO> users = userDAO.searchDealerStaffAndManagerByName(name.trim());
+            Map<String, Object> params = RequestUtils.extractParams(req);
 
-            if (users == null || users.isEmpty()) {
-                ResponseUtils.error(resp, "No DealerStaff found with name: " + name);
+            Object nameObj = params.get("username");
+            String name = (nameObj == null) ? null : nameObj.toString();
+
+            if (name == null || name.trim().isEmpty()) {
+                ResponseUtils.error(resp, "Dealer staff username is required");
                 return;
             }
 
-            // Return the list of dealer staff
-            ResponseUtils.success(resp, "DealerStaff found", users);
+            List<UserAccountDTO> users = userDAO.searchDealerStaffAndManagerByName(name.trim());
+
+            if (users != null && !users.isEmpty()) {
+                ResponseUtils.success(resp, "DealerStaff found", users);
+            } else {
+                ResponseUtils.error(resp, "No DealerStaff found with username: " + name);
+            }
 
         } catch (Exception e) {
             e.printStackTrace();
             ResponseUtils.error(resp, "Error searching DealerStaff: " + e.getMessage());
         }
-
     }
 }

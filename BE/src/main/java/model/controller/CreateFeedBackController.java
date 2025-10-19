@@ -10,13 +10,10 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Map;
 import model.dto.FeedbackDTO;
-import model.dto.SpecialOrderDTO;
-import model.dto.TestDriveScheduleDTO;
-import model.service.CreateFeedBackService;
-import model.service.CreateSpecialOrderService;
-import model.service.CreateTestDriveScheduleService;
-import utils.JwtUtil;
+import model.service.FeedBackService;
+import utils.RequestUtils;
 import utils.ResponseUtils;
 
 /**
@@ -26,23 +23,42 @@ import utils.ResponseUtils;
 @WebServlet("/api/staff/createFeedBack")
 public class CreateFeedBackController extends HttpServlet {
 
-    private final CreateFeedBackService CFBService = new CreateFeedBackService();
+    private final FeedBackService CFBService = new FeedBackService();
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-              
-        int customerId = Integer.parseInt(req.getParameter("customer_id"));
-        int orderId = Integer.parseInt(req.getParameter("order_id"));
+        try {
+            Map<String, Object> params = RequestUtils.extractParams(req);
 
-        String type = req.getParameter("type");
-        String content = req.getParameter("content");
-        String status=req.getParameter("status");
-        FeedbackDTO feedback=CFBService.handlingCreateFeedBack(customerId, orderId, type, content, status);
-        if (feedback == null) {
-            ResponseUtils.error(resp, "Failed to create special order");
-        } else {
-            ResponseUtils.success(resp, "Special order created", feedback);
+            String customerIdStr = params.get("customer_id").toString();
+            String orderIdStr = params.get("order_id").toString();
+            String type = params.get("type").toString();
+            String content = params.get("content").toString();
+            String status = params.get("status").toString();
+
+            if (customerIdStr == null || customerIdStr.trim().isEmpty() ||
+                orderIdStr == null || orderIdStr.trim().isEmpty() ||
+                content == null || content.trim().isEmpty()) {
+                ResponseUtils.error(resp, "Customer ID, Order ID, and Content are required");
+                return;
+            }
+
+            int customerId = Integer.parseInt(customerIdStr);
+            int orderId = Integer.parseInt(orderIdStr);
+
+            FeedbackDTO feedback = CFBService.handlingCreateFeedBack(customerId, orderId, type, content, status);
+
+            if (feedback != null) {
+                ResponseUtils.success(resp, "Feedback created successfully", feedback);
+            } else {
+                ResponseUtils.error(resp, "Failed to create feedback");
+            }
+
+        } catch (NumberFormatException e) {
+            ResponseUtils.error(resp, "Invalid format for Customer ID or Order ID");
+        } catch (Exception e) {
+            e.printStackTrace();
+            ResponseUtils.error(resp, "Error creating feedback: " + e.getMessage());
         }
     }
-
 }

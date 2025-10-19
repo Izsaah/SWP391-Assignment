@@ -33,6 +33,7 @@ public class ResponseUtils {
         ApiResponse<Object> response = new ApiResponse<>("error", message, null);
         mapper.writeValue(resp.getWriter(), response);
     }
+
     //Helper For Update
     public <T> void updateIfNotNull(Consumer<T> setter, T newValue) {
         if (newValue != null) {
@@ -46,4 +47,7 @@ public class ResponseUtils {
         }
     }
 
+    public static boolean isNullOrEmpty(String s) {
+        return s == null || s.trim().isEmpty();
+    }
 }

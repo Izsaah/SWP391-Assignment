@@ -6,53 +6,45 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import model.service.CreateFeedBackService; // Assuming this service has the delete method
+import java.util.Map;
+import model.service.FeedBackService;
+import utils.RequestUtils;
 import utils.ResponseUtils;
 
-/**
- *
- * @author Admin
- */
 @WebServlet("/api/staff/deleteFeedBackByFeedBackId")
 public class DeleteFeedBackByFeedBackIdController extends HttpServlet {
 
-    // Rename to a more appropriate service name if possible (e.g., FeedbackService)
-    private final CreateFeedBackService CFBService = new CreateFeedBackService();
+    private final FeedBackService service = new FeedBackService();
 
-    // Use doPost for deletion operations
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
-        String idParam = req.getParameter("id");
-
-        if (idParam == null || idParam.trim().isEmpty()) {
-            ResponseUtils.error(resp, "Feedback ID is required");
-            return;
-        }
-
-        int feedbackId;
         try {
+            Map<String, Object> params = RequestUtils.extractParams(req);
+            
+            Object idObj = params.get("id");
+            String idParam = (idObj == null) ? null : idObj.toString();
 
-            feedbackId = Integer.parseInt(idParam);
+
+            if (idParam == null || idParam.trim().isEmpty()) {
+                ResponseUtils.error(resp, "Feedback ID is required");
+                return;
+            }
+
+            int feedbackId = Integer.parseInt(idParam);
+            boolean isDeleted = service.deleteFeedBack(feedbackId);
+
+            if (isDeleted) {
+                ResponseUtils.success(resp, "Feedback deleted successfully", feedbackId);
+            } else {
+                ResponseUtils.error(resp, "Failed to delete feedback. ID may not exist.");
+            }
         } catch (NumberFormatException e) {
-            ResponseUtils.error(resp, "Invalid Feedback ID format");
-            return;
+            ResponseUtils.error(resp, "Invalid feedback ID format");
+        } catch (Exception e) {
+            e.printStackTrace();
+            ResponseUtils.error(resp, "Error deleting feedback: " + e.getMessage());
         }
-
-        boolean isDeleted = CFBService.deleteFeedBack(feedbackId);
-
-        if (isDeleted) {
-            ResponseUtils.success(resp, "Feedback with ID " + feedbackId + " successfully deleted", null);
-        } else {
-
-            ResponseUtils.error(resp, "Failed to delete feedback with ID " + feedbackId + ". It may not exist.");
-        }
-    }
-
-    @Override
-    protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        // You can simply call doPost or implement the logic here directly
-        doPost(req, resp);
     }
 }

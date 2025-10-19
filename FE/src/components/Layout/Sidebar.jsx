@@ -8,6 +8,11 @@ import {
   Settings,
   ChevronLast,
   ChevronFirst,
+  ChevronDown,
+  ChevronRight,
+  Car,
+  GitCompare,
+  Truck,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router";
 
@@ -18,16 +23,24 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [expanded, setExpanded] = useState(true);
+  const [openDropdowns, setOpenDropdowns] = useState({});
 
   const isActive = (path) => location.pathname === path;
+
+  const toggleDropdown = (dropdownId) => {
+    setOpenDropdowns(prev => ({
+      ...prev,
+      [dropdownId]: !prev[dropdownId]
+    }));
+  };
 
   return (
     <aside className="min-h-screen">
       <nav className="h-full flex flex-col bg-gray-900 text-white shadow-sm relative">
-        <div className="p-4 pb-2 flex justify-between items-center">
+        <div className="p-3 pb-2 flex justify-between items-center">
           <h2
-            className={`uppercase tracking-wider text-lg font-semibold overflow-hidden transition-all ${
-              expanded ? "w-32" : "w-0"
+            className={`uppercase tracking-wider text-base font-semibold overflow-hidden transition-all ${
+              expanded ? "w-24" : "w-0"
             }`}
           >
             Menu
@@ -40,27 +53,29 @@ export default function Sidebar() {
           </button>
         </div>
 
-        <SidebarContext.Provider value={{ expanded }}>
-          <ul className="flex-1 px-3 my-10 space-y-6 ">
+        <SidebarContext.Provider value={{ expanded, openDropdowns, toggleDropdown }}>
+          <ul className="flex-1 px-2 my-6 space-y-4 ">
             {menuItems.map((item) => (
               <SidebarItem
                 key={item.id}
                 icon={<item.icon className="w-5 h-5" />}
                 text={item.label}
                 active={isActive(item.path)}
-                onClick={() => navigate(item.path)}
+                onClick={() => item.subItems ? toggleDropdown(item.id) : navigate(item.path)}
+                subItems={item.subItems}
+                dropdownId={item.id}
               />
             ))}
           </ul>
         </SidebarContext.Provider>
 
-        <div className="border-t border-gray-700 flex p-4">
-          <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-            <Users className="w-5 h-5 text-white" />
+        <div className="border-t border-gray-700 flex p-3">
+          <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+            <Users className="w-4 h-4 text-white" />
           </div>
           <div
             className={`flex justify-between items-center overflow-hidden transition-all ${
-              expanded ? "w-52 ml-3" : "w-0"
+              expanded ? "w-40 ml-2" : "w-0"
             }`}
           >
             <div className="leading-4">
@@ -74,48 +89,96 @@ export default function Sidebar() {
   );
 }
 
-function SidebarItem({ icon, text, active, onClick, alert }) {
-  const { expanded } = useSidebar();
+function SidebarItem({ icon, text, active, onClick, alert, subItems, dropdownId }) {
+  const { expanded, openDropdowns } = useSidebar();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const isDropdownOpen = openDropdowns[dropdownId];
+  const hasSubItems = subItems && subItems.length > 0;
+
+  const handleSubItemClick = (subItem) => {
+    navigate(subItem.path);
+  };
 
   return (
-    <li
-      onClick={onClick}
-      className={`
-        relative flex items-center py-2 px-3 
-        font-medium rounded-md cursor-pointer transition-colors group
-        ${
-          active
-            ? "bg-gradient-to-tr from-blue-500/20 to-blue-500/10 text-white"
-            : "hover:bg-gray-800 text-gray-300"
-        }
-      `}
-    >
-      {icon}
-      <span
-        className={`overflow-hidden transition-all ${
-          expanded ? "w-52 ml-3" : "w-0"
-        }`}
+    <li className="relative">
+      <div
+        onClick={onClick}
+        className={`
+          relative flex items-center py-1.5 px-2 
+          font-medium rounded-md cursor-pointer transition-colors group
+          ${
+            active
+              ? "bg-gradient-to-tr from-blue-500/20 to-blue-500/10 text-white"
+              : "hover:bg-gray-800 text-gray-300"
+          }
+        `}
       >
-        {text}
-      </span>
-      {alert && (
-        <div
-          className={`absolute right-2 w-2 h-2 rounded bg-indigo-400 ${
-            expanded ? "" : "top-2"
+        {icon}
+        <span
+          className={`overflow-hidden transition-all ${
+            expanded ? "w-40 ml-2" : "w-0"
           }`}
-        />
-      )}
-      {!expanded && (
-        <div
-          className="
-            absolute left-full rounded-md px-2 py-1 ml-6
-            bg-indigo-100 text-indigo-800 text-sm
-            invisible opacity-20 -translate-x-3 transition-all
-            group-hover:visible group-hover:opacity-100 group-hover:translate-x-0
-          "
         >
           {text}
-        </div>
+        </span>
+        
+        {/* Dropdown arrow */}
+        {hasSubItems && expanded && (
+          <div className="ml-auto">
+            {isDropdownOpen ? (
+              <ChevronDown className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
+          </div>
+        )}
+
+        {alert && (
+          <div
+            className={`absolute right-2 w-2 h-2 rounded bg-indigo-400 ${
+              expanded ? "" : "top-2"
+            }`}
+          />
+        )}
+        
+        {!expanded && (
+          <div
+            className="
+              absolute left-full rounded-md px-2 py-1 ml-6
+              bg-indigo-100 text-indigo-800 text-sm
+              invisible opacity-20 -translate-x-3 transition-all
+              group-hover:visible group-hover:opacity-100 group-hover:translate-x-0
+            "
+          >
+            {text}
+          </div>
+        )}
+      </div>
+
+      {/* Dropdown sub-items */}
+      {hasSubItems && expanded && isDropdownOpen && (
+        <ul className="ml-4 mt-1 space-y-1">
+          {subItems.map((subItem) => (
+            <li
+              key={subItem.id}
+              onClick={() => handleSubItemClick(subItem)}
+              className={`
+                flex items-center py-1 px-2 
+                font-medium rounded-md cursor-pointer transition-colors group
+                ${
+                  location.pathname === subItem.path
+                    ? "bg-gradient-to-tr from-blue-500/20 to-blue-500/10 text-white"
+                    : "hover:bg-gray-800 text-gray-300"
+                }
+              `}
+            >
+              <subItem.icon className="w-3 h-3" />
+              <span className="ml-2 text-xs">{subItem.label}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </li>
   );
@@ -128,7 +191,32 @@ const menuItems = [
     icon: LayoutDashboard,
     path: "/dashboard",
   },
-  { id: "inventory", label: "Inventory", icon: Package, path: "/inventory" },
+  { 
+    id: "inventory", 
+    label: "Inventory", 
+    icon: Package, 
+    path: "/inventory",
+    subItems: [
+      {
+        id: "vehicle-list",
+        label: "Vehicle List",
+        icon: Car,
+        path: "/inventory/vehicle-list"
+      },
+      {
+        id: "compare-models",
+        label: "Compare Models",
+        icon: GitCompare,
+        path: "/inventory/compare-models"
+      },
+      {
+        id: "request-manufacturer",
+        label: "Request From Manufacturer",
+        icon: Truck,
+        path: "/inventory/request-manufacturer"
+      }
+    ]
+  },
   { id: "customers", label: "Customers", icon: Users, path: "/customers" },
   { id: "orders", label: "Orders", icon: ShoppingCart, path: "/orders" },
   { id: "reports", label: "Reports", icon: BarChart3, path: "/reports" },

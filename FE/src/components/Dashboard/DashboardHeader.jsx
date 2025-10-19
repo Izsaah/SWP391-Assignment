@@ -15,18 +15,18 @@ const DashboardHeader = ({ onRefresh, lastUpdated }) => {
   });
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+    <div className="mb-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Dealer Staff Dashboard
+            Dashboard
           </h1>
           <p className="text-gray-600 text-lg">
-            Tổng quan hoạt động kinh doanh của bạn hôm nay
+            Check the sales, value and bounce rate by country.
           </p>
         </div>
         
-        <div className="flex items-center space-x-6">
+        <div className="flex items-center space-x-4">
           {/* Current Date & Time */}
           <div className="text-right">
             <div className="flex items-center space-x-2 text-gray-600 mb-1">
@@ -49,15 +49,6 @@ const DashboardHeader = ({ onRefresh, lastUpdated }) => {
           </button>
         </div>
       </div>
-      
-      {/* Last Updated Info */}
-      {lastUpdated && (
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <p className="text-sm text-gray-500">
-            Cập nhật lần cuối: {lastUpdated.toLocaleString('vi-VN')}
-          </p>
-        </div>
-      )}
     </div>
   );
 };

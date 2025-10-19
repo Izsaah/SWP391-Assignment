@@ -12,7 +12,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.io.PrintWriter;
-import model.service.ViewVehicleService;
+import model.service.VehicleService;
 import utils.ResponseUtils;
 
 
@@ -22,7 +22,7 @@ import utils.ResponseUtils;
  */
 @WebServlet("/api/staff/viewVehicle")
 public class ViewVehicleController extends HttpServlet {
-    private final ViewVehicleService service = new ViewVehicleService();
+    private final VehicleService service = new VehicleService();
    
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) 

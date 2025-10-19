@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/JSP_Servlet/Servlet.java to edit this template
- */
 package model.controller;
 
 import jakarta.servlet.ServletException;
@@ -11,36 +7,42 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
-import model.dao.CustomerDAO;
+import java.util.Map;
 import model.dto.CustomerDTO;
-import model.service.CreateTestDriveScheduleService;
+import model.service.TestDriveScheduleService;
+import utils.RequestUtils;
 import utils.ResponseUtils;
 
-/**
- *
- * @author Admin
- */
 @WebServlet("/api/staff/searchCustomerForSchedule")
 public class SearchCustomerForScheduleController extends HttpServlet {
 
-    private final CreateTestDriveScheduleService CTDSService=new CreateTestDriveScheduleService();
+    private final TestDriveScheduleService service = new TestDriveScheduleService();
 
     @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
-        String name = req.getParameter("name");
+        try {
+            Map<String, Object> params = RequestUtils.extractParams(req);
+            
+            Object nameObj = params.get("name");
+            String name = (nameObj == null) ? null : nameObj.toString().trim();
 
-        if (name == null || name.trim().isEmpty()) {
-            ResponseUtils.error(resp, "Customer name is required");
-            return;
-        }
+            if (name == null || name.isEmpty()) {
+                ResponseUtils.error(resp, "Customer name is required");
+                return;
+            }
 
-        List<CustomerDTO> customers = CTDSService.getTestDriveScheduleByCustomer(name);
+            List<CustomerDTO> customers = service.getTestDriveScheduleByCustomer(name);
 
-        if (customers != null && !customers.isEmpty()) {
-            ResponseUtils.success(resp, "Customers found", customers);
-        } else {
-            ResponseUtils.error(resp, "No customers found with name: " + name);
+            if (customers != null && !customers.isEmpty()) {
+                ResponseUtils.success(resp, "Customers found", customers);
+            } else {
+                ResponseUtils.error(resp, "No customers found with name: " + name);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            ResponseUtils.error(resp, "Error retrieving customers: " + e.getMessage());
         }
     }
 }
