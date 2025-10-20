@@ -16,7 +16,7 @@ public class InstallmentPlanDAO {
                 rs.getInt("payment_id"),
                 rs.getString("interest_rate"),
                 rs.getString("term_month"),
-                rs.getString("monthly_rate"),
+                rs.getString("monthly_pay"),
                 rs.getString("status")
         );
     }

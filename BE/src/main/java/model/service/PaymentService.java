@@ -129,7 +129,7 @@ public class PaymentService {
     public List<Map<String, Object>> getCustomersWithActiveInstallments() {
         List<Map<String, Object>> responseList = new ArrayList<>();
         try {
-            List<InstallmentPlanDTO> plans = installDAO.retrieve("status IN (?, ?)", "Active", "Overdue");
+            List<InstallmentPlanDTO> plans = installDAO.getActiveOrOverduePlans();
             if (plans != null && !plans.isEmpty()) {
                 Set<Integer> addedCustomerIds = new HashSet<>();
                 for (InstallmentPlanDTO plan : plans) {
