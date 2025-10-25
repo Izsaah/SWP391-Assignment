@@ -12,7 +12,13 @@ import {
   ChevronRight,
   Car,
   GitCompare,
-  Truck,
+  FileText,
+  ScrollText,
+  CreditCard,
+  DollarSign,
+  List,
+  Calendar,
+  MessageSquare,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router";
 
@@ -36,10 +42,10 @@ export default function Sidebar() {
 
   return (
     <aside className="min-h-screen">
-      <nav className="h-full flex flex-col bg-gray-900 text-white shadow-sm relative">
+      <nav className="h-full flex flex-col bg-gray-800 text-white shadow-sm relative">
         <div className="p-3 pb-2 flex justify-between items-center">
           <h2
-            className={`uppercase tracking-wider text-base font-semibold overflow-hidden transition-all ${
+            className={`uppercase tracking-wider text-sm font-medium text-gray-400 overflow-hidden transition-all ${
               expanded ? "w-24" : "w-0"
             }`}
           >
@@ -49,16 +55,16 @@ export default function Sidebar() {
             onClick={() => setExpanded((curr) => !curr)}
             className="p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700"
           >
-            {expanded ? <ChevronFirst /> : <ChevronLast />}
+            {expanded ? <ChevronFirst className="w-4 h-4" /> : <ChevronLast className="w-4 h-4" />}
           </button>
         </div>
 
         <SidebarContext.Provider value={{ expanded, openDropdowns, toggleDropdown }}>
-          <ul className="flex-1 px-2 my-6 space-y-4 ">
+          <ul className="flex-1 px-2 my-4 space-y-2">
             {menuItems.map((item) => (
               <SidebarItem
                 key={item.id}
-                icon={<item.icon className="w-5 h-5" />}
+                icon={<item.icon className="w-4 h-4" />}
                 text={item.label}
                 active={isActive(item.path)}
                 onClick={() => item.subItems ? toggleDropdown(item.id) : navigate(item.path)}
@@ -70,7 +76,7 @@ export default function Sidebar() {
         </SidebarContext.Provider>
 
         <div className="border-t border-gray-700 flex p-3">
-          <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+          <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
             <Users className="w-4 h-4 text-white" />
           </div>
           <div
@@ -106,11 +112,11 @@ function SidebarItem({ icon, text, active, onClick, alert, subItems, dropdownId 
       <div
         onClick={onClick}
         className={`
-          relative flex items-center py-1.5 px-2 
-          font-medium rounded-md cursor-pointer transition-colors group
+          relative flex items-center py-2 px-3 
+          text-sm font-medium rounded-md cursor-pointer transition-colors group
           ${
             active
-              ? "bg-gradient-to-tr from-blue-500/20 to-blue-500/10 text-white"
+              ? "bg-blue-600 text-white shadow-sm"
               : "hover:bg-gray-800 text-gray-300"
           }
         `}
@@ -118,7 +124,7 @@ function SidebarItem({ icon, text, active, onClick, alert, subItems, dropdownId 
         {icon}
         <span
           className={`overflow-hidden transition-all ${
-            expanded ? "w-40 ml-2" : "w-0"
+            expanded ? "w-40 ml-3" : "w-0"
           }`}
         >
           {text}
@@ -159,18 +165,18 @@ function SidebarItem({ icon, text, active, onClick, alert, subItems, dropdownId 
 
       {/* Dropdown sub-items */}
       {hasSubItems && expanded && isDropdownOpen && (
-        <ul className="ml-4 mt-1 space-y-1">
+        <ul className="ml-6 mt-1 space-y-1">
           {subItems.map((subItem) => (
             <li
               key={subItem.id}
               onClick={() => handleSubItemClick(subItem)}
               className={`
-                flex items-center py-1 px-2 
-                font-medium rounded-md cursor-pointer transition-colors group
+                flex items-center py-1.5 px-3 
+                text-sm font-medium rounded-md cursor-pointer transition-colors group
                 ${
                   location.pathname === subItem.path
-                    ? "bg-gradient-to-tr from-blue-500/20 to-blue-500/10 text-white"
-                    : "hover:bg-gray-800 text-gray-300"
+                    ? "bg-blue-500/20 text-blue-200"
+                    : "hover:bg-gray-800 text-gray-400"
                 }
               `}
             >
@@ -201,24 +207,68 @@ const menuItems = [
         id: "vehicle-list",
         label: "Vehicle List",
         icon: Car,
-        path: "/inventory/vehicle-list"
+        path: "/inventory"
       },
       {
         id: "compare-models",
         label: "Compare Models",
         icon: GitCompare,
-        path: "/inventory/compare-models"
-      },
-      {
-        id: "request-manufacturer",
-        label: "Request From Manufacturer",
-        icon: Truck,
-        path: "/inventory/request-manufacturer"
+        path: "/inventory/compare"
       }
     ]
   },
-  { id: "customers", label: "Customers", icon: Users, path: "/customers" },
-  { id: "orders", label: "Orders", icon: ShoppingCart, path: "/orders" },
+  { 
+    id: "sales", 
+    label: "Sales", 
+    icon: DollarSign, 
+    path: "/sales",
+    subItems: [
+      {
+        id: "quotations",
+        label: "Quotations",
+        icon: FileText,
+        path: "/sales/quotations"
+      },
+      {
+        id: "contracts",
+        label: "Contracts",
+        icon: ScrollText,
+        path: "/sales/contracts"
+      },
+      {
+        id: "payment-delivery",
+        label: "Payment & Delivery",
+        icon: CreditCard,
+        path: "/sales/payment-delivery"
+      }
+    ]
+  },
+  { 
+    id: "customers", 
+    label: "Customers", 
+    icon: Users, 
+    path: "/customers",
+    subItems: [
+      {
+        id: "customer-list",
+        label: "Customer List",
+        icon: List,
+        path: "/customers/list"
+      },
+      {
+        id: "test-drive-schedule",
+        label: "Test Drive Schedule",
+        icon: Calendar,
+        path: "/customers/test-drive"
+      },
+      {
+        id: "feedback-complaints",
+        label: "Feedback & Complaints",
+        icon: MessageSquare,
+        path: "/customers/feedback"
+      }
+    ]
+  },
   { id: "reports", label: "Reports", icon: BarChart3, path: "/reports" },
   { id: "settings", label: "Settings", icon: Settings, path: "/settings" },
 ];

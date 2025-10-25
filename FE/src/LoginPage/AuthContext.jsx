@@ -32,7 +32,7 @@ export function useAuth() {
     const login = async (email, password) => {
         try{
 
-            const res = await axios.post(`${API_URL}`, { email, password });
+            const res = await axios.post(`${API_URL}/login`, { email, password });
             const token = res.data?.data?.token;
             const user = res.data?.data?.user;
 
