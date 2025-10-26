@@ -167,7 +167,6 @@ public class SaleRecordService {
 
             SaleRecordDTO dto = new SaleRecordDTO(
                     0, // summary record
-                    customerId,
                     dealerStaffId,
                     latestOrderDate,
                     totalAmount
