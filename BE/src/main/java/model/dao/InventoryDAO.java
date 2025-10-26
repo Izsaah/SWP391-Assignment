@@ -18,30 +18,40 @@ import utils.DbUtils;
  * @author Admin
  */
 public class InventoryDAO {
+
     private static final String TABLE_NAME = "Inventory";
 
     private InventoryDTO mapToInventory(ResultSet rs) throws SQLException {
         return new InventoryDTO(
-            rs.getInt("inventory_id"),
-            rs.getInt("model_id"),
-            rs.getString("quantity")
+                rs.getInt("inventory_id"),
+                rs.getInt("model_id"),
+                rs.getString("quantity")
         );
     }
 
     public List<InventoryDTO> retrieve(String condition, Object... params) {
         String sql = "SELECT * FROM " + TABLE_NAME + " WHERE " + condition;
-        try (Connection conn = DbUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            for (int i = 0; i < params.length; i++) ps.setObject(i + 1, params[i]);
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+            for (int i = 0; i < params.length; i++) {
+                ps.setObject(i + 1, params[i]);
+            }
             ResultSet rs = ps.executeQuery();
             List<InventoryDTO> list = new ArrayList<>();
-            while (rs.next()) list.add(mapToInventory(rs));
+            while (rs.next()) {
+                list.add(mapToInventory(rs));
+            }
             return list;
         } catch (Exception e) {
             e.printStackTrace();
         }
         return null;
     }
-     public List<InventoryDTO> viewAllInventory() {
+
+    public List<InventoryDTO> viewAllInventory() {
         return retrieve("1 = 1");
+    }
+
+    public List<InventoryDTO> getInventoryByModelId(int id) {
+        return retrieve("model_id = ?", id);
     }
 }

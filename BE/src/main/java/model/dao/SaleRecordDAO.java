@@ -34,14 +34,13 @@ public class SaleRecordDAO {
 
         return new SaleRecordDTO(
                 rs.getInt("sale_id"),
-                rs.getInt("customer_id"),
                 rs.getInt("dealer_staff_id"),
                 saleDateString,
                 rs.getDouble("sale_amount")
         );
     }
 
-    public SaleRecordDTO create(int customerId, int dealerId, int dealerStaffId, String saleDate, double saleAmount) throws ClassNotFoundException {
+    public SaleRecordDTO create(int dealerId, int dealerStaffId, String saleDate, double saleAmount) throws ClassNotFoundException {
         Timestamp saleTimestamp = null;
 
         try {
@@ -49,12 +48,10 @@ public class SaleRecordDAO {
             saleTimestamp = new Timestamp(utilDate.getTime());
 
             try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(CREATE_SQL, Statement.RETURN_GENERATED_KEYS)) {
-
-                ps.setInt(1, customerId);
-                ps.setInt(2, dealerId);
-                ps.setInt(3, dealerStaffId);
-                ps.setTimestamp(4, saleTimestamp);
-                ps.setDouble(5, saleAmount);
+                ps.setInt(1, dealerId);
+                ps.setInt(2, dealerStaffId);
+                ps.setTimestamp(3, saleTimestamp);
+                ps.setDouble(4, saleAmount);
 
                 int affectedRows = ps.executeUpdate();
 
@@ -65,7 +62,6 @@ public class SaleRecordDAO {
 
                             return new SaleRecordDTO(
                                     generatedId,
-                                    customerId,
                                     dealerStaffId,
                                     saleDate,
                                     saleAmount
