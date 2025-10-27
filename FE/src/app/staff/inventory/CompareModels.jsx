@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import Layout from '../components/Layout/Layout';
-import VehicleComparisonCard from '../features/inventory/components/VehicleComparisonCard';
-import VehicleSelectorModal from '../features/inventory/components/VehicleSelectorModal';
+import Layout from '../layout/Layout';
+import VehicleComparisonCard from './components/VehicleComparisonCard';
+import VehicleSelectorModal from './components/VehicleSelectorModal';
 import { FileText, Download, RefreshCw, Plus } from 'lucide-react';
-import { fetchInventory, transformInventoryData } from '../services/inventoryService.jsx';
+import { fetchInventory, transformInventoryData } from '../services/inventoryService';
 
 const CompareModels = () => {
   const [selectedVehicles, setSelectedVehicles] = useState([null, null, null]);

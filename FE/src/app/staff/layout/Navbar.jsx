@@ -1,6 +1,6 @@
 import React from 'react';
 import { Bell, Search, User, LogOut } from 'lucide-react';
-import { useAuth } from '../../LoginPage/AuthContext';
+import { useAuth } from '../../login/AuthContext';
 import { useNavigate } from 'react-router';
 
 const Navbar = () => {

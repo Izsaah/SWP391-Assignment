@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import Layout from '../components/Layout/Layout';
+import Layout from '../layout/Layout';
 import { CreditCard, Package, Eye, CheckCircle, Plus, FileText } from 'lucide-react';
 
 const PaymentDelivery = () => {

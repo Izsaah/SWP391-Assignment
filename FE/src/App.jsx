@@ -1,19 +1,19 @@
 import { Routes, Route, Navigate } from 'react-router';
 import './App.css'
-import { AuthProvider } from './LoginPage/AuthContext';
-import Login from './LoginPage/Login';
-import { DashBoard } from './DashBoard/DashBoard';
-import Inventory from './pages/Inventory';
-import CompareModels from './pages/CompareModels';
-import Quotations from './pages/Quotations';
-import Contracts from './pages/Contracts';
-import PaymentDelivery from './pages/PaymentDelivery';
-import Customers from './pages/Customers';
-import CustomerDetail from './pages/CustomerDetail';
-import Orders from './pages/Orders';
-import Reports from './pages/Reports';
-import Settings from './pages/Settings';
-import ProtectedRoute from './LoginPage/ProtectedRoute';
+import { AuthProvider } from './app/login/AuthContext';
+import Login from './app/login/Login';
+import { DashBoard } from './app/staff/dashboard/Dashboard';
+import Inventory from './app/staff/inventory/Inventory';
+import CompareModels from './app/staff/inventory/CompareModels';
+import Quotations from './app/staff/pages/Quotations';
+import Contracts from './app/staff/pages/Contracts';
+import PaymentDelivery from './app/staff/pages/PaymentDelivery';
+import Customers from './app/staff/pages/Customers';
+import CustomerDetail from './app/staff/pages/CustomerDetail';
+import Orders from './app/staff/pages/Orders';
+import Reports from './app/staff/pages/Reports';
+import Settings from './app/staff/pages/Settings';
+import ProtectedRoute from './app/login/ProtectedRoute';
 
 function App() {
   return (

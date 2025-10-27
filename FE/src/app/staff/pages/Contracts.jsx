@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import Layout from '../components/Layout/Layout';
+import Layout from '../layout/Layout';
 import { Eye, CreditCard, Package, Download, ScrollText } from 'lucide-react';
 import { useNavigate } from 'react-router';
 
@@ -118,7 +118,7 @@ const Contracts = () => {
   };
 
   // Handle mark completed
-  const handleMarkCompleted = (contractId) => {
+  const _handleMarkCompleted = (contractId) => {
     if (window.confirm(`Mark contract ${contractId} as completed?`)) {
       console.log('Marking contract as completed:', contractId);
       alert(`Contract ${contractId} marked as completed!`);

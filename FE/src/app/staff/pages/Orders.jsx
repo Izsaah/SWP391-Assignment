@@ -1,5 +1,5 @@
 import React from 'react';
-import Layout from '../components/Layout/Layout';
+import Layout from '../layout/Layout';
 import { ShoppingCart, Search, Plus, Eye, Edit, Trash2 } from 'lucide-react';
 
 const Orders = () => {

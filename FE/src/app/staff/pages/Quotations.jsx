@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import Layout from '../components/Layout/Layout';
+import Layout from '../layout/Layout';
 import { Plus, Eye, Edit2, Trash2, FileText, CheckCircle } from 'lucide-react';
 import { useLocation } from 'react-router';
-import tesla1 from '../assets/tesla1.png';
+import tesla1 from '../../../assets/tesla1.png';
 
 const Quotations = () => {
   const location = useLocation();

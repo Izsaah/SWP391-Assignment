@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import Layout from '../components/Layout/Layout';
-import DashboardHeader from '../components/Dashboard/DashboardHeader';
-import SummaryCards from '../components/Dashboard/SummaryCards';
-import ChartsSection from '../components/Dashboard/ChartsSection';
-import DataTablesSection from '../components/Dashboard/DataTablesSection';
+import Layout from '../layout/Layout';
+import DashboardHeader from './components/DashboardHeader';
+import SummaryCards from './components/SummaryCards';
+import ChartsSection from './components/ChartsSection';
+import DataTablesSection from './components/DataTablesSection';
 
 export const DashBoard = () => {
   const [lastUpdated, setLastUpdated] = useState(new Date());

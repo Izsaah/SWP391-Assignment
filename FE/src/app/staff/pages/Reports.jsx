@@ -1,5 +1,5 @@
 import React from 'react';
-import Layout from '../components/Layout/Layout';
+import Layout from '../layout/Layout';
 import { BarChart3, TrendingUp, Download, Calendar } from 'lucide-react';
 
 const Reports = () => {

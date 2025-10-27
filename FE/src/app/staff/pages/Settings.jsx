@@ -1,5 +1,5 @@
 import React from 'react';
-import Layout from '../components/Layout/Layout';
+import Layout from '../layout/Layout';
 import { Settings as SettingsIcon, User, Bell, Shield, Save } from 'lucide-react';
 
 const Settings = () => {

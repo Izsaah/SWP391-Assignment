@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import Layout from '../components/Layout/Layout';
+import Layout from '../layout/Layout';
 import {
   ChevronRight,
   Phone,

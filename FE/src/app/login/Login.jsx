@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router';
-import ReactImg from '../assets/car2.jpg'
+import ReactImg from '../../assets/car2.jpg'
 import { FaGoogle } from "react-icons/fa";
 import { useAuth } from './AuthContext';
 

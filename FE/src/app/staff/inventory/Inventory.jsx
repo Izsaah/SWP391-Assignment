@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import Layout from '../components/Layout/Layout';
-import InventoryControlBar from '../features/inventory/components/InventoryControlBar';
-import VehicleCard from '../features/inventory/components/VehicleCard';
-import CarDetailModal from '../features/inventory/components/CarDetailModal';
-import { useInventoryControls } from '../features/inventory/hooks/useInventoryControls';
-import { fetchInventory, transformInventoryData } from '../services/inventoryService.jsx';
+import Layout from '../layout/Layout';
+import InventoryControlBar from './components/InventoryControlBar';
+import VehicleCard from './components/VehicleCard';
+import CarDetailModal from './components/CarDetailModal';
+import { useInventoryControls } from './hooks/useInventoryControls';
+import { fetchInventory, transformInventoryData } from '../services/inventoryService';
 
 
 
