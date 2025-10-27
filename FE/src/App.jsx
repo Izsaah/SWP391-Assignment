@@ -9,6 +9,7 @@ import Quotations from './pages/Quotations';
 import Contracts from './pages/Contracts';
 import PaymentDelivery from './pages/PaymentDelivery';
 import Customers from './pages/Customers';
+import CustomerDetail from './pages/CustomerDetail';
 import Orders from './pages/Orders';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
@@ -27,6 +28,8 @@ function App() {
         <Route path="/sales/contracts" element={<Contracts />} />
         <Route path="/sales/payment-delivery" element={<PaymentDelivery />} />
         <Route path="/customers" element={<Customers />} />
+        <Route path="/customers/list" element={<Customers />} />
+        <Route path="/customers/:customerId" element={<CustomerDetail />} />
         <Route path="/orders" element={<Orders />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />

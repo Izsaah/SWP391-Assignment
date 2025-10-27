@@ -62,13 +62,15 @@ const Quotations = () => {
       customer: 'Le Minh Tuan',
       customerId: 'C-001',
       vehicle: 'Model 3 Standard RWD',
-      vin: 'Pending',
+      vin: '5YJ3E1EA0001',
       price: 970000000,
       discount: 50000000,
       paymentMethod: 'Cash',
       status: 'Approved',
       date: '2025-10-22',
-      notes: 'Customer wants white color',
+      sentDate: '2025-10-15',
+      linked_order_id: 'O-2025-001',
+      notes: 'Customer wants white color - Order already created',
       createdBy: 'Nguyen Van Hung',
     },
     {
@@ -96,6 +98,7 @@ const Quotations = () => {
       paymentMethod: 'Cash',
       status: 'Approved',
       date: '2025-10-21',
+      sentDate: '2025-10-14',
       notes: 'VIP customer - priority delivery',
       createdBy: 'Pham Thi Lan',
     },
@@ -110,8 +113,24 @@ const Quotations = () => {
       paymentMethod: 'Cash',
       status: 'Expired',
       date: '2025-10-10',
+      sentDate: '2025-10-03',
       notes: 'Customer did not respond',
       createdBy: 'Tran Van Minh',
+    },
+    {
+      id: 'Q-2025-005',
+      customer: 'Hoang Thi Lan',
+      customerId: 'C-005',
+      vehicle: 'Model 3 Standard RWD',
+      vin: 'Pending',
+      price: 970000000,
+      discount: 30000000,
+      paymentMethod: 'Cash',
+      status: 'Pending',
+      date: '2025-10-20',
+      sentDate: '2025-10-20',
+      notes: 'Online order - waiting for customer confirmation',
+      createdBy: 'Nguyen Van Hung',
     },
   ];
 
@@ -125,6 +144,7 @@ const Quotations = () => {
   const getStatusBadge = (status) => {
     const statusConfig = {
       'Draft': { color: 'bg-gray-100 text-gray-800', icon: '📝' },
+      'Pending': { color: 'bg-yellow-100 text-yellow-800', icon: '⏳' },
       'Approved': { color: 'bg-green-100 text-green-800', icon: '✅' },
       'Expired': { color: 'bg-red-100 text-red-800', icon: '⏱️' },
     };
@@ -139,7 +159,12 @@ const Quotations = () => {
 
   // Format currency
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('vi-VN').format(amount) + ' ₫';
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
   };
 
   // Handle view quotation
@@ -150,10 +175,32 @@ const Quotations = () => {
 
   // Handle convert to order
   const handleConvertToOrder = (quotation) => {
+    if (!window.confirm(`Convert quotation ${quotation.id} to order?\n\nThis will:\n• Create a new Order\n• Create Contract\n• Reserve vehicle\n• Lock this quotation`)) {
+      return;
+    }
+    
     console.log('Converting quotation to order:', quotation.id);
-    // Implement conversion logic
-    alert(`Quotation ${quotation.id} converted to order successfully!`);
+    
+    // Simulate API call
+    const newOrderId = `O-2025-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
+    
+    // TODO: Call backend API
+    // await createOrderFromQuote(quotation.id)
+    
+    alert(
+      `✅ Order Created Successfully!\n\n` +
+      `Order ID: ${newOrderId}\n` +
+      `Contract ID: C-2025-${String(Math.floor(Math.random() * 100)).padStart(3, '0')}\n` +
+      `Vehicle Reserved: ${quotation.vehicle}\n\n` +
+      `Quotation ${quotation.id} is now locked.\n` +
+      `Redirecting to Order page...`
+    );
+    
     setIsViewModalOpen(false);
+    
+    // Simulate redirect
+    console.log(`Would redirect to: /orders/${newOrderId}`);
+    // In real app: navigate(`/orders/${newOrderId}`);
   };
 
   // Handle delete
@@ -441,6 +488,16 @@ const Quotations = () => {
               Draft
             </button>
             <button
+              onClick={() => setStatusFilter('pending')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                statusFilter === 'pending'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Pending
+            </button>
+            <button
               onClick={() => setStatusFilter('approved')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 statusFilter === 'approved'
@@ -487,14 +544,15 @@ const Quotations = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredQuotations.map((quotation) => (
-                  <tr key={quotation.id} className="hover:bg-gray-50">
+                  <tr 
+                    key={quotation.id} 
+                    onClick={() => handleView(quotation)}
+                    className="hover:bg-blue-50 cursor-pointer transition-colors"
+                  >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{quotation.id}</div>
                     </td>
@@ -521,34 +579,6 @@ const Quotations = () => {
                           month: 'long',
                           day: 'numeric',
                         })}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-3">
-                        <button
-                          onClick={() => handleView(quotation)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="View"
-                        >
-                          <Eye className="w-5 h-5" />
-                        </button>
-                        {quotation.status === 'Draft' && (
-                          <>
-                            <button
-                              className="text-green-600 hover:text-green-900"
-                              title="Edit"
-                            >
-                              <Edit2 className="w-5 h-5" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(quotation.id)}
-                              className="text-red-600 hover:text-red-900"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </button>
-                          </>
-                        )}
                       </div>
                     </td>
                   </tr>
@@ -1276,37 +1306,146 @@ const Quotations = () => {
                 )}
               </div>
 
-              {/* Modal Footer */}
-              <div className="bg-gray-50 border-t border-gray-200 p-4 flex items-center justify-between">
-                <button
-                  onClick={() => setIsViewModalOpen(false)}
-                  className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors"
-                >
-                  Close
-                </button>
-                <div className="flex items-center space-x-3">
-                  {selectedQuotation.status === 'Approved' && (
-                    <button
-                      onClick={() => handleConvertToOrder(selectedQuotation)}
-                      className="flex items-center space-x-2 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
-                    >
-                      <CheckCircle className="w-5 h-5" />
-                      <span>Convert to Order</span>
-                    </button>
-                  )}
-                  {selectedQuotation.status === 'Draft' && (
-                    <>
-                      <button className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors">
-                        Edit Notes
-                      </button>
+              {/* Modal Footer - Actions based on Status */}
+              <div className="bg-gray-50 border-t border-gray-200 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  {/* Left: Close Button */}
+                  <button
+                    onClick={() => setIsViewModalOpen(false)}
+                    className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors text-sm whitespace-nowrap"
+                  >
+                    Close
+                  </button>
+                  
+                  {/* Center: Status Banner */}
+                  <div className="flex-1">
+                    {selectedQuotation.status === 'Pending' && selectedQuotation.sentDate && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2">
+                        <p className="text-xs text-yellow-800">
+                          ⏳ <strong>Waiting for customer confirmation</strong> • Sent on {new Date(selectedQuotation.sentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • Expires in 7 days
+                        </p>
+                      </div>
+                    )}
+                    {selectedQuotation.status === 'Expired' && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2">
+                        <p className="text-xs text-red-800">
+                          ⚠️ <strong>Quotation expired.</strong> Customer did not respond within 7 days.
+                        </p>
+                      </div>
+                    )}
+                    {selectedQuotation.status === 'Approved' && selectedQuotation.linked_order_id && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2">
+                        <p className="text-xs text-green-800">
+                          ✅ <strong>Order Created:</strong>{' '}
+                          <a 
+                            href={`/orders/${selectedQuotation.linked_order_id}`}
+                            className="text-green-700 hover:underline font-bold"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              alert(`Navigate to Order: ${selectedQuotation.linked_order_id}`);
+                            }}
+                          >
+                            {selectedQuotation.linked_order_id}
+                          </a>
+                          {' '}• Quotation approved
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Right: Action Buttons */}
+                  <div className="flex items-center gap-2">
+                    {/* DRAFT Status Actions */}
+                    {selectedQuotation.status === 'Draft' && (
+                      <>
+                        <button
+                          onClick={() => handleDelete(selectedQuotation.id)}
+                          className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors text-xs whitespace-nowrap"
+                        >
+                          🗑️ Delete
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIsViewModalOpen(false);
+                            alert('Send quotation to customer - implement this feature');
+                          }}
+                          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-xs whitespace-nowrap"
+                        >
+                          📤 Send to Customer
+                        </button>
+                        <button
+                          onClick={() => handleConvertToOrder(selectedQuotation)}
+                          className="px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors text-xs whitespace-nowrap"
+                        >
+                          ✅ Create Order
+                        </button>
+                      </>
+                    )}
+                    
+                    {/* PENDING Status Actions */}
+                    {selectedQuotation.status === 'Pending' && (
+                      <>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Mark quotation ${selectedQuotation.id} as Expired?`)) {
+                              alert('Quotation marked as Expired');
+                              setIsViewModalOpen(false);
+                            }
+                          }}
+                          className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors text-xs whitespace-nowrap"
+                        >
+                          ⏱️ Expire
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Customer confirmed quotation ${selectedQuotation.id}?`)) {
+                              alert('Quotation approved! You can now create order.');
+                              setIsViewModalOpen(false);
+                            }
+                          }}
+                          className="px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors text-xs whitespace-nowrap"
+                        >
+                          ✅ Confirmed
+                        </button>
+                      </>
+                    )}
+                    
+                    {/* APPROVED Status Actions */}
+                    {selectedQuotation.status === 'Approved' && selectedQuotation.linked_order_id && (
+                      <>
+                        <button
+                          onClick={() => {
+                            alert(`Navigate to Order: ${selectedQuotation.linked_order_id}`);
+                            // In real app: navigate(`/orders/${selectedQuotation.linked_order_id}`);
+                          }}
+                          className="px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors text-xs whitespace-nowrap"
+                        >
+                          📦 View Order
+                        </button>
+                        <button
+                          onClick={() => {
+                            alert(`Download PDF for quotation ${selectedQuotation.id}`);
+                          }}
+                          className="px-4 py-2.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors text-xs whitespace-nowrap"
+                        >
+                          📄 Download PDF
+                        </button>
+                      </>
+                    )}
+                    
+                    {/* EXPIRED Status Actions */}
+                    {selectedQuotation.status === 'Expired' && (
                       <button
-                        onClick={() => handleDelete(selectedQuotation.id)}
-                        className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+                        onClick={() => {
+                          alert('Renew quotation - create new quotation based on this one');
+                          setIsViewModalOpen(false);
+                        }}
+                        className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-xs whitespace-nowrap"
                       >
-                        Delete
+                        🔄 Renew
                       </button>
-                    </>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
