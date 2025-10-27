@@ -14,7 +14,7 @@ import model.service.SaleRecordService;
 import utils.RequestUtils;
 import utils.ResponseUtils;
 
-@WebServlet("/api/dealer/salesRecords")
+@WebServlet("/api/staff/dealerSalesRecords")
 public class DealerSaleRecordController extends HttpServlet {
 
     private final SaleRecordService service = new SaleRecordService();
