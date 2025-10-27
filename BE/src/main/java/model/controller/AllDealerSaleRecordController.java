@@ -12,28 +12,30 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import model.service.PromotionForDealerService;
+import model.service.SaleRecordService;
+import utils.RequestUtils;
 import utils.ResponseUtils;
 
 /**
  *
  * @author Admin
  */
-@WebServlet("/api/EVM/viewPromotionDealerCount")
-public class ViewPromotionDealerCountController extends HttpServlet {
+@WebServlet("/api/EVM/dealerSaleRecords")
+public class AllDealerSaleRecordController extends HttpServlet {
 
-    private final PromotionForDealerService service = new PromotionForDealerService();
+    private SaleRecordService saleService = new SaleRecordService();
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         try {
-            List<Map<String, Object>> counts = service.getAllPromotionsWithDealers();
-            ResponseUtils.success(response, "Promotion dealer counts retrieved successfully", counts);
+            Map<String, Object> params = RequestUtils.extractParams(request);
+            List<Map<String, Object>> summaryList = saleService.getDealerSalesSummary();
+            ResponseUtils.success(response, "Dealer sales summary retrieved successfully", summaryList);
 
         } catch (Exception e) {
             e.printStackTrace();
-            ResponseUtils.error(response, "Internal server error: " + e.getMessage());
+            ResponseUtils.error(response, "Failed to retrieve dealer sales summary: " + e.getMessage());
         }
     }
 }

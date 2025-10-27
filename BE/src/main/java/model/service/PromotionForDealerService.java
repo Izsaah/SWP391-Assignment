@@ -47,8 +47,8 @@ public class PromotionForDealerService {
         return dealerPromotionDAO.updatePromotionForDealer(promoId, dealerId, newPromoId);
     }
     
-    public List<Map<String, Object>> getPromotionDealerCount() throws ClassNotFoundException {
-        return dealerPromotionDAO.getPromotionDealerCount();
+    public List<Map<String, Object>> getAllPromotionsWithDealers() {
+        return dealerPromotionDAO.getAllPromotionsWithDealers();
     }
 
 }

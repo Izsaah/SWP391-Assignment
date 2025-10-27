@@ -63,20 +63,55 @@ public class DealerPromotionDAO {
         }
     }
 
-    public List<Map<String, Object>> getPromotionDealerCount() {
-        String sql = "SELECT promo_id, COUNT(dealer_id) AS dealer_count FROM " + TABLE_NAME + " GROUP BY promo_id";
+    public List<Map<String, Object>> getAllPromotionsWithDealers() {
         List<Map<String, Object>> result = new ArrayList<>();
-        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
-            ResultSet rs = ps.executeQuery();
+
+        String sql = "SELECT p.promo_id, p.description, p.start_date, p.end_date, p.discount_rate, p.type, "
+                + "d.dealer_id, d.dealer_name "
+                + "FROM Promotion p "
+                + "LEFT JOIN DealerPromotion dp ON p.promo_id = dp.promo_id "
+                + "LEFT JOIN Dealer d ON dp.dealer_id = d.dealer_id "
+                + "ORDER BY p.promo_id";
+
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql);  ResultSet rs = ps.executeQuery()) {
+
+            Map<Integer, Map<String, Object>> promoMap = new LinkedHashMap<>();
+
             while (rs.next()) {
-                Map<String, Object> row = new HashMap<>();
-                row.put("promoId", rs.getInt("promo_id"));
-                row.put("dealerCount", rs.getInt("dealer_count"));
-                result.add(row);
+                int promoId = rs.getInt("promo_id");
+                Map<String, Object> promo;
+
+                if (!promoMap.containsKey(promoId)) {
+                    promo = new LinkedHashMap<>(); // preserve order
+                    promo.put("promoId", promoId);
+                    promo.put("description", rs.getString("description"));
+                    promo.put("startDate", rs.getString("start_date"));
+                    promo.put("endDate", rs.getString("end_date"));
+                    promo.put("discountRate", rs.getString("discount_rate"));
+                    promo.put("type", rs.getString("type"));
+                    promo.put("dealers", new ArrayList<Map<String, Object>>());
+                    promoMap.put(promoId, promo);
+                } else {
+                    promo = promoMap.get(promoId);
+                }
+
+                int dealerId = rs.getInt("dealer_id");
+                String dealerName = rs.getString("dealer_name");
+
+                if (dealerId > 0) { // only add if dealer exists
+                    Map<String, Object> dealer = new LinkedHashMap<>(); // preserve order
+                    dealer.put("dealerId", dealerId);
+                    dealer.put("dealerName", dealerName);
+                    ((List<Map<String, Object>>) promo.get("dealers")).add(dealer);
+                }
             }
+
+            result.addAll(promoMap.values());
+
         } catch (Exception e) {
             e.printStackTrace();
         }
+
         return result;
     }
 }
