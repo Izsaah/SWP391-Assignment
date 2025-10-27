@@ -97,4 +97,8 @@ public class SaleRecordDAO {
         }
         return null;
     }
+    
+    public List<SaleRecordDTO> findSaleRecordByDealerStaffId(int dealerStaffId){
+        return retrieve("dealer_staff_id = ?", dealerStaffId);
+    }
 }

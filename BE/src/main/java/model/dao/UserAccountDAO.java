@@ -53,6 +53,10 @@ public class UserAccountDAO {
         List<UserAccountDTO> list = retrieve("dealer_id IS NOT NULL AND dealer_id != 0");
         return list != null ? list : new ArrayList<>();
     }
+    
+    public List<UserAccountDTO> findUserByDealerId(int dealerId){
+        return retrieve("dealer_id = ?", dealerId);
+    }
 
     public List<RoleDTO> getUserRoles(int userId) {
         List<RoleDTO> roles = new ArrayList<>();
