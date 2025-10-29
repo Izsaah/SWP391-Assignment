@@ -65,5 +65,10 @@ public class VehicleSerialDAO {
             return ps.executeUpdate();
         }
     }
+    
+    public VehicleSerialDTO getSerialBySerialId(String serialId){
+        List<VehicleSerialDTO> lists = retrieve("serial_id = ?", serialId);
+        return lists.get(0);
+    }
 
 }
