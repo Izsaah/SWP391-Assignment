@@ -89,4 +89,21 @@ public class OrderDetailDAO {
         }
         return 0;
     }
+    
+    public boolean updateUnitPrice(int orderDetailId, double unitPrice) throws SQLException, ClassNotFoundException {
+        String sql = "UPDATE " + TABLE_NAME + " SET unit_price = ? WHERE order_detail_id = ?";
+
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setDouble(1, unitPrice);
+            ps.setInt(2, orderDetailId);
+
+            int updated = ps.executeUpdate();
+            return updated > 0;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
 }
