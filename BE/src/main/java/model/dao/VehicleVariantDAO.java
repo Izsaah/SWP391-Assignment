@@ -71,4 +71,24 @@ public class VehicleVariantDAO {
         }
     }
     
+    public VehicleVariantDTO findUnitPriceByVariantId(int variantId) {
+        List<VehicleVariantDTO> lists = retrieve("variant_id = ?", variantId);
+        return lists.get(0);
+    }
+    
+    public boolean updateVariantById(int variantId, String versionName, String color) {
+        String sql = "UPDATE " + TABLE_NAME + " SET version_name = ?, color = ? WHERE variant_id = ?";
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, versionName);
+            ps.setString(2, color);
+            ps.setInt(3, variantId);
+
+            int updated = ps.executeUpdate();
+            return updated > 0; // returns true if at least one row was updated
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
 }

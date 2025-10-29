@@ -5,6 +5,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import model.dto.ConfirmationDTO;
@@ -40,78 +42,86 @@ public class ConfirmationDAO {
         }
     }
 
-    // Transaction-aware insert method using Connection parameter
-    public ConfirmationDTO insert(Connection conn, int orderDetailId, String agreement, String date) throws SQLException {
-        ConfirmationDTO confirmation = new ConfirmationDTO();
-        confirmation.setOrderDetailId(orderDetailId);
-        confirmation.setAgreement(agreement);
-        confirmation.setDate(date);
+    public ConfirmationDTO insert(Connection conn, Integer staff_admin_id, int order_detail_id, String agreement, String date) {
+        String sql = "INSERT INTO " + TABLE_NAME + " (staff_admin_id, order_detail_id, agreement, date_time) VALUES(?, ?, ?, ?)";
 
-        String sql = "INSERT INTO " + TABLE_NAME + " (order_detail_id, agreement, date_time) VALUES(?,?,?)";
+        try {
+            // If connection is null, handle it or throw (depends on your app logic)
+            if (conn == null) {
+                throw new SQLException("Connection cannot be null");
+            }
 
-        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            ps.setInt(1, orderDetailId);
-            ps.setString(2, agreement);
-            ps.setString(3, date);
+            try ( PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                if (staff_admin_id == null) {
+                    ps.setNull(1, java.sql.Types.INTEGER); // Insert NULL if staff_admin_id is not provided
+                } else {
+                    ps.setInt(1, staff_admin_id);
+                }
 
-            if (ps.executeUpdate() > 0) {
-                try (ResultSet rs = ps.getGeneratedKeys()) {
-                    if (rs.next()) {
-                        confirmation.setConfirmationId(rs.getInt(1));
+                ps.setInt(2, order_detail_id);
+                ps.setString(3, agreement);
+                ps.setString(4, date);
+
+                int rowsInserted = ps.executeUpdate();
+                System.out.println("DEBUG DAO: Rows inserted: " + rowsInserted);
+
+                if (rowsInserted > 0) {
+                    try ( ResultSet rs = ps.getGeneratedKeys()) {
+                        if (rs.next()) {
+                            int confId = rs.getInt(1);
+                            ConfirmationDTO confirmation = new ConfirmationDTO(
+                                    confId,
+                                    staff_admin_id != null ? staff_admin_id : 0, // default 0 if null
+                                    order_detail_id,
+                                    agreement,
+                                    date
+                            );
+                            System.out.println("DEBUG DAO: Confirmation inserted with ID: " + confId);
+                            return confirmation;
+                        }
                     }
                 }
-                return confirmation;
             }
-        }
-        throw new SQLException("Failed to insert confirmation");
-    }
-
-    // Legacy method - creates its own connection
-    public ConfirmationDTO insert(int orderDetailId, String agreement, String date) throws ClassNotFoundException, SQLException {
-        try (Connection conn = DbUtils.getConnection()) {
-            return insert(conn, orderDetailId, agreement, date);
-        }
-    }
-
-    public ConfirmationDTO getConfirmationByOrderDetailId(int id) throws SQLException, ClassNotFoundException {
-        List<ConfirmationDTO> results = retrieve("order_detail_id = ?", id);
-        if (results != null && !results.isEmpty()) {
-            return results.get(0);
+        } catch (Exception e) {
+            System.out.println("DEBUG DAO ERROR: " + e.getMessage());
+            e.printStackTrace();
         }
         return null;
     }
 
-    // Transaction-aware update method using Connection parameter
-    public ConfirmationDTO updateStatus(Connection conn, int confirmationId, String agreement) throws SQLException {
-        String updateSql = "UPDATE " + TABLE_NAME + " SET agreement = ? WHERE confirmation_id = ?";
+    public ConfirmationDTO insert(Connection conn, int order_detail_id, String agreement, String date) {
+        return insert(conn, null, order_detail_id, agreement, date);
+    }
 
-        try (PreparedStatement ps = conn.prepareStatement(updateSql)) {
-            ps.setString(1, agreement);
-            ps.setInt(2, confirmationId);
+    public ConfirmationDTO getConfirmationByOrderDetailId(int id) throws SQLException, ClassNotFoundException {
+        List<ConfirmationDTO> results = retrieve("order_detail_id =?", id);
+        return results.get(0);
+    }
+
+    public ConfirmationDTO updateStatus(int confirmationId, String agreement, int staffAdminId) {
+        String updateSql = "UPDATE " + TABLE_NAME + " SET agreement = ?, date_time = ?, staff_admin_id = ? WHERE confirmation_id = ?";
+
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(updateSql)) {
+
+            String currentDate = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+            ps.setString(1, agreement);          // Agree / Disagree
+            ps.setString(2, currentDate);        // current datetime
+            ps.setInt(3, staffAdminId);          
+            ps.setInt(4, confirmationId);        
 
             if (ps.executeUpdate() > 0) {
-                // Retrieve within the same connection/transaction
-                String selectSql = "SELECT * FROM " + TABLE_NAME + " WHERE confirmation_id = ?";
-                try (PreparedStatement selectPs = conn.prepareStatement(selectSql)) {
-                    selectPs.setInt(1, confirmationId);
-                    ResultSet rs = selectPs.executeQuery();
-                    if (rs.next()) {
-                        return mapToConfirmation(rs);
-                    }
+                // return updated object
+                List<ConfirmationDTO> results = retrieve("confirmation_id = ?", confirmationId);
+                if (results != null && !results.isEmpty()) {
+                    return results.get(0);
                 }
             }
-        }
-        throw new SQLException("Failed to update confirmation status");
-    }
 
-    // Legacy method - creates its own connection
-    public ConfirmationDTO updateStatus(int confirmationId, String agreement) throws SQLException, ClassNotFoundException {
-        try (Connection conn = DbUtils.getConnection()) {
-            return updateStatus(conn, confirmationId, agreement);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-    }
 
-    public List<ConfirmationDTO> GetConfirmationBySpecialOrderId(int id) throws SQLException, ClassNotFoundException {
-        return retrieve("special_order_id=?", id);
+        return null;
     }
 }
