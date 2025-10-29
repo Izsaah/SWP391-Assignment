@@ -26,7 +26,7 @@ public class VehicleSerialDAO {
     private VehicleSerialDTO mapToVehicleSerial(ResultSet rs) throws SQLException {
         return new model.dto.VehicleSerialDTO(
                 rs.getString("serial_id"),
-                rs.getInt("model_id")
+                rs.getInt("variant_id")
         );
     }
 

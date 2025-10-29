@@ -41,21 +41,6 @@ public class OrderDetailDAO {
         }
     }
 
-    public List<OrderDetailDTO> retrieveWithConnection(Connection conn, String condition, Object... params) throws SQLException {
-        String sql = "SELECT * FROM " + TABLE_NAME + " WHERE " + condition;
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            for (int i = 0; i < params.length; i++) {
-                ps.setObject(i + 1, params[i]);
-            }
-            ResultSet rs = ps.executeQuery();
-            List<OrderDetailDTO> list = new ArrayList<>();
-            while (rs.next()) {
-                list.add(mapToOrderDetail(rs));
-            }
-            return list;
-        }
-    }
-
     public int create(Connection conn, OrderDetailDTO detail) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(INSERT_ORDER_DETAIL)) {
             ps.setInt(1, detail.getOrderId());
