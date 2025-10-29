@@ -34,20 +34,123 @@ public class UserAccountService {
         return user;
     }
 
- 
-
     public List<String> getAllRoles(UserAccountDTO user) {
         if (user == null) {
             throw new IllegalArgumentException("User cannot be null");
         }
 
         if (user.getRoles() == null || user.getRoles().isEmpty()) {
-            return Collections.singletonList("USER"); 
+            return Collections.singletonList("USER");
         }
 
         return user.getRoles().stream()
                 .map(r -> r.getRoleName())
-                .collect(Collectors.toList());  
+                .collect(Collectors.toList());
     }
 
+    public UserAccountDTO createDealerAccount(int dealerId, String email, String username, String password, String phoneNumber, int roleId) {
+        // Validation
+        if (dealerId <= 0) {
+            throw new IllegalArgumentException("Invalid dealer ID");
+        }
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email is required");
+        }
+        if (username == null || username.trim().isEmpty()) {
+            throw new IllegalArgumentException("Username is required");
+        }
+        if (password == null || password.trim().isEmpty()) {
+            throw new IllegalArgumentException("Password is required");
+        }
+        if (roleId != 3 && roleId != 2) {
+            throw new IllegalArgumentException("Invalid role ID. Use 2 for Manager or 3 for Staff");
+        }
+
+        return UDao.createDealerAccount(
+                dealerId,
+                email.trim(),
+                username.trim(),
+                password,
+                phoneNumber != null ? phoneNumber.trim() : null,
+                roleId
+        );
+    }
+
+    public UserAccountDTO updateDealerAccount(int userId, String email, String username, String phoneNumber, String password, int roleId) {
+        if (userId <= 0) {
+            throw new IllegalArgumentException("Invalid user ID");
+        }
+
+        // Trim non-null values
+        String trimmedEmail = email != null ? email.trim() : null;
+        String trimmedUsername = username != null ? username.trim() : null;
+        String trimmedPhoneNumber = phoneNumber != null ? phoneNumber.trim() : null;
+
+        // Validate that at least one field is being updated
+        if (trimmedEmail == null && trimmedUsername == null
+                && trimmedPhoneNumber == null && password == null) {
+            throw new IllegalArgumentException("At least one field must be provided for update");
+        }
+
+        if (roleId != 2 && roleId != 3) {
+            throw new IllegalArgumentException("Invalid role ID. Only Manager (2) or Staff (3) are allowed.");
+        }
+
+        return UDao.updateDealerAccount(
+                userId,
+                trimmedEmail,
+                trimmedUsername,
+                trimmedPhoneNumber,
+                password,
+                roleId
+        );
+    }
+
+    public boolean disableDealerAccount(int userId) {
+        if (userId <= 0) {
+            throw new IllegalArgumentException("Invalid user ID");
+        }
+        try {
+            UserAccountDTO user = UDao.getUserById(userId);
+            if (user == null) {
+                throw new IllegalArgumentException("User not found");
+            }
+            if (user.getRoleId() != 2 && user.getRoleId() != 3) {
+                throw new IllegalArgumentException("Only dealer accounts (roleId 2 or 3) can be disabled");
+            }
+
+            return UDao.setAccountStatus(userId, false);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public boolean enableDealerAccount(int userId) {
+        if (userId <= 0) {
+            throw new IllegalArgumentException("Invalid user ID");
+        }
+        try {
+            UserAccountDTO user = UDao.getUserById(userId);
+            if (user == null) {
+                throw new IllegalArgumentException("User not found");
+            }
+            if (user.getRoleId() != 2 && user.getRoleId() != 3) {
+                throw new IllegalArgumentException("Only dealer accounts (roleId 2 or 3) can be enabled");
+            }
+
+            return UDao.setAccountStatus(userId, true);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public List<UserAccountDTO> getAllDealerAccounts() {
+        return UDao.getAllDealerAccounts();
+    }
+
+    public List<UserAccountDTO> getDealerStaffByName(String name) {
+        return UDao.searchDealerStaffAndManagerByName(name);
+    }
 }

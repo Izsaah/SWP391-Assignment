@@ -111,4 +111,9 @@ public class OrderDAO {
         }
         return orders;
     }
+    
+    public int countOrdersByDealerStaffId(int dealerStaffId) throws ClassNotFoundException, SQLException {
+        List<OrderDTO> list = retrieve("dealer_staff_id = ?", dealerStaffId);
+        return list.size();
+    }
 }

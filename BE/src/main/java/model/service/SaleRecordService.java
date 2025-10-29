@@ -4,24 +4,76 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import model.dao.DealerDAO;
 import model.dao.OrderDAO;
 import model.dao.OrderDetailDAO;
+import model.dao.SaleRecordDAO;
 import model.dao.UserAccountDAO;
+import model.dto.DealerDTO;
 import model.dto.OrderDTO;
 import model.dto.OrderDetailDTO;
 import model.dto.SaleRecordDTO;
+import model.dto.UserAccountDTO;
 
 public class SaleRecordService {
 
+    private final DealerDAO dealerDAO = new DealerDAO();
     private final OrderDAO orderDAO = new OrderDAO();
     private final OrderDetailDAO orderDetailDAO = new OrderDetailDAO();
-    private final UserAccountDAO UADAO = new UserAccountDAO();
+    private final UserAccountDAO userDAO = new UserAccountDAO();
+    private SaleRecordDAO saleDAO = new SaleRecordDAO();
+
+    public List<Map<String, Object>> getDealerSalesSummary() throws ClassNotFoundException, SQLException {
+        List<DealerDTO> dealerList = dealerDAO.retrieve("1=1"); // Get all dealers
+        List<Map<String, Object>> responseList = new ArrayList<>();
+        Set<Integer> addedDealerIds = new HashSet<>();
+
+        for (DealerDTO dealer : dealerList) {
+            if (addedDealerIds.contains(dealer.getDealerId())) {
+                continue;
+            }
+
+            double totalSales = 0;
+            int totalOrders = 0;
+
+            List<UserAccountDTO> staffList = userDAO.findUserByDealerId(dealer.getDealerId());
+            if (staffList != null) {
+                for (UserAccountDTO staff : staffList) {
+                    List<SaleRecordDTO> sales = saleDAO.findSaleRecordByDealerStaffId(staff.getUserId());
+                    if (sales != null) {
+                        totalSales += sales.stream()
+                                .mapToDouble(SaleRecordDTO::getSaleAmount)
+                                .sum();
+                    }
+
+                    totalOrders += orderDAO.countOrdersByDealerStaffId(staff.getUserId());
+                }
+            }
+
+            // Store dealer info and computed totals in a map
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("dealerId", dealer.getDealerId());
+            map.put("dealerName", dealer.getDealerName());
+            map.put("address", dealer.getAddress());
+            map.put("phoneNumber", dealer.getPhoneNumber());
+            map.put("totalSales", totalSales);
+            map.put("totalOrders", totalOrders);
+
+            responseList.add(map);
+            addedDealerIds.add(dealer.getDealerId());
+        }
+
+        return responseList;
+    }
 
     public List<OrderDTO> getOrdersByDealer(int dealerId) {
         try {
-            List<Integer> staffIds = UADAO.getStaffIdsByDealer(dealerId);
+            List<Integer> staffIds = userDAO.getStaffIdsByDealer(dealerId);
             if (staffIds == null || staffIds.isEmpty()) {
                 return new ArrayList<>();
             }
@@ -31,38 +83,39 @@ public class SaleRecordService {
             return new ArrayList<>();
         }
     }
+
     public List<SaleRecordDTO> getCombinedSaleRecordsForDealerByDateRange(
-        int dealerId, String startDate, String endDate) {
-    try {
-        List<Integer> staffIds = UADAO.getStaffIdsByDealer(dealerId);
-        if (staffIds == null || staffIds.isEmpty()) {
+            int dealerId, String startDate, String endDate) {
+        try {
+            List<Integer> staffIds = userDAO.getStaffIdsByDealer(dealerId);
+            if (staffIds == null || staffIds.isEmpty()) {
+                return Collections.emptyList();
+            }
+
+            List<SaleRecordDTO> allSales = new ArrayList<>();
+
+            for (Integer staffId : staffIds) {
+                List<SaleRecordDTO> staffSales
+                        = getCombinedSaleRecordsForStaffByDateRange(staffId, startDate, endDate);
+                allSales.addAll(staffSales);
+            }
+
+            return allSales;
+
+        } catch (Exception e) {
+            e.printStackTrace();
             return Collections.emptyList();
         }
-
-        List<SaleRecordDTO> allSales = new ArrayList<>();
-
-        for (Integer staffId : staffIds) {
-            List<SaleRecordDTO> staffSales =
-                    getCombinedSaleRecordsForStaffByDateRange(staffId, startDate, endDate);
-            allSales.addAll(staffSales);
-        }
-
-        return allSales;
-
-    } catch (Exception e) {
-        e.printStackTrace();
-        return Collections.emptyList();
     }
-}
 
     public List<SaleRecordDTO> getCombinedSaleRecordsForStaffByDateRange(
             int dealerStaffId, String startDate, String endDate) {
-        
+
         System.out.println("DEBUG: Processing sales for Staff ID: " + dealerStaffId);
-        
+
         try {
             List<OrderDTO> allOrders = orderDAO.getByStaffId(dealerStaffId);
-            
+
             if (allOrders == null || allOrders.isEmpty()) {
                 System.out.println("DEBUG: Staff ID " + dealerStaffId + " has no orders in the database.");
                 return Collections.emptyList();
@@ -72,7 +125,7 @@ public class SaleRecordService {
             Map<Integer, Double> totalSalesByCustomer = new HashMap<>();
             Map<Integer, Integer> totalOrdersByCustomer = new HashMap<>();
             Map<Integer, String> latestOrderDateByCustomer = new HashMap<>();
-            
+
             int processedCount = 0;
 
             for (OrderDTO order : allOrders) {
@@ -80,15 +133,15 @@ public class SaleRecordService {
                     System.out.println("DEBUG: Skipping Order ID " + order.getOrderId() + ". Date " + order.getOrderDate() + " is outside range " + startDate + " to " + endDate);
                     continue;
                 }
-                
+
                 processOrder(order, totalSalesByCustomer, totalOrdersByCustomer, latestOrderDateByCustomer);
                 processedCount++;
             }
-            
+
             System.out.println("DEBUG: Staff ID " + dealerStaffId + " finished processing. Orders processed/attempted: " + processedCount + ". Customers aggregated: " + totalSalesByCustomer.size());
 
             return buildSaleRecordList(totalSalesByCustomer, totalOrdersByCustomer, latestOrderDateByCustomer, dealerStaffId);
-            
+
         } catch (Exception e) {
             e.printStackTrace();
             System.err.println("ERROR: Top-level error in getCombinedSaleRecordsForStaffByDateRange for Staff ID " + dealerStaffId + ": " + e.getMessage());
@@ -167,7 +220,6 @@ public class SaleRecordService {
 
             SaleRecordDTO dto = new SaleRecordDTO(
                     0, // summary record
-                    customerId,
                     dealerStaffId,
                     latestOrderDate,
                     totalAmount

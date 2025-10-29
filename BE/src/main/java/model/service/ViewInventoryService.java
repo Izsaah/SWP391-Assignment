@@ -4,6 +4,7 @@
  */
 package model.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import model.dao.InventoryDAO;
 import model.dao.VehicleModelDAO;
@@ -15,10 +16,10 @@ import model.dto.VehicleModelDTO;
  * @author khoac
  */
 public class ViewInventoryService {
-    
+
     private VehicleModelDAO modelDAO = new VehicleModelDAO();
     private InventoryDAO inventoryDAO = new InventoryDAO();
-    
+
     public List<InventoryDTO> handleViewAllInventory() {
         List<InventoryDTO> inventories = inventoryDAO.viewAllInventory();
         if (inventories != null) {
@@ -28,5 +29,20 @@ public class ViewInventoryService {
             }
         }
         return inventories;
+    }
+
+    public List<VehicleModelDTO> getInventoryByModelName(String name) {
+        List<VehicleModelDTO> models = modelDAO.SearchVehicleModel(name);
+        if (models == null || models.isEmpty()) {
+            return new ArrayList<>();
+        }
+        for (VehicleModelDTO tmp : models) {
+            int modelId = tmp.getModelId();
+            List<InventoryDTO> inventory = inventoryDAO.getInventoryByModelId(modelId);
+            if (inventory != null) {
+                tmp.setInventoryList(inventory);
+            }
+        }
+        return models;
     }
 }

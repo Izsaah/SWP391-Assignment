@@ -11,11 +11,13 @@ import java.util.List;
  * @author Admin
  */
 public class VehicleModelDTO {
+
     private int modelId;
     private String modelName;
     private String description;
     private boolean isActive;
     private List<VehicleVariantDTO> lists;
+    private List<InventoryDTO> inventoryList;
 
     public VehicleModelDTO(int modelId, String modelName, String description, boolean isActive, List<VehicleVariantDTO> lists) {
         this.modelId = modelId;
@@ -23,6 +25,14 @@ public class VehicleModelDTO {
         this.description = description;
         this.isActive = isActive;
         this.lists = lists;
+    }
+
+    public List<InventoryDTO> getInventoryList() {
+        return inventoryList;
+    }
+
+    public void setInventoryList(List<InventoryDTO> inventoryList) {
+        this.inventoryList = inventoryList;
     }
 
     public List<VehicleVariantDTO> getLists() {
