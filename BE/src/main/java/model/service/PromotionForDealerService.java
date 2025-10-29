@@ -5,20 +5,18 @@
 package model.service;
 
 import java.util.List;
+import java.util.Map;
 import model.dao.DealerDAO;
 import model.dao.DealerPromotionDAO;
-import model.dao.PromotionDAO;
 import model.dto.DealerDTO;
 import model.dto.PromotionDTO;
-import model.dto.VehicleModelDTO;
-import model.dto.VehicleVariantDTO;
 
 /**
  *
  * @author ACER
  */
 public class PromotionForDealerService {
-   private DealerDAO dealerDAO = new DealerDAO();
+    private DealerDAO dealerDAO = new DealerDAO();
     private DealerPromotionDAO dealerPromotionDAO = new DealerPromotionDAO();
 
     public DealerDTO HandlingViewPromotionForDealer(int dealerId) {
@@ -33,6 +31,24 @@ public class PromotionForDealerService {
         }
 
         return dealer;
+    }
+    
+    public boolean createPromotionForDealer(int promoId, int dealerId) {
+        if (promoId <= 0 || dealerId <= 0) {
+            throw new IllegalArgumentException("Invalid promoId or dealerId");
+        }
+        return dealerPromotionDAO.createPromotionForDealer(promoId, dealerId);
+    }
+
+    public boolean updatePromotionForDealer(int promoId, int dealerId, int newPromoId) {
+        if (promoId <= 0 || dealerId <= 0 || newPromoId <= 0) {
+            throw new IllegalArgumentException("Invalid promoId, dealerId, or newPromoId");
+        }
+        return dealerPromotionDAO.updatePromotionForDealer(promoId, dealerId, newPromoId);
+    }
+    
+    public List<Map<String, Object>> getAllPromotionsWithDealers() {
+        return dealerPromotionDAO.getAllPromotionsWithDealers();
     }
 
 }
