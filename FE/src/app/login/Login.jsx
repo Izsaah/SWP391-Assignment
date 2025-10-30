@@ -2,19 +2,24 @@ import React, { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router';
 import ReactImg from '../../assets/car2.jpg'
 import { FaGoogle } from "react-icons/fa";
-import { useAuth } from './AuthContext';
+import { useAuth } from './useAuth';
 
 
 export default function LoginPage() {
-        const { login } = useAuth();
+        const { login, currentUser } = useAuth();
         const [email, setEmail] = useState('');
         const [password, setPassword] = useState('');
         const navigate = useNavigate();
         const [error, setError] = useState('');
         const [loading, setLoading] = useState(false);
+        const LOGIN_DISABLED = String(import.meta.env.VITE_DISABLE_LOGIN || 'false') === 'true';
 
       const handleSubmit = async (e) => {
         e.preventDefault();
+        if (LOGIN_DISABLED) {
+          setError('Login is temporarily disabled. Please try again later.');
+          return;
+        }
         setLoading(true);
         setError('');
 
@@ -22,7 +27,20 @@ export default function LoginPage() {
         try {
           const res = await login(email, password);
           if (res.success) {
-            navigate('/dashboard');
+            // Get user role and redirect to appropriate dashboard
+            const userRole = res.user?.roles?.[0]?.roleName || currentUser?.roles?.[0]?.roleName;
+            
+            // Backend returns "Dealer Manager" and "Dealer Staff" (from database role_name column)
+            // Support both backend format and short format for flexibility
+            if (userRole === 'Dealer Manager' || userRole === 'MANAGER') {
+              navigate('/manager/dashboard');
+            } else if (userRole === 'Dealer Staff' || userRole === 'STAFF') {
+              navigate('/staff/dashboard');
+            } else {
+              // Default fallback - could also show error for unknown roles
+              console.warn('Unknown role:', userRole);
+              navigate('/staff/dashboard');
+            }
           } else {
             setError(res.message || 'Login failed. Please check your credentials.');
           }
@@ -43,6 +61,11 @@ export default function LoginPage() {
         {/* Left - Sign In */}
         <div className="flex-1 flex flex-col justify-center items-center p-10 bg-gradient-to-r from-gray-400 to-gray-200">
           <h2 className="text-3xl font-bold mb-6">Sign In</h2>
+          {LOGIN_DISABLED && (
+            <div className="w-full mb-4 p-3 rounded-md bg-yellow-100 text-yellow-800 text-sm">
+              Login is temporarily disabled by the administrator.
+            </div>
+          )}
 
           <p className="text-gray-500 mb-4">or use your email password</p>
           <button
@@ -58,14 +81,16 @@ export default function LoginPage() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder="Email"
-              className="w-full p-3 mb-4 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              disabled={LOGIN_DISABLED}
+              className={`w-full p-3 mb-4 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${LOGIN_DISABLED ? 'bg-gray-100 cursor-not-allowed' : ''}`}
             />
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder="Password"
-              className="w-full p-3 mb-4 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              disabled={LOGIN_DISABLED}
+              className={`w-full p-3 mb-4 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${LOGIN_DISABLED ? 'bg-gray-100 cursor-not-allowed' : ''}`}
             />
             <a href="#" className="text-sm font-medium text-black mb-4">
               Forget Your Password?
@@ -77,10 +102,10 @@ export default function LoginPage() {
             )}
             <button
               type="submit"
-              disabled={loading}
-              className={`w-full px-4 py-2 mt-4 my-2 text-white font-medium rounded-lg ${loading ? 'bg-gray-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-xl transition duration-300'}`}
+              disabled={loading || LOGIN_DISABLED}
+              className={`w-full px-4 py-2 mt-4 my-2 text-white font-medium rounded-lg ${(loading || LOGIN_DISABLED) ? 'bg-gray-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-xl transition duration-300'}`}
             >
-              {loading ? 'Signing In...' : 'Sign In'}
+              {loading ? 'Signing In...' : (LOGIN_DISABLED ? 'Sign In Disabled' : 'Sign In')}
             </button>
           </form>
         </div>
