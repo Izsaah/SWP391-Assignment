@@ -1,10 +1,5 @@
 import React, { useMemo, useState } from 'react'
-
-const grid = { display: 'grid', gap: 16 }
-const row = { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }
-const card = { background: '#fff', border: '1px solid #e6e6ea', borderRadius: 8, padding: 16 }
-const header = { display: 'flex', alignItems: 'center', justifyContent: 'space-between' }
-const input = { padding: '8px 10px', border: '1px solid #d0d5dd', borderRadius: 6, minWidth: 140 }
+import { ChevronRight, AlertTriangle, TrendingUp } from 'lucide-react'
 
 const InventoryReport = () => {
   const [model, setModel] = useState('All')
@@ -24,63 +19,92 @@ const InventoryReport = () => {
   const forecast = useMemo(() => Math.round(totalSold * 1.1), [totalSold])
 
   return (
-    <div style={grid}>
-      <div style={header}>
-        <div>
-          <h2 style={{margin: 0}}>Inventory & Consumption</h2>
-          <div style={{color: '#6b7280'}}>Track stock levels and sell-through rate</div>
-        </div>
-        <div style={{display: 'flex', gap: 8}}>
-          <select value={period} onChange={(e) => setPeriod(e.target.value)} style={input}>
-            <option>Last 7 days</option>
-            <option>Last 30 days</option>
-            <option>Last 90 days</option>
-          </select>
-          <select value={model} onChange={(e) => setModel(e.target.value)} style={input}>
-            <option>All</option>
-            <option>Model 3</option>
-            <option>Model S</option>
-            <option>E-Urban</option>
-          </select>
+    <div className="space-y-6">
+      {/* Breadcrumb */}
+      <div className="flex items-center text-sm text-gray-600">
+        <span className="hover:text-blue-600 cursor-pointer">Dashboard</span>
+        <ChevronRight className="w-4 h-4 mx-2" />
+        <span className="text-gray-900 font-medium">Inventory & Consumption</span>
+      </div>
+
+      {/* Header */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Inventory & Consumption</h1>
+            <p className="text-sm text-gray-600 mt-1">Track stock levels and sell-through rate</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <select 
+              value={period} 
+              onChange={(e) => setPeriod(e.target.value)} 
+              className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option>Last 7 days</option>
+              <option>Last 30 days</option>
+              <option>Last 90 days</option>
+            </select>
+            <select 
+              value={model} 
+              onChange={(e) => setModel(e.target.value)} 
+              className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option>All</option>
+              <option>Model 3</option>
+              <option>Model S</option>
+              <option>E-Urban</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      <div style={row}>
-        <div style={card}>
-          <div style={{color: '#6b7280', marginBottom: 4}}>Total Stock</div>
-          <div style={{fontSize: 22, fontWeight: 700}}>{totalStock}</div>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="text-sm text-gray-600 mb-2">Total Stock</div>
+          <div className="text-3xl font-bold text-gray-900">{totalStock}</div>
         </div>
-        <div style={card}>
-          <div style={{color: '#6b7280', marginBottom: 4}}>Total Sold</div>
-          <div style={{fontSize: 22, fontWeight: 700}}>{totalSold}</div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="text-sm text-gray-600 mb-2">Total Sold</div>
+          <div className="text-3xl font-bold text-gray-900">{totalSold}</div>
         </div>
-        <div style={card}>
-          <div style={{color: '#6b7280', marginBottom: 4}}>Consumption Rate</div>
-          <div style={{fontSize: 22, fontWeight: 700}}>{rate}%</div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="text-sm text-gray-600 mb-2">Consumption Rate</div>
+          <div className="text-3xl font-bold text-gray-900">{rate}%</div>
         </div>
-        <div style={card}>
-          <div style={{color: '#6b7280', marginBottom: 4}}>Forecast (next period)</div>
-          <div style={{fontSize: 22, fontWeight: 700}}>{forecast}</div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="text-sm text-gray-600 mb-2">Forecast (next period)</div>
+          <div className="text-3xl font-bold text-gray-900">{forecast}</div>
         </div>
       </div>
 
-      <div style={card}>
-        <div style={{fontWeight: 600, marginBottom: 12}}>Models Breakdown</div>
-        <div style={{display: 'grid', gap: 10}}>
+      {/* Models Breakdown */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="text-sm font-semibold text-gray-900 mb-4">Models Breakdown</div>
+        <div className="space-y-4">
           {filtered.map(r => (
             <div key={r.model}>
-              <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 6}}>
-                <div>{r.model}</div>
-                <div style={{color: '#64748b'}}>Stock {r.stock} • Sold {r.sold}</div>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium text-gray-900">{r.model}</span>
+                <span className="text-sm text-gray-600">Stock {r.stock} • Sold {r.sold}</span>
               </div>
-              <div style={{height: 10, background: '#eef2f7', borderRadius: 6}}>
-                <div style={{height: '100%', width: `${(r.sold / (r.stock + r.sold)) * 100}%`, background: '#10b981', borderRadius: 6}} />
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-green-500 transition-all duration-300" 
+                  style={{ width: `${(r.sold / (r.stock + r.sold)) * 100}%` }}
+                />
               </div>
               {r.stock <= 5 && (
-                <div style={{marginTop: 6, color: '#b45309', fontSize: 12}}>Warning: Near out-of-stock</div>
+                <div className="mt-2 flex items-center text-sm text-yellow-700">
+                  <AlertTriangle className="w-4 h-4 mr-2" />
+                  Warning: Near out-of-stock
+                </div>
               )}
               {r.stock > 0 && r.stock >= 50 && (
-                <div style={{marginTop: 6, color: '#b91c1c', fontSize: 12}}>Warning: Long-term inventory risk</div>
+                <div className="mt-2 flex items-center text-sm text-red-700">
+                  <TrendingUp className="w-4 h-4 mr-2" />
+                  Warning: Long-term inventory risk
+                </div>
               )}
             </div>
           ))}
@@ -91,5 +115,3 @@ const InventoryReport = () => {
 }
 
 export default InventoryReport
-
-

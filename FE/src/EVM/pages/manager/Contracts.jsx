@@ -1,13 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react'
+import { ChevronRight, Download, Edit2, Eye, ChevronLeft, ChevronDown } from 'lucide-react'
 import Modal from '../../components/Modal'
-
-const grid = { display: 'grid', gap: 16 }
-const card = { background: '#fff', border: '1px solid #e6e6ea', borderRadius: 8, padding: 16 }
-const header = { display: 'flex', alignItems: 'center', justifyContent: 'space-between' }
-const input = { padding: '8px 10px', border: '1px solid #d0d5dd', borderRadius: 6, minWidth: 180 }
-const button = { padding: '8px 12px', background: '#0d6efd', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }
-const table = { width: '100%', borderCollapse: 'collapse' }
-const cell = { textAlign: 'left', padding: '10px 8px', borderBottom: '1px solid #eee' }
 
 const Contracts = () => {
   const [dealer, setDealer] = useState('All')
@@ -61,75 +54,161 @@ const Contracts = () => {
   const handleView = useCallback((row) => { window.alert(`Dealer ${row.dealer}\nTarget ${row.target}, Achieved ${row.achieved}\nDebt $${row.debt}`) }, [])
 
   return (
-    <div style={grid}>
-      <div style={header}>
-        <div>
-          <h2 style={{margin: 0}}>Contracts</h2>
-          <div style={{color: '#6b7280'}}>Revenue targets and receivables by dealer</div>
+    <div className="space-y-6">
+      {/* Breadcrumb */}
+      <div className="flex items-center text-sm text-gray-600">
+        <span className="hover:text-blue-600 cursor-pointer">Dashboard</span>
+        <ChevronRight className="w-4 h-4 mx-2" />
+        <span className="text-gray-900 font-medium">Contracts</span>
+      </div>
+
+      {/* Header */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Contracts</h1>
+            <p className="text-sm text-gray-600 mt-1">Revenue targets and receivables by dealer</p>
+          </div>
+          <button 
+            onClick={exportCsv}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg flex items-center space-x-2 shadow-sm transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export CSV</span>
+          </button>
         </div>
-        <div style={{display: 'flex', gap: 8}}>
-          <input placeholder="Search contract ID..." value={query} onChange={(e) => setQuery(e.target.value)} style={input} />
-          <select value={dealer} onChange={(e) => setDealer(e.target.value)} style={{...input, minWidth: 140}}>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="flex items-center gap-4">
+          <input 
+            placeholder="Search contract ID..." 
+            value={query} 
+            onChange={(e) => setQuery(e.target.value)} 
+            className="flex-1 px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+          />
+          <select 
+            value={dealer} 
+            onChange={(e) => setDealer(e.target.value)} 
+            className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
             <option>All</option>
             <option>Dealer A</option>
             <option>Dealer B</option>
           </select>
-          <button style={{...button, background: '#0ea5e9'}} onClick={exportCsv}>Export CSV</button>
         </div>
       </div>
 
-      <div style={card}>
-        <table style={table}>
-          <thead>
-            <tr>
-              <th style={cell} onClick={() => toggleSort('id')}>Contract ID</th>
-              <th style={cell} onClick={() => toggleSort('dealer')}>Dealer</th>
-              <th style={cell} onClick={() => toggleSort('target')}>Target (units)</th>
-              <th style={cell} onClick={() => toggleSort('debt')}>Debt</th>
-              <th style={cell}>Progress</th>
-              <th style={cell} onClick={() => toggleSort('status')}>Status</th>
-              <th style={cell}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paged.map(c => (
-              <tr key={c.id}>
-                <td style={cell}>{c.id}</td>
-                <td style={cell}>{c.dealer}</td>
-                <td style={cell}>{c.target}</td>
-                <td style={cell}>${c.debt.toLocaleString()}</td>
-                <td style={cell}>
-                  <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
-                    <div style={{width: 120, height: 10, background: '#eef2f7', borderRadius: 6}}>
-                      <div style={{height: '100%', width: `${Math.min(100, Math.round((c.achieved / Math.max(1, c.target)) * 100))}%`, background: '#0d6efd', borderRadius: 6}} />
-                    </div>
-                    <span style={{fontSize: 12, color: '#475569'}}>{Math.min(100, Math.round((c.achieved / Math.max(1, c.target)) * 100))}%</span>
-                  </div>
-                </td>
-                <td style={cell}>{c.status}</td>
-                <td style={cell}>
-                  <div style={{display: 'flex', gap: 8}}>
-                    <button style={{padding: '6px 10px', border: '1px solid #0d6efd', color: '#0d6efd', background: 'transparent', borderRadius: 6, cursor: 'pointer'}} onClick={() => handleEdit(c)}>Edit</button>
-                    <button style={{padding: '6px 10px', border: '1px solid #64748b', color: '#475569', background: 'transparent', borderRadius: 6, cursor: 'pointer'}} onClick={() => handleView(c)}>View</button>
-                  </div>
-                </td>
+      {/* Table */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => toggleSort('id')}
+                >
+                  Contract ID
+                </th>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => toggleSort('dealer')}
+                >
+                  Dealer
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Target (units)</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Debt</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12}}>
-          <div style={{color: '#64748b', fontSize: 12}}>Page {page} of {totalPages} • Total {filtered.length}</div>
-          <div style={{display: 'flex', gap: 8}}>
-            <button onClick={() => setPage(p=>Math.max(1, p-1))} disabled={page===1} style={{padding: '6px 10px', border: '1px solid #64748b', color: '#475569', background: 'transparent', borderRadius: 6, cursor: 'pointer', opacity: page===1?0.5:1}}>Prev</button>
-            <button onClick={() => setPage(p=>Math.min(totalPages, p+1))} disabled={page===totalPages} style={{padding: '6px 10px', border: '1px solid #64748b', color: '#475569', background: 'transparent', borderRadius: 6, cursor: 'pointer', opacity: page===totalPages?0.5:1}}>Next</button>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {paged.map(c => (
+                <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{c.id}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{c.dealer}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{c.target}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${c.debt.toLocaleString()}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-blue-600 transition-all duration-300" 
+                          style={{ width: `${Math.min(100, Math.round((c.achieved / Math.max(1, c.target)) * 100))}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-gray-600">{Math.min(100, Math.round((c.achieved / Math.max(1, c.target)) * 100))}%</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      c.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {c.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => handleEdit(c)}
+                        className="text-blue-600 hover:text-blue-900"
+                      >
+                        <Edit2 className="w-4 h-4 inline" />
+                      </button>
+                      <button 
+                        onClick={() => handleView(c)}
+                        className="text-gray-600 hover:text-gray-900"
+                      >
+                        <Eye className="w-4 h-4 inline" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            Page {page} of {totalPages} • Total {filtered.length}
+          </div>
+          <div className="flex items-center gap-2">
+            <button 
+              disabled={page === 1} 
+              onClick={() => setPage(p => Math.max(1, p - 1))} 
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Prev
+            </button>
+            <button 
+              disabled={page === totalPages} 
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
+            >
+              Next
+              <ChevronDown className="w-4 h-4 rotate-[-90deg]" />
+            </button>
           </div>
         </div>
       </div>
 
-      <Modal title={`Edit Contract ${editing?.id || ''}`} open={showEdit} onClose={() => setShowEdit(false)} onSubmit={() => { setRows(prev => prev.map(c => c.id === editing.id ? { ...c, target: parseInt(form.target,10), debt: parseInt(form.debt,10) } : c)); setShowEdit(false) }}>
-        <div className="grid gap-3">
-          <input className="border rounded px-3 py-2 w-full" placeholder="Target" type="number" value={form.target} onChange={(e)=>setForm(f=>({...f, target: e.target.value}))} />
-          <input className="border rounded px-3 py-2 w-full" placeholder="Debt" type="number" value={form.debt} onChange={(e)=>setForm(f=>({...f, debt: e.target.value}))} />
+      {/* Edit Modal */}
+      <Modal title={`Edit Contract ${editing?.id || ''}`} open={showEdit} onClose={() => setShowEdit(false)} onSubmit={() => { setRows(prev => prev.map(c => c.id === editing.id ? { ...c, target: parseInt(form.target, 10), debt: parseInt(form.debt, 10) } : c)); setShowEdit(false) }}>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Target</label>
+            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Target" type="number" value={form.target} onChange={(e) => setForm(f => ({ ...f, target: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Debt</label>
+            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Debt" type="number" value={form.debt} onChange={(e) => setForm(f => ({ ...f, debt: e.target.value }))} />
+          </div>
         </div>
       </Modal>
     </div>
@@ -137,5 +216,3 @@ const Contracts = () => {
 }
 
 export default Contracts
-
-

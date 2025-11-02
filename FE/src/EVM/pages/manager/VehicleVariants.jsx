@@ -1,13 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react'
+import { ChevronRight, Plus, Search, Edit2, Trash2, Power, PowerOff, ChevronLeft, ChevronDown } from 'lucide-react'
 import Modal from '../../components/Modal'
-
-const grid = { display: 'grid', gap: 16 }
-const card = { background: '#fff', border: '1px solid #e6e6ea', borderRadius: 8, padding: 16 }
-const headerStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between' }
-const input = { padding: '8px 10px', border: '1px solid #d0d5dd', borderRadius: 6, minWidth: 180 }
-const button = { padding: '8px 12px', background: '#0d6efd', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }
-const table = { width: '100%', borderCollapse: 'collapse' }
-const cell = { textAlign: 'left', padding: '10px 8px', borderBottom: '1px solid #eee' }
 
 const VehicleVariants = () => {
   const [rows, setRows] = useState([
@@ -36,85 +29,228 @@ const VehicleVariants = () => {
   const handleDelete = useCallback(async (row) => { if (window.confirm(`Delete variant ${row.model} ${row.version}?`)) setRows(prev => prev.filter(v => v.id !== row.id)) }, [])
 
   return (
-    <div style={grid}>
-      <div style={headerStyle}>
-        <div>
-          <h2 style={{margin: 0}}>Vehicle Variants</h2>
-          <div style={{color: '#6b7280'}}>Manage versions, colors and pricing</div>
+    <div className="space-y-6">
+      {/* Breadcrumb */}
+      <div className="flex items-center text-sm text-gray-600">
+        <span className="hover:text-blue-600 cursor-pointer">Dashboard</span>
+        <ChevronRight className="w-4 h-4 mx-2" />
+        <span className="text-gray-900 font-medium">Vehicle Variants</span>
+      </div>
+
+      {/* Header */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Vehicle Variants</h1>
+            <p className="text-sm text-gray-600 mt-1">Manage versions, colors and pricing</p>
+          </div>
+          <button 
+            onClick={handleAdd}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg flex items-center space-x-2 shadow-sm transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Variant</span>
+          </button>
         </div>
-        <div style={{display: 'flex', gap: 8}}>
-          <input placeholder="Search variants..." value={query} onChange={(e) => { setQuery(e.target.value); setPage(1) }} style={input} />
-          <select value={color} onChange={(e) => setColor(e.target.value)} style={{...input, minWidth: 120}}>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="flex items-center gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <input 
+              placeholder="Search variants..." 
+              value={query} 
+              onChange={(e) => { setQuery(e.target.value); setPage(1) }} 
+              className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+            />
+          </div>
+          <select 
+            value={color} 
+            onChange={(e) => setColor(e.target.value)} 
+            className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
             <option>All</option>
             <option>White</option>
             <option>Blue</option>
             <option>Red</option>
           </select>
-          <button style={button} onClick={handleAdd}>Add variant</button>
         </div>
       </div>
 
-      <div style={card}>
-        <table style={table}>
-          <thead>
-            <tr>
-              <th style={cell}>ID</th>
-              <th style={cell}>Model</th>
-              <th style={cell}>Version</th>
-              <th style={cell}>Color</th>
-              <th style={cell}>Price</th>
-              <th style={cell}>Status</th>
-              <th style={cell}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paged.map(v => (
-              <tr key={v.id}>
-                <td style={cell}>{v.id}</td>
-                <td style={cell}>{v.model}</td>
-                <td style={cell}>{v.version}</td>
-                <td style={cell}>{v.color}</td>
-                <td style={cell}>${v.price.toLocaleString()}</td>
-                <td style={cell}>
-                  <span style={{padding: '2px 8px', borderRadius: 12, background: v.active ? '#e6f4ea' : '#fdeaea', color: v.active ? '#18794e' : '#b42318'}}>
-                    {v.active ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-                <td style={cell}>
-                  <div style={{display: 'flex', gap: 8}}>
-                    <button style={{padding: '6px 10px', border: '1px solid #0d6efd', color: '#0d6efd', background: 'transparent', borderRadius: 6, cursor: 'pointer'}} onClick={() => handleEdit(v)}>Edit</button>
-                    <button style={{padding: '6px 10px', border: '1px solid #b42318', color: '#b42318', background: 'transparent', borderRadius: 6, cursor: 'pointer'}} onClick={() => handleDelete(v)}>Delete</button>
-                    <button style={{padding: '6px 10px', border: '1px solid #64748b', color: '#475569', background: 'transparent', borderRadius: 6, cursor: 'pointer'}} onClick={() => setRows(prev => prev.map(x => x.id === v.id ? { ...x, active: !x.active } : x))}>{v.active ? 'Deactivate' : 'Activate'}</button>
-                  </div>
-                </td>
+      {/* Table */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Model</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Version</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Color</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12}}>
-          <div style={{color: '#64748b', fontSize: 12}}>Page {page} of {totalPages} • Total {filtered.length}</div>
-          <div style={{display: 'flex', gap: 8}}>
-            <button onClick={() => setPage(p=>Math.max(1, p-1))} disabled={page===1} style={{padding: '6px 10px', border: '1px solid #64748b', color: '#475569', background: 'transparent', borderRadius: 6, cursor: 'pointer', opacity: page===1?0.5:1}}>Prev</button>
-            <button onClick={() => setPage(p=>Math.min(totalPages, p+1))} disabled={page===totalPages} style={{padding: '6px 10px', border: '1px solid #64748b', color: '#475569', background: 'transparent', borderRadius: 6, cursor: 'pointer', opacity: page===totalPages?0.5:1}}>Next</button>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {paged.map(v => (
+                <tr key={v.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.id}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{v.model}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.version}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.color}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${v.price.toLocaleString()}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      v.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {v.active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => handleEdit(v)}
+                        className="text-blue-600 hover:text-blue-900 inline-flex items-center gap-1"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                        Edit
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(v)}
+                        className="text-red-600 hover:text-red-900 inline-flex items-center gap-1"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete
+                      </button>
+                      <button 
+                        onClick={() => setRows(prev => prev.map(x => x.id === v.id ? { ...x, active: !x.active } : x))}
+                        className="text-gray-600 hover:text-gray-900 inline-flex items-center gap-1"
+                      >
+                        {v.active ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
+                        {v.active ? 'Deactivate' : 'Activate'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            Page {page} of {totalPages} • Total {filtered.length}
+          </div>
+          <div className="flex items-center gap-2">
+            <button 
+              disabled={page === 1} 
+              onClick={() => setPage(p => Math.max(1, p - 1))} 
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Prev
+            </button>
+            <button 
+              disabled={page === totalPages} 
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
+            >
+              Next
+              <ChevronDown className="w-4 h-4 rotate-[-90deg]" />
+            </button>
           </div>
         </div>
       </div>
 
-      <Modal title="Add Variant" open={showAdd} onClose={() => setShowAdd(false)} onSubmit={() => { const id = Math.max(10, ...rows.map(r=>r.id)) + 1; const modelName = form.modelId === 1 ? 'Model 3' : (form.modelId === 2 ? 'Model S' : 'Unknown'); setRows(prev => [...prev, { id, modelId: parseInt(form.modelId,10), model: modelName, version: form.version, color: form.color, price: parseInt(form.price,10), active: true }]); setShowAdd(false) }}>
-        <div className="grid gap-3">
-          <input className="border rounded px-3 py-2 w-full" placeholder="Model ID" type="number" value={form.modelId} onChange={(e)=>setForm(f=>({...f, modelId: parseInt(e.target.value,10)}))} />
-          <input className="border rounded px-3 py-2 w-full" placeholder="Version" value={form.version} onChange={(e)=>setForm(f=>({...f, version: e.target.value}))} />
-          <input className="border rounded px-3 py-2 w-full" placeholder="Color" value={form.color} onChange={(e)=>setForm(f=>({...f, color: e.target.value}))} />
-          <input className="border rounded px-3 py-2 w-full" placeholder="Price" type="number" value={form.price} onChange={(e)=>setForm(f=>({...f, price: e.target.value}))} />
+      {/* Add Modal */}
+      <Modal title="Add Variant" open={showAdd} onClose={() => setShowAdd(false)} onSubmit={() => { const id = Math.max(10, ...rows.map(r => r.id)) + 1; const modelName = form.modelId === 1 ? 'Model 3' : (form.modelId === 2 ? 'Model S' : 'Unknown'); setRows(prev => [...prev, { id, modelId: parseInt(form.modelId, 10), model: modelName, version: form.version, color: form.color, price: parseInt(form.price, 10), active: true }]); setShowAdd(false) }}>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Model ID <span className="text-red-500">*</span></label>
+            <input 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              placeholder="Model ID" 
+              type="number" 
+              value={form.modelId} 
+              onChange={(e) => setForm(f => ({ ...f, modelId: parseInt(e.target.value, 10) }))} 
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Version <span className="text-red-500">*</span></label>
+            <input 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              placeholder="Version" 
+              value={form.version} 
+              onChange={(e) => setForm(f => ({ ...f, version: e.target.value }))} 
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
+            <input 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              placeholder="Color" 
+              value={form.color} 
+              onChange={(e) => setForm(f => ({ ...f, color: e.target.value }))} 
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Price <span className="text-red-500">*</span></label>
+            <input 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              placeholder="Price" 
+              type="number" 
+              value={form.price} 
+              onChange={(e) => setForm(f => ({ ...f, price: e.target.value }))} 
+            />
+          </div>
         </div>
       </Modal>
 
-      <Modal title={`Edit Variant #${editing?.id || ''}`} open={showEdit} onClose={() => setShowEdit(false)} onSubmit={() => { setRows(prev => prev.map(v => v.id === editing.id ? { ...v, modelId: parseInt(form.modelId,10), model: form.modelId===1?'Model 3':(form.modelId===2?'Model S':'Unknown'), version: form.version, color: form.color, price: parseInt(form.price,10) } : v)); setShowEdit(false) }}>
-        <div className="grid gap-3">
-          <input className="border rounded px-3 py-2 w-full" placeholder="Model ID" type="number" value={form.modelId} onChange={(e)=>setForm(f=>({...f, modelId: parseInt(e.target.value,10)}))} />
-          <input className="border rounded px-3 py-2 w-full" placeholder="Version" value={form.version} onChange={(e)=>setForm(f=>({...f, version: e.target.value}))} />
-          <input className="border rounded px-3 py-2 w-full" placeholder="Color" value={form.color} onChange={(e)=>setForm(f=>({...f, color: e.target.value}))} />
-          <input className="border rounded px-3 py-2 w-full" placeholder="Price" type="number" value={form.price} onChange={(e)=>setForm(f=>({...f, price: e.target.value}))} />
+      {/* Edit Modal */}
+      <Modal title={`Edit Variant #${editing?.id || ''}`} open={showEdit} onClose={() => setShowEdit(false)} onSubmit={() => { setRows(prev => prev.map(v => v.id === editing.id ? { ...v, modelId: parseInt(form.modelId, 10), model: form.modelId === 1 ? 'Model 3' : (form.modelId === 2 ? 'Model S' : 'Unknown'), version: form.version, color: form.color, price: parseInt(form.price, 10) } : v)); setShowEdit(false) }}>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Model ID <span className="text-red-500">*</span></label>
+            <input 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              placeholder="Model ID" 
+              type="number" 
+              value={form.modelId} 
+              onChange={(e) => setForm(f => ({ ...f, modelId: parseInt(e.target.value, 10) }))} 
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Version <span className="text-red-500">*</span></label>
+            <input 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              placeholder="Version" 
+              value={form.version} 
+              onChange={(e) => setForm(f => ({ ...f, version: e.target.value }))} 
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
+            <input 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              placeholder="Color" 
+              value={form.color} 
+              onChange={(e) => setForm(f => ({ ...f, color: e.target.value }))} 
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Price <span className="text-red-500">*</span></label>
+            <input 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              placeholder="Price" 
+              type="number" 
+              value={form.price} 
+              onChange={(e) => setForm(f => ({ ...f, price: e.target.value }))} 
+            />
+          </div>
         </div>
       </Modal>
     </div>
@@ -122,5 +258,3 @@ const VehicleVariants = () => {
 }
 
 export default VehicleVariants
-
-

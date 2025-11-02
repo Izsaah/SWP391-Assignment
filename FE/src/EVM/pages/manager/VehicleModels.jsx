@@ -1,14 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react'
+import { ChevronRight, Plus, Search, Edit2, Trash2, Power, PowerOff, ChevronLeft, ChevronDown } from 'lucide-react'
 import Modal from '../../components/Modal'
-
-const headerStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between' }
-const toolbarStyle = { display: 'flex', gap: 8 }
-const cardStyle = { background: '#fff', border: '1px solid #e6e6ea', borderRadius: 8, padding: 16 }
-const inputStyle = { padding: '8px 10px', border: '1px solid #d0d5dd', borderRadius: 6, minWidth: 180 }
-const buttonPrimary = { padding: '8px 12px', background: '#0d6efd', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }
-const buttonGhost = { padding: '8px 12px', background: 'transparent', color: '#0d6efd', border: '1px solid #0d6efd', borderRadius: 6, cursor: 'pointer' }
-const tableStyle = { width: '100%', borderCollapse: 'collapse' }
-const thtd = { textAlign: 'left', padding: '10px 8px', borderBottom: '1px solid #eee', cursor: 'pointer' }
 
 const VehicleModels = () => {
   const [rows, setRows] = useState([
@@ -53,80 +45,233 @@ const VehicleModels = () => {
   const handleDelete = useCallback((row) => { if (window.confirm(`Delete model ${row.name}?`)) setRows(prev => prev.filter(r => r.id !== row.id)) }, [])
 
   return (
-    <div style={{display: 'grid', gap: 16}}>
-      <div style={headerStyle}>
-        <div>
-          <h2 style={{margin: 0}}>Vehicle Models</h2>
-          <div style={{color: '#6b7280'}}>Manage model catalog and lifecycle</div>
+    <div className="space-y-6">
+      {/* Breadcrumb */}
+      <div className="flex items-center text-sm text-gray-600">
+        <span className="hover:text-blue-600 cursor-pointer">Dashboard</span>
+        <ChevronRight className="w-4 h-4 mx-2" />
+        <span className="text-gray-900 font-medium">Vehicle Models</span>
+      </div>
+
+      {/* Header */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Vehicle Models</h1>
+            <p className="text-sm text-gray-600 mt-1">Manage model catalog and lifecycle</p>
+          </div>
+          <button 
+            onClick={handleAdd}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg flex items-center space-x-2 shadow-sm transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Model</span>
+          </button>
         </div>
-        <div style={toolbarStyle}>
-          <input placeholder="Search models..." value={query} onChange={(e) => { setQuery(e.target.value); setPage(1) }} style={inputStyle} />
-          <select value={brand} onChange={(e) => setBrand(e.target.value)} style={{...inputStyle, minWidth: 140}}>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="flex items-center gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <input 
+              placeholder="Search models..." 
+              value={query} 
+              onChange={(e) => { setQuery(e.target.value); setPage(1) }} 
+              className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+            />
+          </div>
+          <select 
+            value={brand} 
+            onChange={(e) => setBrand(e.target.value)} 
+            className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
             <option>All</option>
             <option>EVM</option>
             <option>Neo</option>
           </select>
-          <button style={buttonPrimary} onClick={handleAdd}>Add model</button>
         </div>
       </div>
 
-      <div style={cardStyle}>
-        <table style={tableStyle}>
-          <thead>
-            <tr>
-              <th style={thtd} onClick={() => toggleSort('id')}>ID</th>
-              <th style={thtd} onClick={() => toggleSort('name')}>Name {sortKey==='name' ? (sortDir==='asc'?'▲':'▼') : ''}</th>
-              <th style={thtd} onClick={() => toggleSort('brand')}>Brand</th>
-              <th style={thtd} onClick={() => toggleSort('variants')}>Variants</th>
-              <th style={thtd} onClick={() => toggleSort('active')}>Status</th>
-              <th style={thtd}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paged.map(row => (
-              <tr key={row.id}>
-                <td style={thtd}>{row.id}</td>
-                <td style={thtd}>{row.name}</td>
-                <td style={thtd}>{row.brand}</td>
-                <td style={thtd}>{row.variants}</td>
-                <td style={thtd}>
-                  <span style={{padding: '2px 8px', borderRadius: 12, background: row.active ? '#e6f4ea' : '#fdeaea', color: row.active ? '#18794e' : '#b42318'}}>
-                    {row.active ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-                <td style={thtd}>
-                  <div style={{display: 'flex', gap: 8}}>
-                    <button style={buttonGhost} onClick={() => handleEdit(row)}>Edit</button>
-                    <button style={{...buttonGhost, color: '#b42318', borderColor: '#b42318'}} onClick={() => handleDelete(row)}>Delete</button>
-                    <button style={{...buttonGhost}} onClick={() => setRows(prev => prev.map(r => r.id === row.id ? { ...r, active: !r.active } : r))}>{row.active ? 'Deactivate' : 'Activate'}</button>
-                  </div>
-                </td>
+      {/* Table */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => toggleSort('id')}
+                >
+                  ID {sortKey === 'id' && (sortDir === 'asc' ? '▲' : '▼')}
+                </th>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => toggleSort('name')}
+                >
+                  Name {sortKey === 'name' && (sortDir === 'asc' ? '▲' : '▼')}
+                </th>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => toggleSort('brand')}
+                >
+                  Brand
+                </th>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => toggleSort('variants')}
+                >
+                  Variants
+                </th>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => toggleSort('active')}
+                >
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12}}>
-          <div style={{color: '#64748b', fontSize: 12}}>Page {page} of {totalPages} • Total {sorted.length}</div>
-          <div style={{display: 'flex', gap: 8}}>
-            <button disabled={page===1} onClick={() => setPage(p=>Math.max(1, p-1))} style={{...buttonGhost, opacity: page===1?0.5:1}}>Prev</button>
-            <button disabled={page===totalPages} onClick={() => setPage(p=>Math.min(totalPages, p+1))} style={{...buttonGhost, opacity: page===totalPages?0.5:1}}>Next</button>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {paged.map(row => (
+                <tr key={row.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.id}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">{row.name}</div>
+                    <div className="text-xs text-gray-500">{row.description}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.brand}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.variants}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      row.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {row.active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => handleEdit(row)}
+                        className="text-blue-600 hover:text-blue-900 inline-flex items-center gap-1"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                        Edit
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(row)}
+                        className="text-red-600 hover:text-red-900 inline-flex items-center gap-1"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete
+                      </button>
+                      <button 
+                        onClick={() => setRows(prev => prev.map(r => r.id === row.id ? { ...r, active: !r.active } : r))}
+                        className="text-gray-600 hover:text-gray-900 inline-flex items-center gap-1"
+                      >
+                        {row.active ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
+                        {row.active ? 'Deactivate' : 'Activate'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            Page {page} of {totalPages} • Total {sorted.length}
+          </div>
+          <div className="flex items-center gap-2">
+            <button 
+              disabled={page === 1} 
+              onClick={() => setPage(p => Math.max(1, p - 1))} 
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Prev
+            </button>
+            <button 
+              disabled={page === totalPages} 
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
+            >
+              Next
+              <ChevronDown className="w-4 h-4 rotate-[-90deg]" />
+            </button>
           </div>
         </div>
       </div>
 
-      <Modal title="Add Model" open={showAdd} onClose={() => setShowAdd(false)} onSubmit={() => { const id = Math.max(0, ...rows.map(r=>r.id)) + 1; setRows(prev => [...prev, { id, name: form.name, brand: form.brand, year: parseInt(form.year, 10), variants: 0, active: true }]); setShowAdd(false) }}>
-        <div className="grid gap-3">
-          <input className="border rounded px-3 py-2 w-full" placeholder="Model name" value={form.name} onChange={(e)=>setForm(f=>({...f, name: e.target.value}))} />
-          <input className="border rounded px-3 py-2 w-full" placeholder="Brand" value={form.brand} onChange={(e)=>setForm(f=>({...f, brand: e.target.value}))} />
-          <input className="border rounded px-3 py-2 w-full" placeholder="Year" type="number" value={form.year} onChange={(e)=>setForm(f=>({...f, year: e.target.value}))} />
+      {/* Add Modal */}
+      <Modal title="Add Model" open={showAdd} onClose={() => setShowAdd(false)} onSubmit={() => { const id = Math.max(0, ...rows.map(r => r.id)) + 1; setRows(prev => [...prev, { id, name: form.name, brand: form.brand, year: parseInt(form.year, 10), variants: 0, active: true }]); setShowAdd(false) }}>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Model Name <span className="text-red-500">*</span></label>
+            <input 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              placeholder="Model name" 
+              value={form.name} 
+              onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} 
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Brand</label>
+            <input 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              placeholder="Brand" 
+              value={form.brand} 
+              onChange={(e) => setForm(f => ({ ...f, brand: e.target.value }))} 
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
+            <input 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              placeholder="Year" 
+              type="number" 
+              value={form.year} 
+              onChange={(e) => setForm(f => ({ ...f, year: e.target.value }))} 
+            />
+          </div>
         </div>
       </Modal>
 
+      {/* Edit Modal */}
       <Modal title={`Edit Model #${editing?.id || ''}`} open={showEdit} onClose={() => setShowEdit(false)} onSubmit={() => { setRows(prev => prev.map(r => r.id === editing.id ? { ...r, name: form.name, brand: form.brand, year: parseInt(form.year, 10) } : r)); setShowEdit(false) }}>
-        <div className="grid gap-3">
-          <input className="border rounded px-3 py-2 w-full" placeholder="Model name" value={form.name} onChange={(e)=>setForm(f=>({...f, name: e.target.value}))} />
-          <input className="border rounded px-3 py-2 w-full" placeholder="Brand" value={form.brand} onChange={(e)=>setForm(f=>({...f, brand: e.target.value}))} />
-          <input className="border rounded px-3 py-2 w-full" placeholder="Year" type="number" value={form.year} onChange={(e)=>setForm(f=>({...f, year: e.target.value}))} />
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Model Name <span className="text-red-500">*</span></label>
+            <input 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              placeholder="Model name" 
+              value={form.name} 
+              onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} 
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Brand</label>
+            <input 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              placeholder="Brand" 
+              value={form.brand} 
+              onChange={(e) => setForm(f => ({ ...f, brand: e.target.value }))} 
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
+            <input 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              placeholder="Year" 
+              type="number" 
+              value={form.year} 
+              onChange={(e) => setForm(f => ({ ...f, year: e.target.value }))} 
+            />
+          </div>
         </div>
       </Modal>
     </div>
@@ -134,5 +279,3 @@ const VehicleModels = () => {
 }
 
 export default VehicleModels
-
-

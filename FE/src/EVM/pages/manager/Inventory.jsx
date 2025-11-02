@@ -1,19 +1,15 @@
 import React, { useMemo, useState, useCallback } from 'react'
+import { ChevronRight, RefreshCw, Download, TrendingUp, Package, Building2, BarChart3, AlertTriangle, Clock } from 'lucide-react'
 import Modal from '../../components/Modal'
 
-const grid = { display: 'grid', gap: 16 }
-const row = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }
-const card = { background: '#fff', border: '1px solid #e6e6ea', borderRadius: 8, padding: 16 }
-const header = { display: 'flex', alignItems: 'center', justifyContent: 'space-between' }
-const input = { padding: '8px 10px', border: '1px solid #d0d5dd', borderRadius: 6, minWidth: 180 }
-const button = { padding: '8px 12px', background: '#0d6efd', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }
-const table = { width: '100%', borderCollapse: 'collapse' }
-const cell = { textAlign: 'left', padding: '10px 8px', borderBottom: '1px solid #eee' }
-
-const Metric = ({ label, value }) => (
-  <div style={{...card}}>
-    <div style={{color: '#6b7280', marginBottom: 4}}>{label}</div>
-    <div style={{fontSize: 22, fontWeight: 700}}>{value}</div>
+const Metric = ({ label, value, icon: Icon, iconColor }) => (
+  <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+    <div className="flex items-center justify-between mb-2">
+      <Icon className={`w-5 h-5 ${iconColor || 'text-gray-600'}`} />
+      <TrendingUp className="w-4 h-4 text-green-500" />
+    </div>
+    <div className="text-2xl font-bold text-gray-900">{value.toLocaleString()}</div>
+    <div className="text-xs text-gray-600 mt-1">{label}</div>
   </div>
 )
 
@@ -89,88 +85,211 @@ const Inventory = () => {
   }, [filtered])
 
   return (
-    <div style={grid}>
-      <div style={header}>
-        <div>
-          <h2 style={{margin: 0}}>Inventory</h2>
-          <div style={{color: '#6b7280'}}>Coordinate vehicle stock across dealers</div>
-        </div>
-        <div style={{display: 'flex', gap: 8}}>
-          <input placeholder="Search model/variant..." value={query} onChange={(e) => { setQuery(e.target.value); setPage(1) }} style={input} />
-          <select value={dealer} onChange={(e) => setDealer(e.target.value)} style={{...input, minWidth: 140}}>
-            <option>All</option>
-            <option>Dealer A</option>
-            <option>Dealer B</option>
-          </select>
-          <button style={button} onClick={handleRefresh}>Refresh</button>
-          <button style={{...button, background: '#0ea5e9'}} onClick={exportCsv}>Export CSV</button>
-        </div>
+    <div className="space-y-6">
+      {/* Breadcrumb */}
+      <div className="flex items-center text-sm text-gray-600">
+        <span className="hover:text-blue-600 cursor-pointer">Dashboard</span>
+        <ChevronRight className="w-4 h-4 mx-2" />
+        <span className="text-gray-900 font-medium">Inventory</span>
       </div>
 
-      <div style={row}>
-        <Metric label="Total Units" value={summary.totalUnits} />
-        <Metric label="Dealers" value={summary.dealers} />
-        <Metric label="Models" value={summary.models} />
-      </div>
-
-      <div style={card}>
-        {lastRefreshed && (
-          <div style={{color: '#64748b', fontSize: 12, marginBottom: 8}}>Last refreshed at {lastRefreshed}</div>
-        )}
-        <table style={table}>
-          <thead>
-            <tr>
-              <th style={cell} onClick={() => toggleSort('dealer')}>Dealer</th>
-              <th style={cell} onClick={() => toggleSort('model')}>Model</th>
-              <th style={cell} onClick={() => toggleSort('variant')}>Variant</th>
-              <th style={cell} onClick={() => toggleSort('qty')}>Quantity</th>
-              <th style={cell}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paged.map(r => (
-              <tr key={r.id}>
-                <td style={cell}>{r.dealer}</td>
-                <td style={cell}>{r.model}</td>
-                <td style={cell}>{r.variant}</td>
-                <td style={cell}>
-                  {r.qty}
-                  {(r.qty <= 2) && (
-                    <span style={{marginLeft: 8, padding: '2px 6px', borderRadius: 10, background: '#fef3c7', color: '#92400e', fontSize: 12}}>Low</span>
-                  )}
-                  {(r.daysInStock >= 60 && r.qty > 0) && (
-                    <span style={{marginLeft: 6, padding: '2px 6px', borderRadius: 10, background: '#fee2e2', color: '#991b1b', fontSize: 12}}>Long stock</span>
-                  )}
-                </td>
-                <td style={cell}>
-                  <div style={{display: 'flex', gap: 8}}>
-                    <button style={{padding: '6px 10px', border: '1px solid #0d6efd', color: '#0d6efd', background: 'transparent', borderRadius: 6, cursor: 'pointer'}} onClick={() => handleAllocate(r)}>Allocate</button>
-                    <button style={{padding: '6px 10px', border: '1px solid #64748b', color: '#475569', background: 'transparent', borderRadius: 6, cursor: 'pointer'}} onClick={() => handleAdjust(r)}>Adjust</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12}}>
-          <div style={{color: '#64748b', fontSize: 12}}>Page {page} of {totalPages} • Total {filtered.length}</div>
-          <div style={{display: 'flex', gap: 8}}>
-            <button onClick={() => setPage(p=>Math.max(1, p-1))} disabled={page===1} style={{padding: '6px 10px', border: '1px solid #64748b', color: '#475569', background: 'transparent', borderRadius: 6, cursor: 'pointer', opacity: page===1?0.5:1}}>Prev</button>
-            <button onClick={() => setPage(p=>Math.min(totalPages, p+1))} disabled={page===totalPages} style={{padding: '6px 10px', border: '1px solid #64748b', color: '#475569', background: 'transparent', borderRadius: 6, cursor: 'pointer', opacity: page===totalPages?0.5:1}}>Next</button>
+      {/* Header */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Inventory</h1>
+            <p className="text-sm text-gray-600 mt-1">Coordinate vehicle stock across dealers</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={handleRefresh}
+              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2.5 rounded-lg flex items-center space-x-2 shadow-sm transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Refresh</span>
+            </button>
+            <button 
+              onClick={exportCsv}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg flex items-center space-x-2 shadow-sm transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              <span>Export CSV</span>
+            </button>
           </div>
         </div>
       </div>
 
-      <Modal title={`Allocate from ${selected?.dealer || ''}`} open={allocOpen} onClose={() => setAllocOpen(false)} onSubmit={() => { try { const qty = parseInt(allocForm.qty, 10); setRows(prev => { const from = prev.find(i=>i.id===selected.id); if (!from || from.qty < qty) throw new Error('Insufficient stock'); from.qty -= qty; const existing = prev.find(i => i.dealer===allocForm.dealer && i.modelId===from.modelId && i.variant===from.variant); if (existing) existing.qty += qty; else prev.push({ id: Math.max(...prev.map(p=>p.id))+1, dealer: allocForm.dealer, modelId: from.modelId, model: from.model, variant: from.variant, qty, status: 'in_stock', daysInStock: 0 }); return [...prev] }); setAllocOpen(false) } catch (e) { window.alert(e.message) } }}>
-        <div className="grid gap-3">
-          <input className="border rounded px-3 py-2 w-full" placeholder="Dealer" value={allocForm.dealer} onChange={(e)=>setAllocForm(f=>({...f, dealer: e.target.value}))} />
-          <input className="border rounded px-3 py-2 w-full" placeholder="Quantity" type="number" value={allocForm.qty} onChange={(e)=>setAllocForm(f=>({...f, qty: e.target.value}))} />
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Metric label="Total Units" value={summary.totalUnits} icon={Package} />
+        <Metric label="Dealers" value={summary.dealers} icon={Building2} />
+        <Metric label="Models" value={summary.models} icon={BarChart3} />
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="flex items-center gap-4">
+          <input 
+            placeholder="Search model/variant..." 
+            value={query} 
+            onChange={(e) => { setQuery(e.target.value); setPage(1) }} 
+            className="flex-1 px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+          />
+          <select 
+            value={dealer} 
+            onChange={(e) => setDealer(e.target.value)} 
+            className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option>All</option>
+            <option>Dealer A</option>
+            <option>Dealer B</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        {lastRefreshed && (
+          <div className="text-xs text-gray-500 px-6 pt-4 mb-2">Last refreshed at {lastRefreshed}</div>
+        )}
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => toggleSort('dealer')}
+                >
+                  Dealer
+                </th>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => toggleSort('model')}
+                >
+                  Model
+                </th>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => toggleSort('variant')}
+                >
+                  Variant
+                </th>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => toggleSort('qty')}
+                >
+                  Quantity
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {paged.map(r => (
+                <tr key={r.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{r.dealer}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{r.model}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{r.variant}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900">{r.qty}</span>
+                      {(r.qty <= 2) && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                          <AlertTriangle className="w-3 h-3 mr-1" />
+                          Low
+                        </span>
+                      )}
+                      {(r.daysInStock >= 60 && r.qty > 0) && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                          <Clock className="w-3 h-3 mr-1" />
+                          Long stock
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => handleAllocate(r)}
+                        className="text-blue-600 hover:text-blue-900"
+                      >
+                        Allocate
+                      </button>
+                      <button 
+                        onClick={() => handleAdjust(r)}
+                        className="text-gray-600 hover:text-gray-900"
+                      >
+                        Adjust
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            Page {page} of {totalPages} • Total {filtered.length}
+          </div>
+          <div className="flex items-center gap-2">
+            <button 
+              disabled={page === 1} 
+              onClick={() => setPage(p => Math.max(1, p - 1))} 
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Prev
+            </button>
+            <button 
+              disabled={page === totalPages} 
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Allocate Modal */}
+      <Modal title={`Allocate from ${selected?.dealer || ''}`} open={allocOpen} onClose={() => setAllocOpen(false)} onSubmit={() => { try { const qty = parseInt(allocForm.qty, 10); setRows(prev => { const from = prev.find(i => i.id === selected.id); if (!from || from.qty < qty) throw new Error('Insufficient stock'); from.qty -= qty; const existing = prev.find(i => i.dealer === allocForm.dealer && i.modelId === from.modelId && i.variant === from.variant); if (existing) existing.qty += qty; else prev.push({ id: Math.max(...prev.map(p => p.id)) + 1, dealer: allocForm.dealer, modelId: from.modelId, model: from.model, variant: from.variant, qty, status: 'in_stock', daysInStock: 0 }); return [...prev] }); setAllocOpen(false) } catch (e) { window.alert(e.message) } }}>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Dealer</label>
+            <input 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              placeholder="Dealer" 
+              value={allocForm.dealer} 
+              onChange={(e) => setAllocForm(f => ({ ...f, dealer: e.target.value }))} 
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
+            <input 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              placeholder="Quantity" 
+              type="number" 
+              value={allocForm.qty} 
+              onChange={(e) => setAllocForm(f => ({ ...f, qty: e.target.value }))} 
+            />
+          </div>
         </div>
       </Modal>
 
+      {/* Adjust Modal */}
       <Modal title={`Adjust ${selected?.model || ''} ${selected?.variant || ''}`} open={adjustOpen} onClose={() => setAdjustOpen(false)} onSubmit={() => { setRows(prev => prev.map(i => i.id === selected.id ? { ...i, qty: Math.max(0, parseInt(adjustForm.qty, 10)) } : i)); setAdjustOpen(false) }}>
-        <div className="grid gap-3">
-          <input className="border rounded px-3 py-2 w-full" placeholder="New quantity" type="number" value={adjustForm.qty} onChange={(e)=>setAdjustForm({ qty: e.target.value })} />
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">New Quantity</label>
+            <input 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              placeholder="New quantity" 
+              type="number" 
+              value={adjustForm.qty} 
+              onChange={(e) => setAdjustForm({ qty: e.target.value })} 
+            />
+          </div>
         </div>
       </Modal>
     </div>
@@ -178,5 +297,3 @@ const Inventory = () => {
 }
 
 export default Inventory
-
-

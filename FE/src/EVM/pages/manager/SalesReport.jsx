@@ -1,19 +1,17 @@
 import React, { useMemo, useState } from 'react'
-
-const grid = { display: 'grid', gap: 16 }
-const row = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }
-const card = { background: '#fff', border: '1px solid #e6e6ea', borderRadius: 8, padding: 16 }
-const header = { display: 'flex', alignItems: 'center', justifyContent: 'space-between' }
-const input = { padding: '8px 10px', border: '1px solid #d0d5dd', borderRadius: 6, minWidth: 120 }
+import { ChevronRight, Download } from 'lucide-react'
 
 const Bar = ({ label, value, max }) => (
-  <div style={{marginBottom: 10}}>
-    <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 6}}>
-      <div>{label}</div>
-      <div style={{color: '#64748b'}}>{value}</div>
+  <div className="mb-4">
+    <div className="flex justify-between items-center mb-2">
+      <span className="text-sm font-medium text-gray-900">{label}</span>
+      <span className="text-sm text-gray-600">{value}</span>
     </div>
-    <div style={{height: 10, background: '#eef2f7', borderRadius: 6}}>
-      <div style={{height: '100%', width: `${(value / max) * 100}%`, background: '#0d6efd', borderRadius: 6}} />
+    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+      <div 
+        className="h-full bg-blue-600 transition-all duration-300" 
+        style={{ width: `${(value / max) * 100}%` }}
+      />
     </div>
   </div>
 )
@@ -45,46 +43,87 @@ const SalesReport = () => {
   }
 
   return (
-    <div style={grid}>
-      <div style={header}>
-        <div>
-          <h2 style={{margin: 0}}>Sales Report</h2>
-          <div style={{color: '#6b7280'}}>Sales by region and dealer</div>
-        </div>
-        <div style={{display: 'flex', gap: 8}}>
-          <select value={period} onChange={(e) => setPeriod(e.target.value)} style={input}>
-            <option>Q1</option>
-            <option>Q2</option>
-            <option>Q3</option>
-            <option>Q4</option>
-          </select>
-          <select value={region} onChange={(e) => setRegion(e.target.value)} style={input}>
-            <option>All</option>
-            <option>North</option>
-            <option>South</option>
-          </select>
-          <button onClick={exportCsv} className="px-3 py-2 text-sm border border-gray-300 rounded">Export CSV</button>
+    <div className="space-y-6">
+      {/* Breadcrumb */}
+      <div className="flex items-center text-sm text-gray-600">
+        <span className="hover:text-blue-600 cursor-pointer">Dashboard</span>
+        <ChevronRight className="w-4 h-4 mx-2" />
+        <span className="text-gray-900 font-medium">Sales Report</span>
+      </div>
+
+      {/* Header */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Sales Report</h1>
+            <p className="text-sm text-gray-600 mt-1">Sales by region and dealer</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <select 
+              value={period} 
+              onChange={(e) => setPeriod(e.target.value)} 
+              className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option>Q1</option>
+              <option>Q2</option>
+              <option>Q3</option>
+              <option>Q4</option>
+            </select>
+            <select 
+              value={region} 
+              onChange={(e) => setRegion(e.target.value)} 
+              className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option>All</option>
+              <option>North</option>
+              <option>South</option>
+            </select>
+            <button 
+              onClick={exportCsv}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg flex items-center space-x-2 shadow-sm transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              <span>Export CSV</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      <div style={row}>
-        <div style={card}>
-          <div style={{fontWeight: 600, marginBottom: 8}}>Top Dealers</div>
+      {/* Charts Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Top Dealers */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="text-sm font-semibold text-gray-900 mb-4">Top Dealers</div>
           {filtered.map(r => (
             <Bar key={r.dealer} label={r.dealer} value={r.sales} max={max} />
           ))}
         </div>
-        <div style={card}>
-          <div style={{fontWeight: 600, marginBottom: 8}}>Summary</div>
-          <div style={{display: 'grid', gap: 8}}>
-            <div>Total sales: {total}</div>
-            <div>Dealers: {filtered.length}</div>
-            <div>Period: {period}</div>
+
+        {/* Summary */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="text-sm font-semibold text-gray-900 mb-4">Summary</div>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Total sales</span>
+              <span className="text-lg font-bold text-gray-900">{total}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Dealers</span>
+              <span className="text-lg font-bold text-gray-900">{filtered.length}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Period</span>
+              <span className="text-lg font-bold text-gray-900">{period}</span>
+            </div>
           </div>
         </div>
-        <div style={card}>
-          <div style={{fontWeight: 600, marginBottom: 8}}>Notes</div>
-          <div style={{color: '#64748b'}}>Use filters to analyze performance by region and quarter.</div>
+
+        {/* Notes */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="text-sm font-semibold text-gray-900 mb-4">Notes</div>
+          <div className="text-sm text-gray-600">
+            Use filters to analyze performance by region and quarter.
+          </div>
         </div>
       </div>
     </div>
@@ -92,5 +131,3 @@ const SalesReport = () => {
 }
 
 export default SalesReport
-
-
