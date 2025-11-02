@@ -126,48 +126,5 @@ public class PaymentService {
         }
     }
 
-    public List<Map<String, Object>> getCustomersWithActiveInstallments() {
-        List<Map<String, Object>> responseList = new ArrayList<>();
-        try {
-            List<InstallmentPlanDTO> plans = installDAO.getActiveOrOverduePlans();
-            if (plans != null && !plans.isEmpty()) {
-                Set<Integer> addedCustomerIds = new HashSet<>();
-                for (InstallmentPlanDTO plan : plans) {
-                    PaymentDTO payment = paymentDAO.findPaymentById(plan.getPaymentId());
-                    if (payment == null) continue;
-
-                    OrderDTO order = orderDAO.getById(payment.getOrderId());
-                    if (order == null) continue;
-
-                    int customerId = order.getCustomerId();
-                    if (customerId <= 0 || addedCustomerIds.contains(customerId)) continue;
-
-                    List<CustomerDTO> customerList = customerDAO.findById(customerId);
-                    if (customerList == null || customerList.isEmpty()) continue;
-
-                    CustomerDTO customer = customerList.get(0);
-                    double monthlyPay = 0.0;
-                    int termMonth = 0;
-                    try { monthlyPay = Double.parseDouble(plan.getMonthlyPay()); } catch (NumberFormatException e) {}
-                    try { termMonth = Integer.parseInt(plan.getTermMonth()); } catch (NumberFormatException e) {}
-
-                    double outstanding = Math.max(0, monthlyPay * termMonth);
-
-                    Map<String, Object> map = new LinkedHashMap<>();
-                    map.put("customerId", customer.getCustomerId());
-                    map.put("name", customer.getName());
-                    map.put("address", customer.getAddress());
-                    map.put("email", customer.getEmail());
-                    map.put("phoneNumber", customer.getPhoneNumber());
-                    map.put("outstandingAmount", outstanding);
-
-                    responseList.add(map);
-                    addedCustomerIds.add(customerId);
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return responseList;
-    }
+   
 }

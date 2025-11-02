@@ -28,48 +28,6 @@ public class SaleRecordService {
     private final UserAccountDAO userDAO = new UserAccountDAO();
     private SaleRecordDAO saleDAO = new SaleRecordDAO();
 
-    public List<Map<String, Object>> getDealerSalesSummary() throws ClassNotFoundException, SQLException {
-        List<DealerDTO> dealerList = dealerDAO.retrieve("1=1"); // Get all dealers
-        List<Map<String, Object>> responseList = new ArrayList<>();
-        Set<Integer> addedDealerIds = new HashSet<>();
-
-        for (DealerDTO dealer : dealerList) {
-            if (addedDealerIds.contains(dealer.getDealerId())) {
-                continue;
-            }
-
-            double totalSales = 0;
-            int totalOrders = 0;
-
-            List<UserAccountDTO> staffList = userDAO.findUserByDealerId(dealer.getDealerId());
-            if (staffList != null) {
-                for (UserAccountDTO staff : staffList) {
-                    List<SaleRecordDTO> sales = saleDAO.findSaleRecordByDealerStaffId(staff.getUserId());
-                    if (sales != null) {
-                        totalSales += sales.stream()
-                                .mapToDouble(SaleRecordDTO::getSaleAmount)
-                                .sum();
-                    }
-
-                    totalOrders += orderDAO.countOrdersByDealerStaffId(staff.getUserId());
-                }
-            }
-
-            // Store dealer info and computed totals in a map
-            Map<String, Object> map = new LinkedHashMap<>();
-            map.put("dealerId", dealer.getDealerId());
-            map.put("dealerName", dealer.getDealerName());
-            map.put("address", dealer.getAddress());
-            map.put("phoneNumber", dealer.getPhoneNumber());
-            map.put("totalSales", totalSales);
-            map.put("totalOrders", totalOrders);
-
-            responseList.add(map);
-            addedDealerIds.add(dealer.getDealerId());
-        }
-
-        return responseList;
-    }
 
     public List<OrderDTO> getOrdersByDealer(int dealerId) {
         try {
