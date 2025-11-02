@@ -53,6 +53,14 @@ public class OrderDTO {
         this.status = status;
     }
 
+    public OrderDTO(int customerId, int dealerStaffId, int modelId, String orderDate, String status) {
+        this.customerId = customerId;
+        this.dealerStaffId = dealerStaffId;
+        this.modelId = modelId;
+        this.orderDate = orderDate;
+        this.status = status;
+    }
+
     public int getDealerStaffId() {
         return dealerStaffId;
     }

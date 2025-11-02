@@ -25,13 +25,13 @@ public class OrderService {
     private final VehicleVariantDAO variantDAO = new VehicleVariantDAO();
     private final VehicleSerialDAO vehicleSerialDAO = new VehicleSerialDAO();
     private final OrderDetailDAO orderDetailDAO = new OrderDetailDAO();
-
+    
     public int HandlingCreateOrder(
             int customerId,
-            int dealerStaffId,
+            int dealerstaffId,
             int modelId,
             String status,
-            int variantId,
+            Integer variantId,
             int quantity,
             double unitPrice,
             boolean isCustom) {
@@ -42,59 +42,83 @@ public class OrderService {
             conn = DbUtils.getConnection();
             conn.setAutoCommit(false);
 
+            // Create order
             String currentDate = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            OrderDTO order = new OrderDTO(0, customerId, dealerStaffId, modelId, currentDate, status);
+            OrderDTO order = new OrderDTO(customerId, dealerstaffId, modelId, currentDate, status);
             int orderId = orderDAO.create(conn, order);
             if (orderId <= 0) {
                 throw new SQLException("Failed to create order");
             }
 
-            if (!isCustom) {
-                String generatedSerialId = vehicleSerialDAO.generateSerialId();
-                if (generatedSerialId == null || generatedSerialId.trim().isEmpty()) {
-                    throw new SQLException("Failed to generate serial ID");
+            int finalVariantId;
+            double finalUnitPrice;
+
+            // Auto-generate variant if missing
+            if (variantId == null || variantId <= 0) {
+                VehicleVariantDTO newVariant = new VehicleVariantDTO();
+                newVariant.setModelId(modelId);
+                newVariant.setVersionName("Auto-Generated Version");
+                newVariant.setColor("Default Color");
+                newVariant.setPrice(0.0);
+                newVariant.setIsActive(true);
+
+                finalVariantId = variantDAO.create(conn, newVariant);
+                if (finalVariantId <= 0) {
+                    throw new SQLException("Failed to create variant");
                 }
-
-                VehicleSerialDTO serial = new VehicleSerialDTO(generatedSerialId, variantId);
-                int createdSerial = vehicleSerialDAO.create(conn, serial);
-                if (createdSerial != 1) {
-                    throw new SQLException("Failed to create vehicle serial");
-                }
-
-                OrderDetailDTO detail = new OrderDetailDTO();
-                detail.setOrderId(orderId);
-                detail.setSerialId(generatedSerialId);
-                detail.setQuantity(String.valueOf(quantity));
-                detail.setUnitPrice(unitPrice);
-
-                int inserted = orderDetailDAO.create(conn, detail);
-                if (inserted != 1) {
-                    throw new SQLException("Failed to insert order detail");
-                }
-
+                finalUnitPrice = 0.0;
             } else {
-                OrderDetailDTO detail = new OrderDetailDTO();
-                detail.setOrderId(orderId);
-                detail.setSerialId(null);
-                detail.setQuantity(String.valueOf(quantity));
-                detail.setUnitPrice(unitPrice);
-
-                int inserted = orderDetailDAO.create(conn, detail);
-                if (inserted != 1) {
-                    throw new SQLException("Failed to insert order detail");
+                VehicleVariantDTO variant = variantDAO.findUnitPriceByVariantId(variantId);
+                if (variant == null) {
+                    throw new SQLException("Variant not found with ID: " + variantId);
                 }
+                finalVariantId = variantId;
+                finalUnitPrice = variant.getPrice();
+            }
 
-                List<OrderDetailDTO> createdDetails = orderDetailDAO.retrieveWithConnection(conn, "order_id = ?", orderId);
-                if (createdDetails == null || createdDetails.isEmpty()) {
-                    throw new SQLException("Failed to retrieve created order detail");
+            // Order details
+            String serialId = null;
+            if (!isCustom) {
+                // Normal order: reuse or generate serial
+                List<VehicleSerialDTO> existingSerials = vehicleSerialDAO.retrieve("variant_id = ?", finalVariantId);
+                if (existingSerials != null && !existingSerials.isEmpty()) {
+                    serialId = existingSerials.get(0).getSerialId();
+                } else {
+                    serialId = vehicleSerialDAO.generateSerialId();
+                    VehicleSerialDTO serial = new VehicleSerialDTO(serialId, finalVariantId);
+                    int createdSerial = vehicleSerialDAO.create(conn, serial);
+                    if (createdSerial != 1) {
+                        throw new SQLException("Failed to create vehicle serial");
+                    }
                 }
-                int orderDetailId = createdDetails.get(0).getOrderDetailId();
+            } else {
+                // Custom order: generate temporary serial
+                serialId = vehicleSerialDAO.generateSerialId();
+                VehicleSerialDTO serial = new VehicleSerialDTO(serialId, finalVariantId);
+                vehicleSerialDAO.create(conn, serial);
+            }
 
+            // Insert OrderDetail
+            OrderDetailDTO detail = new OrderDetailDTO();
+            detail.setOrderId(orderId);
+            detail.setSerialId(serialId);
+            detail.setQuantity(String.valueOf(quantity));
+            detail.setUnitPrice(finalUnitPrice);
+            int orderDetailId = orderDetailDAO.create(conn, detail);
+            if (orderDetailId <= 0) {
+                throw new SQLException("Failed to insert order detail");
+            }
+
+            System.out.println("DEBUG: orderDetailId = " + orderDetailId);
+
+            // Insert confirmation for custom orders (use the order_detail_id we just got)
+            if (isCustom) {
                 String agreement = "Pending";
-                ConfirmationDTO confirmation = confirmationDAO.insert(conn, orderDetailId, agreement, currentDate);
+                ConfirmationDTO confirmation = confirmationDAO.insert(conn, 1, orderDetailId, agreement, currentDate);
                 if (confirmation == null) {
-                    throw new SQLException("Failed to create confirmation");
+                    throw new SQLException("Failed to insert confirmation");
                 }
+                System.out.println("DEBUG: Confirmation inserted, ID = " + confirmation.getConfirmationId());
             }
 
             conn.commit();
@@ -102,89 +126,87 @@ public class OrderService {
 
         } catch (Exception e) {
             e.printStackTrace();
-            if (conn != null) {
-                try {
-                    conn.rollback();
-                    System.out.println("Transaction rolled back due to error: " + e.getMessage());
-                } catch (SQLException ex) {
-                    System.err.println("Rollback failed: " + ex.getMessage());
-                }
+            if (conn != null) try {
+                conn.rollback();
+            } catch (SQLException ex) {
             }
             return -1;
         } finally {
-            if (conn != null) {
-                try {
-                    conn.setAutoCommit(true);
-                    conn.close();
-                } catch (SQLException ex) {
-                    System.err.println("Failed to close connection: " + ex.getMessage());
-                }
+            if (conn != null) try {
+                conn.setAutoCommit(true);
+                conn.close();
+            } catch (SQLException ex) {
             }
         }
     }
 
-    public boolean approveCustomOrder(int orderId, boolean isAgree, double unitPrice) {
+    public boolean approveCustomOrderByOrderId(int orderId, String decision, String versionName,
+            String color, double unitPrice, int staffAdminId) {
         Connection conn = null;
         try {
             conn = DbUtils.getConnection();
             conn.setAutoCommit(false);
 
-            OrderDTO order = orderDAO.getById(orderId);
-            if (order == null) {
-                throw new SQLException("Order not found");
-            }
-            int modelId = order.getModelId();
-
-            List<OrderDetailDTO> detailList = orderDetailDAO.retrieveWithConnection(conn, "order_id = ? AND serial_id IS NULL", orderId);
-            OrderDetailDTO detail = (detailList != null && !detailList.isEmpty()) ? detailList.get(0) : null;
-
+            // Get order detail
+            OrderDetailDTO detail = orderDetailDAO.getOrderDetailByOrderId(orderId);
             if (detail == null) {
-                throw new SQLException("Order detail not found");
+                throw new SQLException("No OrderDetail found for order_id = " + orderId);
             }
 
-            ConfirmationDTO confirmation = confirmationDAO.getConfirmationByOrderDetailId(detail.getOrderDetailId());
+            int orderDetailId = detail.getOrderDetailId();
+            String serialId = detail.getSerialId();
+            if (serialId == null) {
+                throw new SQLException("OrderDetail " + orderDetailId + " has no serial_id");
+            }
+            
+            boolean updatedPrice = orderDetailDAO.updateUnitPrice(orderDetailId, unitPrice);
+            if (!updatedPrice) {
+                throw new SQLException("Failed to update unit_price for order_detail_id = " + orderDetailId);
+            }
+
+            // Get variantId via VehicleSerial
+            VehicleSerialDTO serial = vehicleSerialDAO.getSerialBySerialId(serialId);
+            if (serial == null) {
+                throw new SQLException("No variant found for serial_id = " + serialId);
+            }
+            int variantId = serial.getVariantId();
+
+            // Get confirmation for this order detail
+            ConfirmationDTO confirmation = confirmationDAO.getConfirmationByOrderDetailId(orderDetailId);
             if (confirmation == null) {
-                throw new SQLException("Confirmation not found for this order detail");
+                throw new SQLException("No confirmation found for order_detail_id = " + orderDetailId);
             }
 
-            if (isAgree) {
-                VehicleVariantDTO newVariant = new VehicleVariantDTO();
-                newVariant.setModelId(modelId);
-                newVariant.setVersionName("Custom Version");
-                newVariant.setColor("Custom Color");
-                newVariant.setPrice(unitPrice);
-                newVariant.setIsActive(true);
-                int variantId = variantDAO.create(conn, newVariant);
-                if (variantId <= 0) {
-                    throw new SQLException("Failed to create variant");
-                }
+            // Update confirmation with decision & staff_admin_id
+            ConfirmationDTO updatedConfirmation = confirmationDAO.updateStatus(
+                    confirmation.getConfirmationId(),
+                    decision,
+                    staffAdminId
+            );
 
-                String serialId = vehicleSerialDAO.generateSerialId();
-                if (serialId == null || serialId.trim().isEmpty()) {
-                    throw new SQLException("Failed to generate serial ID");
-                }
+            if (updatedConfirmation == null) {
+                throw new SQLException("Failed to update confirmation for confirmation_id = " + confirmation.getConfirmationId());
+            }
 
-                VehicleSerialDTO serial = new VehicleSerialDTO(serialId, variantId);
-                int serialCreated = vehicleSerialDAO.create(conn, serial);
-                if (serialCreated != 1) {
-                    throw new SQLException("Failed to create vehicle serial");
+            // Take action based on decision
+            if (decision.equalsIgnoreCase("Agree")) {
+                // Update VehicleVariant
+                boolean updated = variantDAO.updateVariantById(variantId, versionName, color);
+                if (!updated) {
+                    throw new SQLException("Failed to update VehicleVariant for variant_id = " + variantId);
                 }
+                System.out.println("INFO: Custom order approved. Updated variant_id = " + variantId);
 
-                int updated = orderDetailDAO.updateSerialId(conn, detail.getOrderDetailId(), serialId);
-                if (updated != 1) {
-                    throw new SQLException("Failed to update order detail with serial ID");
+            } else if (decision.equalsIgnoreCase("Disagree")) {
+
+                // Delete Order
+                boolean orderDeleted = orderDAO.deleteById(conn, orderId);
+                if (!orderDeleted) {
+                    throw new SQLException("Failed to delete order_id = " + orderId);
                 }
-
-                ConfirmationDTO updatedConfirmation = confirmationDAO.updateStatus(conn, confirmation.getConfirmationId(), "Agree");
-                if (updatedConfirmation == null) {
-                    throw new SQLException("Failed to update confirmation status");
-                }
-
+                System.out.println("INFO: Custom order rejected. Deleted order_id = " + orderId);
             } else {
-                ConfirmationDTO updatedConfirmation = confirmationDAO.updateStatus(conn, confirmation.getConfirmationId(), "Disagree");
-                if (updatedConfirmation == null) {
-                    throw new SQLException("Failed to update confirmation status");
-                }
+                System.out.println("INFO: Custom order decision is pending. No action taken.");
             }
 
             conn.commit();
@@ -192,23 +214,18 @@ public class OrderService {
 
         } catch (Exception e) {
             e.printStackTrace();
-            if (conn != null) {
-                try {
-                    conn.rollback();
-                    System.out.println("Transaction rolled back due to error: " + e.getMessage());
-                } catch (SQLException ex) {
-                    System.err.println("Rollback failed: " + ex.getMessage());
-                }
+            if (conn != null) try {
+                conn.rollback();
+            } catch (SQLException ex) {
+                ex.printStackTrace();
             }
             return false;
         } finally {
-            if (conn != null) {
-                try {
-                    conn.setAutoCommit(true);
-                    conn.close();
-                } catch (SQLException ex) {
-                    System.err.println("Failed to close connection: " + ex.getMessage());
-                }
+            if (conn != null) try {
+                conn.setAutoCommit(true);
+                conn.close();
+            } catch (SQLException ex) {
+                ex.printStackTrace();
             }
         }
     }

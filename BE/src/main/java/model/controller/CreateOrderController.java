@@ -11,6 +11,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Map;
+import model.dao.VehicleVariantDAO;
+import model.dto.VehicleVariantDTO;
 import model.service.OrderService;
 import utils.RequestUtils;
 import utils.ResponseUtils;
@@ -23,80 +25,83 @@ import utils.ResponseUtils;
 public class CreateOrderController extends HttpServlet {
 
     private final OrderService service = new OrderService();
+    private final VehicleVariantDAO variantDAO = new VehicleVariantDAO();
 
     @Override
-    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException {
         try {
             Map<String, Object> params = RequestUtils.extractParams(req);
 
-            // Extract parameters, ensuring null checks before toString() if RequestUtils is inconsistent
-            Object customerIdObj = params.get("customerId");
-            String customerIdStr = (customerIdObj != null) ? customerIdObj.toString() : null;
-            
-            Object dealerStaffIdObj = params.get("dealerStaffId");
-            String dealerStaffIdStr = (dealerStaffIdObj != null) ? dealerStaffIdObj.toString() : null;
-            
-            Object modelIdObj = params.get("modelId");
-            String modelIdStr = (modelIdObj != null) ? modelIdObj.toString() : null;
-            
-            Object variantIdObj = params.get("variantId");
-            String variantIdStr = (variantIdObj != null) ? variantIdObj.toString() : null;
-            
-            Object quantityObj = params.get("quantity");
-            String quantityStr = (quantityObj != null) ? quantityObj.toString() : null;
-            
-            Object unitPriceObj = params.get("unitPrice");
-            String unitPriceStr = (unitPriceObj != null) ? unitPriceObj.toString() : null;
-            
-            Object statusObj = params.get("status");
-            String status = (statusObj != null) ? statusObj.toString() : null;
-            
-            Object isCustomObj = params.get("isCustom");
-            String isCustomStr = (isCustomObj != null) ? isCustomObj.toString() : null;
-
             // Validate required fields
-            if (customerIdStr == null || customerIdStr.trim().isEmpty() ||
-                dealerStaffIdStr == null || dealerStaffIdStr.trim().isEmpty() ||
-                modelIdStr == null || modelIdStr.trim().isEmpty() ||
-                variantIdStr == null || variantIdStr.trim().isEmpty() ||
-                quantityStr == null || quantityStr.trim().isEmpty() ||
-                unitPriceStr == null || unitPriceStr.trim().isEmpty()) {
-                ResponseUtils.error(resp, "Missing required parameters: customerId, dealerStaffId, modelId, variantId, quantity, unitPrice");
+            if (!params.containsKey("customerId") || !params.containsKey("dealerstaffId")
+                    || !params.containsKey("modelId") || !params.containsKey("quantity")) {
+                ResponseUtils.error(resp, "Missing required parameters: customerId, dealerstaffId, modelId, quantity");
                 return;
             }
-            
-            // Default 'status' if not provided (Handling null status case)
-            if (status == null || status.trim().isEmpty()) {
-                status = "Pending";
+
+            // Parse required parameters
+            int customerId = Integer.parseInt(params.get("customerId").toString());
+            int dealerstaffId = Integer.parseInt(params.get("dealerstaffId").toString());
+            int modelId = Integer.parseInt(params.get("modelId").toString());
+            int quantity = Integer.parseInt(params.get("quantity").toString());
+
+            // Validate quantity
+            if (quantity <= 0) {
+                ResponseUtils.error(resp, "Quantity must be greater than 0");
+                return;
             }
-            
-            // Default 'isCustom' if not provided
-            if (isCustomStr == null || isCustomStr.trim().isEmpty()) {
-                 isCustomStr = "false"; 
+
+            // Handle variantId - optional
+            Integer variantId = null;
+            double unitPrice = 0.0;
+
+            if (params.containsKey("variantId") && params.get("variantId") != null
+                    && !params.get("variantId").toString().trim().isEmpty()) {
+                variantId = Integer.parseInt(params.get("variantId").toString());
+
+                if (variantId > 0) {
+                    VehicleVariantDTO variant = variantDAO.findUnitPriceByVariantId(variantId);
+                    if (variant == null) {
+                        ResponseUtils.error(resp, "Variant not found with ID: " + variantId);
+                        return;
+                    }
+                    unitPrice = variant.getPrice();
+                }
             }
 
-            // Convert String parameters to correct types
-            int customerId = Integer.parseInt(customerIdStr);
-            int dealerStaffId = Integer.parseInt(dealerStaffIdStr);
-            int modelId = Integer.parseInt(modelIdStr);
-            int variantId = Integer.parseInt(variantIdStr);
-            int quantity = Integer.parseInt(quantityStr);
-            double unitPrice = Double.parseDouble(unitPriceStr);
-            boolean isCustom = Boolean.parseBoolean(isCustomStr);
+            // Handle status - optional, defaults to "Pending"
+            String status = "Pending";
+            if (params.containsKey("status") && params.get("status") != null
+                    && !params.get("status").toString().trim().isEmpty()) {
+                status = params.get("status").toString();
+            }
 
+            // Handle isCustom - optional, defaults to false
+            boolean isCustom = params.containsKey("isCustom") && params.get("isCustom") != null
+                    ? Boolean.parseBoolean(params.get("isCustom").toString())
+                    : false;
 
-            // Call service
-            int orderId = service.HandlingCreateOrder(customerId, dealerStaffId, modelId,
-                                                 status, variantId, quantity, unitPrice, isCustom);
+            // Create order via service
+            int orderId = service.HandlingCreateOrder(customerId, dealerstaffId, modelId,
+                    status, variantId, quantity, unitPrice, isCustom);
 
+            // Return response
             if (orderId > 0) {
-                ResponseUtils.success(resp, "Order created successfully", "Order ID: " + orderId);
+                String message = String.format(
+                        "Order ID: %d | Variant: %s | Unit Price: %.2f%s",
+                        orderId,
+                        variantId != null && variantId > 0 ? variantId : "Auto-Generated",
+                        unitPrice,
+                        isCustom ? " | Status: Custom (Pending Confirmation)" : ""
+                );
+                ResponseUtils.success(resp, "Order created successfully", message);
             } else {
                 ResponseUtils.error(resp, "Failed to create order");
             }
 
         } catch (NumberFormatException e) {
-            ResponseUtils.error(resp, "Invalid number format in parameters");
+            ResponseUtils.error(resp, "Invalid number format: " + e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
             ResponseUtils.error(resp, "Error creating order: " + e.getMessage());

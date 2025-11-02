@@ -116,4 +116,13 @@ public class OrderDAO {
         List<OrderDTO> list = retrieve("dealer_staff_id = ?", dealerStaffId);
         return list.size();
     }
+    
+    public boolean deleteById(Connection conn, int orderId) throws SQLException {
+        String sql = "DELETE FROM [Order] WHERE order_id = ?";
+        try ( PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, orderId);
+            int rows = ps.executeUpdate();
+            return rows > 0;
+        }
+    }
 }
