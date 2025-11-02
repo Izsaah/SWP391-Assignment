@@ -18,7 +18,7 @@ import utils.ResponseUtils;
  *
  * @author khoac
  */
-@WebServlet("/api/staff/viewInventory")
+@WebServlet("/api/EVM/viewInventory")
 public class ViewInventoryController extends HttpServlet {
 
     private final ViewInventoryService service = new ViewInventoryService();
