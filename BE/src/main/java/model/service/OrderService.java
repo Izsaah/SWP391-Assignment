@@ -282,4 +282,23 @@ public class OrderService {
             return Collections.emptyList();
         }
     }
+    public boolean updateOrderStatus(int orderId, String newStatus)
+            throws SQLException, ClassNotFoundException {
+
+        // Validate trực tiếp trong code — chỉ 3 status hợp lệ
+        if (!newStatus.equalsIgnoreCase("pending")
+                && !newStatus.equalsIgnoreCase("delivered")
+                && !newStatus.equalsIgnoreCase("cancelled")) {
+            throw new IllegalArgumentException("Invalid status: " + newStatus);
+        }
+
+        try (Connection conn = DbUtils.getConnection()) {
+            conn.setAutoCommit(false);
+
+            boolean success = orderDAO.updateStatus(orderId, newStatus);
+
+            conn.commit();
+            return success;
+        }
+    }
 }

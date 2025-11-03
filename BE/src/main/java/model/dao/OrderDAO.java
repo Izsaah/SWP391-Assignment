@@ -29,8 +29,7 @@ public class OrderDAO {
 
     public List<OrderDTO> retrieve(String condition, Object... params) throws SQLException, ClassNotFoundException {
         String sql = "SELECT * FROM " + TABLE_NAME + " WHERE " + condition;
-        try (Connection conn = DbUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
             for (int i = 0; i < params.length; i++) {
                 ps.setObject(i + 1, params[i]);
             }
@@ -44,7 +43,7 @@ public class OrderDAO {
     }
 
     public int create(Connection conn, OrderDTO order) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(INSERT_ORDER, Statement.RETURN_GENERATED_KEYS)) {
+        try ( PreparedStatement ps = conn.prepareStatement(INSERT_ORDER, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, order.getCustomerId());
             ps.setInt(2, order.getDealerStaffId());
             ps.setInt(3, order.getModelId());
@@ -56,7 +55,7 @@ public class OrderDAO {
                 throw new SQLException("Creating order failed, no rows affected.");
             }
 
-            try (ResultSet generatedKeys = ps.getGeneratedKeys()) {
+            try ( ResultSet generatedKeys = ps.getGeneratedKeys()) {
                 if (generatedKeys.next()) {
                     return generatedKeys.getInt(1);
                 } else {
@@ -97,8 +96,7 @@ public class OrderDAO {
         }
 
         String sql = "SELECT * FROM [Order] WHERE dealer_staff_id IN (" + inClause + ")";
-        try (Connection conn = DbUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
             for (int i = 0; i < staffIds.size(); i++) {
                 ps.setInt(i + 1, staffIds.get(i));
@@ -111,18 +109,27 @@ public class OrderDAO {
         }
         return orders;
     }
-    
+
     public int countOrdersByDealerStaffId(int dealerStaffId) throws ClassNotFoundException, SQLException {
         List<OrderDTO> list = retrieve("dealer_staff_id = ?", dealerStaffId);
         return list.size();
     }
-    
+
     public boolean deleteById(Connection conn, int orderId) throws SQLException {
         String sql = "DELETE FROM [Order] WHERE order_id = ?";
         try ( PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, orderId);
             int rows = ps.executeUpdate();
             return rows > 0;
+        }
+    }
+
+    public boolean updateStatus(int orderId, String newStatus) throws SQLException, ClassNotFoundException {
+        String sql = "UPDATE [Order] SET status = ? WHERE order_id = ?";
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, newStatus);
+            ps.setInt(2, orderId);
+            return ps.executeUpdate() > 0;
         }
     }
 }
