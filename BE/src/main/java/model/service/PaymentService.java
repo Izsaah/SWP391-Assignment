@@ -21,10 +21,14 @@ public class PaymentService {
 
     public PaymentDTO processPayment(int orderId, String method, InstallmentPlanDTO plan) throws ClassNotFoundException, SQLException {
         OrderDTO order = orderDAO.getById(orderId);
-        if (order == null) return null;
+        if (order == null) {
+            return null;
+        }
 
         OrderDetailDTO detail = orderDetailDAO.getOrderDetailByOrderId(orderId);
-        if (detail == null) return null;
+        if (detail == null) {
+            return null;
+        }
         order.setDetail(detail);
 
         double totalAmount = 0.0;
@@ -47,7 +51,9 @@ public class PaymentService {
 
                 for (PromotionDTO promo : promotions) {
                     try {
-                        if (promo.getStartDate() == null || promo.getEndDate() == null) continue;
+                        if (promo.getStartDate() == null || promo.getEndDate() == null) {
+                            continue;
+                        }
                         LocalDate start = LocalDate.parse(promo.getStartDate(), formatter);
                         LocalDate end = LocalDate.parse(promo.getEndDate(), formatter);
 
@@ -56,7 +62,9 @@ public class PaymentService {
                             if (discountStr != null && !discountStr.trim().isEmpty()) {
                                 discountStr = discountStr.replace("%", "").trim();
                                 double discount = Double.parseDouble(discountStr);
-                                if (discount > 0 && discount < 1) discount = discount * 100;
+                                if (discount > 0 && discount < 1) {
+                                    discount = discount * 100;
+                                }
                                 totalAmount = totalAmount * (1 - discount / 100.0);
                             }
                         }
@@ -74,7 +82,9 @@ public class PaymentService {
         payment.setMethod(method != null ? method : "TT");
 
         boolean paymentCreated = paymentDAO.create(payment);
-        if (!paymentCreated) return null;
+        if (!paymentCreated) {
+            return null;
+        }
 
         if (!"TT".equalsIgnoreCase(method)) {
             if (plan == null) {
@@ -87,8 +97,12 @@ public class PaymentService {
             if (plan.getMonthlyPay() == null || "0".equals(plan.getMonthlyPay()) || "".equals(plan.getMonthlyPay())) {
                 try {
                     int termMonths = 12;
-                    if (plan.getTermMonth() != null) termMonths = Integer.parseInt(plan.getTermMonth());
-                    if (termMonths <= 0) termMonths = 1;
+                    if (plan.getTermMonth() != null) {
+                        termMonths = Integer.parseInt(plan.getTermMonth());
+                    }
+                    if (termMonths <= 0) {
+                        termMonths = 1;
+                    }
                     double monthlyPayment = totalAmount / termMonths;
                     plan.setMonthlyPay(String.valueOf(monthlyPayment));
                 } catch (NumberFormatException e) {
@@ -106,8 +120,12 @@ public class PaymentService {
 
     public InstallmentPlanDTO updateInstallmentPlanStatus(InstallmentPlanDTO plan) {
         try {
-            boolean updated = installDAO.updateStatus(plan);
-            return updated ? plan : null;
+            boolean updated = installDAO.updateStatus(plan); // updates status and term_month
+            if (updated) {
+                // Reload the full updated record from DB
+                return installDAO.findById(plan.getPlanId());
+            }
+            return null;
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
             return null;
@@ -134,22 +152,36 @@ public class PaymentService {
                 Set<Integer> addedCustomerIds = new HashSet<>();
                 for (InstallmentPlanDTO plan : plans) {
                     PaymentDTO payment = paymentDAO.findPaymentById(plan.getPaymentId());
-                    if (payment == null) continue;
+                    if (payment == null) {
+                        continue;
+                    }
 
                     OrderDTO order = orderDAO.getById(payment.getOrderId());
-                    if (order == null) continue;
+                    if (order == null) {
+                        continue;
+                    }
 
                     int customerId = order.getCustomerId();
-                    if (customerId <= 0 || addedCustomerIds.contains(customerId)) continue;
+                    if (customerId <= 0 || addedCustomerIds.contains(customerId)) {
+                        continue;
+                    }
 
                     List<CustomerDTO> customerList = customerDAO.findById(customerId);
-                    if (customerList == null || customerList.isEmpty()) continue;
+                    if (customerList == null || customerList.isEmpty()) {
+                        continue;
+                    }
 
                     CustomerDTO customer = customerList.get(0);
                     double monthlyPay = 0.0;
                     int termMonth = 0;
-                    try { monthlyPay = Double.parseDouble(plan.getMonthlyPay()); } catch (NumberFormatException e) {}
-                    try { termMonth = Integer.parseInt(plan.getTermMonth()); } catch (NumberFormatException e) {}
+                    try {
+                        monthlyPay = Double.parseDouble(plan.getMonthlyPay());
+                    } catch (NumberFormatException e) {
+                    }
+                    try {
+                        termMonth = Integer.parseInt(plan.getTermMonth());
+                    } catch (NumberFormatException e) {
+                    }
 
                     double outstanding = Math.max(0, monthlyPay * termMonth);
 
