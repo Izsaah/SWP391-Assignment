@@ -32,31 +32,51 @@ public class UpdateInstallmentPlanController extends HttpServlet {
         try {
             Map<String, Object> params = RequestUtils.extractParams(request);
 
+            // Extract planId
             Integer planId = params.get("planId") != null
                     ? Integer.parseInt(params.get("planId").toString())
                     : null;
+
+            // Extract status
             String status = params.get("status") != null
                     ? params.get("status").toString().toUpperCase()
                     : null;
 
-            // Validate input
+            // Extract termMonth string
+            String termMonthStr = params.get("termMonth") != null
+                    ? params.get("termMonth").toString()
+                    : null;
+
+            // --- VALIDATION ---
             if (planId == null) {
                 ResponseUtils.error(response, "Missing planId");
                 return;
             }
 
-            if (status == null
-                    || (!status.equals("ACTIVE") && !status.equals("PAID") && !status.equals("OVERDUE"))) {
-
-                ResponseUtils.error(response, "Invalid status. Must be 'Active', 'Paid', or 'Overdue'.");
+            if (status == null || (!status.equals("ACTIVE") && !status.equals("PAID") && !status.equals("OVERDUE"))) {
+                ResponseUtils.error(response, "Invalid status. Must be 'ACTIVE', 'PAID', or 'OVERDUE'.");
                 return;
             }
 
+            if (termMonthStr == null || termMonthStr.trim().isEmpty()) {
+                ResponseUtils.error(response, "Missing termMonth");
+                return;
+            }
+
+            // --- PARSE termMonth safely ---
+            int termValue = parseTermMonth(termMonthStr);
+            if (termValue < 0 || termValue > 12) {
+                ResponseUtils.error(response, "Invalid termMonth value");
+                return;
+            }
+
+            // --- BUILD DTO ---
             InstallmentPlanDTO plan = new InstallmentPlanDTO();
             plan.setPlanId(planId);
             plan.setStatus(status);
+            plan.setTermMonth(String.valueOf(termValue)); // always numeric string
 
-            // Call service to update
+            // --- UPDATE VIA SERVICE ---
             InstallmentPlanDTO updatedPlan = service.updateInstallmentPlanStatus(plan);
 
             if (updatedPlan != null) {
@@ -71,4 +91,23 @@ public class UpdateInstallmentPlanController extends HttpServlet {
         }
     }
 
+    private int parseTermMonth(String termMonth) {
+        if (termMonth == null) {
+            return 0;
+        }
+
+        // Remove all non-digit characters
+        String digitsOnly = termMonth.replaceAll("[^0-9]", "").trim();
+
+        if (digitsOnly.isEmpty()) {
+            return 0;
+        }
+
+        try {
+            return Integer.parseInt(digitsOnly);
+        } catch (NumberFormatException e) {
+            System.err.println("Invalid termMonth format: " + termMonth);
+            return 0;
+        }
+    }
 }

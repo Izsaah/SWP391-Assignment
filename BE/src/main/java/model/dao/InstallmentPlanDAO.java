@@ -23,7 +23,7 @@ public class InstallmentPlanDAO {
 
     public List<InstallmentPlanDTO> retrieve(String condition, Object... params) {
         String sql = "SELECT * FROM " + TABLE_NAME + " WHERE " + condition;
-        try (Connection conn = DbUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
             for (int i = 0; i < params.length; i++) {
                 ps.setObject(i + 1, params[i]);
             }
@@ -42,7 +42,7 @@ public class InstallmentPlanDAO {
     public InstallmentPlanDTO create(InstallmentPlanDTO plan) throws ClassNotFoundException {
         String sql = "INSERT INTO " + TABLE_NAME
                 + " (payment_id, interest_rate, term_month, monthly_pay, status) VALUES (?, ?, ?, ?, ?)";
-        try (Connection conn = DbUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             ps.setInt(1, plan.getPaymentId());
             ps.setDouble(2, Double.parseDouble(plan.getInterestRate()));
@@ -55,7 +55,7 @@ public class InstallmentPlanDAO {
                 throw new SQLException("Creating installment plan failed, no rows affected.");
             }
 
-            try (ResultSet rs = ps.getGeneratedKeys()) {
+            try ( ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
                     plan.setPlanId(rs.getInt(1));
                 }
@@ -69,11 +69,12 @@ public class InstallmentPlanDAO {
     }
 
     public boolean updateStatus(InstallmentPlanDTO plan) throws ClassNotFoundException {
-        String sql = "UPDATE " + TABLE_NAME + " SET status = ? WHERE plan_id = ?";
-        try (Connection conn = DbUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+        String sql = "UPDATE " + TABLE_NAME + " SET status = ?, term_month = ? WHERE plan_id = ?";
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setString(1, plan.getStatus());
-            ps.setInt(2, plan.getPlanId());
+            ps.setString(2, plan.getTermMonth());
+            ps.setInt(3, plan.getPlanId());
 
             int affected = ps.executeUpdate();
             return affected > 0;
@@ -99,6 +100,11 @@ public class InstallmentPlanDAO {
 
     public List<InstallmentPlanDTO> getActiveOrOverduePlans() {
         return retrieve("status IN (?, ?)", "ACTIVE", "OVERDUE");
+    }
+
+    public InstallmentPlanDTO findById(int planId) {
+        List<InstallmentPlanDTO> list = retrieve("plan_id = ?", planId);
+        return list.get(0);
     }
 
 }
