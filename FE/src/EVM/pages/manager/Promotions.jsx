@@ -1,13 +1,81 @@
 import React, { useMemo, useState, useCallback } from 'react'
-import { ChevronRight, Plus, Search, Edit2, X, Download, ChevronLeft, ChevronDown } from 'lucide-react'
+import { Plus, Search, Edit2, X, Download, ChevronLeft, ChevronDown } from 'lucide-react'
 import Modal from '../../components/Modal'
+import ConfirmModal from '../../components/ConfirmModal'
+
+// Inline API base and helpers
+const API_BASE = (typeof import.meta !== 'undefined' ? (import.meta.env?.VITE_EVM_API || import.meta.env?.VITE_API_URL) : undefined)
+  || (typeof process !== 'undefined' ? (process.env?.REACT_APP_EVM_API || process.env?.REACT_APP_API_URL) : undefined)
+  || ''
+const apiGet = async (path) => {
+  const url = `${API_BASE}${path}`
+  if (!API_BASE) {
+    console.error(`[EVM] API_BASE is not set! Please set VITE_EVM_API or VITE_API_URL in .env file. Attempted to fetch: ${path}`)
+    return []
+  }
+  try {
+    const res = await fetch(url, { credentials: 'include' })
+    if (!res.ok) {
+      console.error(`[EVM] API Error: ${res.status} ${res.statusText} for ${url}`)
+      return []
+    }
+    const contentType = res.headers.get('content-type')
+    if (contentType && contentType.includes('application/json')) {
+      return await res.json()
+    } else {
+      console.error(`[EVM] Expected JSON but got ${contentType} for ${url}`)
+      return []
+    }
+  } catch (error) {
+    console.error(`[EVM] Failed to fetch ${url}:`, error)
+    return []
+  }
+}
+const apiSend = async (path, method, body) => {
+  const url = `${API_BASE}${path}`
+  if (!API_BASE) {
+    console.error(`[EVM] API_BASE is not set! Please set VITE_EVM_API or VITE_API_URL in .env file. Attempted to send ${method} to: ${path}`)
+    throw new Error('API_BASE is not configured')
+  }
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: body != null ? JSON.stringify(body) : undefined,
+    })
+    if (!res.ok) {
+      console.error(`[EVM] API Error: ${res.status} ${res.statusText} for ${url}`)
+      const text = await res.text()
+      throw new Error(`API call failed: ${res.status} - ${text.substring(0, 100)}`)
+    }
+    const contentType = res.headers.get('content-type')
+    if (contentType && contentType.includes('application/json')) {
+      return await res.json()
+    } else {
+      // For some endpoints, empty response is OK
+      return {}
+    }
+  } catch (error) {
+    console.error(`[EVM] Failed to send ${method} ${url}:`, error)
+    throw error
+  }
+}
 
 const Promotions = () => {
-  const [rows, setRows] = useState([
-    { id: 101, dealer: 'Dealer A', name: 'Q4 Volume Discount', type: 'Discount', value: '5%', active: true, from: '2025-10-01', to: '2025-12-31' },
-    { id: 102, dealer: 'Dealer B', name: 'Launch Promo', type: 'Rebate', value: '$1,000', active: true, from: '2025-09-01', to: '2025-11-30' },
-    { id: 103, dealer: 'Dealer A', name: 'Old Stock Clearance', type: 'Discount', value: '8%', active: false, from: '2025-07-01', to: '2025-08-31' }
-  ])
+  const [rows, setRows] = useState([])
+
+  // Load from API
+  const fetchPromotions = React.useCallback(async () => {
+    const data = await apiGet('/evm/promotions')
+    setRows(Array.isArray(data) ? data : [])
+  }, [])
+
+  React.useEffect(() => {
+    let cancelled = false
+    ;(async () => { if (!cancelled) await fetchPromotions() })()
+    return () => { cancelled = true }
+  }, [fetchPromotions])
   const [dealer, setDealer] = useState('All')
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState('dealer')
@@ -16,8 +84,10 @@ const Promotions = () => {
   const pageSize = 8
   const [showCreate, setShowCreate] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
+  const [showDisableModal, setShowDisableModal] = useState(false)
   const [form, setForm] = useState({ dealer: 'Dealer A', name: '', type: 'Discount', value: '5%', from: '2025-10-01', to: '2025-12-31' })
   const [editing, setEditing] = useState(null)
+  const [disablingPromotion, setDisablingPromotion] = useState(null)
 
   const filtered = useMemo(() => rows.filter(p =>
     (dealer === 'All' || p.dealer === dealer) &&
@@ -39,7 +109,18 @@ const Promotions = () => {
 
   const handleCreate = useCallback(async () => { setForm({ dealer: 'Dealer A', name: '', type: 'Discount', value: '5%', from: '2025-10-01', to: '2025-12-31' }); setShowCreate(true) }, [])
   const handleEdit = useCallback(async (row) => { setEditing(row); setForm({ dealer: row.dealer, name: row.name, type: row.type, value: row.value, from: row.from, to: row.to }); setShowEdit(true) }, [])
-  const handleDisable = useCallback(async (row) => { const ok = window.confirm(`Disable promotion ${row.name}?`); if (ok) setRows(prev => prev.map(p => p.id === row.id ? { ...p, active: false } : p)) }, [])
+  const handleDisable = useCallback((row) => {
+    setDisablingPromotion(row)
+    setShowDisableModal(true)
+  }, [])
+
+  const confirmDisable = useCallback(async () => {
+    if (!disablingPromotion) return
+    await apiSend(`/evm/promotions/${disablingPromotion.id}/status`, 'PATCH', { active: false })
+    await fetchPromotions()
+    setShowDisableModal(false)
+    setDisablingPromotion(null)
+  }, [disablingPromotion, fetchPromotions])
 
   const exportCsv = () => {
     const header = 'Dealer,Name,Type,Value,Active,From,To\n'
@@ -55,13 +136,6 @@ const Promotions = () => {
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb */}
-      <div className="flex items-center text-sm text-gray-600">
-        <span className="hover:text-blue-600 cursor-pointer">Dashboard</span>
-        <ChevronRight className="w-4 h-4 mx-2" />
-        <span className="text-gray-900 font-medium">Promotions</span>
-      </div>
-
       {/* Header */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between">
@@ -203,7 +277,7 @@ const Promotions = () => {
       </div>
 
       {/* Create Modal */}
-      <Modal title="Create Promotion" open={showCreate} onClose={() => setShowCreate(false)} onSubmit={() => { const id = Math.max(100, ...rows.map(r => r.id)) + 1; setRows(prev => [...prev, { id, ...form, active: true }]); setShowCreate(false) }}>
+      <Modal title="Create Promotion" open={showCreate} onClose={() => setShowCreate(false)} onSubmit={async () => { await apiSend('/evm/promotions', 'POST', { ...form, active: true }); await fetchPromotions(); setShowCreate(false) }}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Dealer</label>
@@ -233,7 +307,7 @@ const Promotions = () => {
       </Modal>
 
       {/* Edit Modal */}
-      <Modal title={`Edit Promotion #${editing?.id || ''}`} open={showEdit} onClose={() => setShowEdit(false)} onSubmit={() => { setRows(prev => prev.map(p => p.id === editing.id ? { ...p, ...form } : p)); setShowEdit(false) }}>
+      <Modal title={`Edit Promotion #${editing?.id || ''}`} open={showEdit} onClose={() => setShowEdit(false)} onSubmit={async () => { await apiSend(`/evm/promotions/${editing.id}`, 'PUT', form); await fetchPromotions(); setShowEdit(false) }}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Dealer</label>
@@ -261,6 +335,21 @@ const Promotions = () => {
           </div>
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={showDisableModal && !!disablingPromotion}
+        title="Disable Promotion"
+        description={disablingPromotion ? (
+          <div>
+            <p className="text-gray-700 mb-2">Are you sure you want to disable <span className="font-semibold text-gray-900">{disablingPromotion.name}</span>?</p>
+            <p className="text-sm text-gray-500">The promotion will be deactivated and no longer available for use.</p>
+          </div>
+        ) : ''}
+        onCancel={() => { setShowDisableModal(false); setDisablingPromotion(null) }}
+        onConfirm={confirmDisable}
+        confirmText="Disable Promotion"
+        tone="yellow"
+      />
     </div>
   )
 }

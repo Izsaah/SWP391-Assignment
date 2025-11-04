@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { ChevronRight, Download } from 'lucide-react'
+import { Download } from 'lucide-react'
 
 const Bar = ({ label, value, max }) => (
   <div className="mb-4">
@@ -44,13 +44,6 @@ const SalesReport = () => {
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb */}
-      <div className="flex items-center text-sm text-gray-600">
-        <span className="hover:text-blue-600 cursor-pointer">Dashboard</span>
-        <ChevronRight className="w-4 h-4 mx-2" />
-        <span className="text-gray-900 font-medium">Sales Report</span>
-      </div>
-
       {/* Header */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between">

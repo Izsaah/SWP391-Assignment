@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { ChevronRight, AlertTriangle, TrendingUp } from 'lucide-react'
+import { AlertTriangle, TrendingUp } from 'lucide-react'
 
 const InventoryReport = () => {
   const [model, setModel] = useState('All')
@@ -20,13 +20,6 @@ const InventoryReport = () => {
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb */}
-      <div className="flex items-center text-sm text-gray-600">
-        <span className="hover:text-blue-600 cursor-pointer">Dashboard</span>
-        <ChevronRight className="w-4 h-4 mx-2" />
-        <span className="text-gray-900 font-medium">Inventory & Consumption</span>
-      </div>
-
       {/* Header */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between">

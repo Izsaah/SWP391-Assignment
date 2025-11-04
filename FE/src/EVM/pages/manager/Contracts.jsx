@@ -1,6 +1,66 @@
 import React, { useMemo, useState, useCallback } from 'react'
-import { ChevronRight, Download, Edit2, Eye, ChevronLeft, ChevronDown } from 'lucide-react'
+import { Edit2, Eye, ChevronLeft, ChevronDown } from 'lucide-react'
 import Modal from '../../components/Modal'
+import ContractViewModal from '../../components/ContractViewModal'
+
+// Inline API base and helpers
+const API_BASE = (typeof import.meta !== 'undefined' ? (import.meta.env?.VITE_EVM_API || import.meta.env?.VITE_API_URL) : undefined)
+  || (typeof process !== 'undefined' ? (process.env?.REACT_APP_EVM_API || process.env?.REACT_APP_API_URL) : undefined)
+  || ''
+const apiGet = async (path) => {
+  const url = `${API_BASE}${path}`
+  if (!API_BASE) {
+    console.error(`[EVM] API_BASE is not set! Please set VITE_EVM_API or VITE_API_URL in .env file. Attempted to fetch: ${path}`)
+    return []
+  }
+  try {
+    const res = await fetch(url, { credentials: 'include' })
+    if (!res.ok) {
+      console.error(`[EVM] API Error: ${res.status} ${res.statusText} for ${url}`)
+      return []
+    }
+    const contentType = res.headers.get('content-type')
+    if (contentType && contentType.includes('application/json')) {
+      return await res.json()
+    } else {
+      console.error(`[EVM] Expected JSON but got ${contentType} for ${url}`)
+      return []
+    }
+  } catch (error) {
+    console.error(`[EVM] Failed to fetch ${url}:`, error)
+    return []
+  }
+}
+const apiSend = async (path, method, body) => {
+  const url = `${API_BASE}${path}`
+  if (!API_BASE) {
+    console.error(`[EVM] API_BASE is not set! Please set VITE_EVM_API or VITE_API_URL in .env file. Attempted to send ${method} to: ${path}`)
+    throw new Error('API_BASE is not configured')
+  }
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: body != null ? JSON.stringify(body) : undefined,
+    })
+    if (!res.ok) {
+      console.error(`[EVM] API Error: ${res.status} ${res.statusText} for ${url}`)
+      const text = await res.text()
+      throw new Error(`API call failed: ${res.status} - ${text.substring(0, 100)}`)
+    }
+    const contentType = res.headers.get('content-type')
+    if (contentType && contentType.includes('application/json')) {
+      return await res.json()
+    } else {
+      // For some endpoints, empty response is OK
+      return {}
+    }
+  } catch (error) {
+    console.error(`[EVM] Failed to send ${method} ${url}:`, error)
+    throw error
+  }
+}
 
 const Contracts = () => {
   const [dealer, setDealer] = useState('All')
@@ -10,14 +70,24 @@ const Contracts = () => {
   const [page, setPage] = useState(1)
   const pageSize = 8
   const [showEdit, setShowEdit] = useState(false)
+  const [showViewModal, setShowViewModal] = useState(false)
   const [editing, setEditing] = useState(null)
-  const [form, setForm] = useState({ target: 0, debt: 0 })
+  const [viewingContract, setViewingContract] = useState(null)
+  const [form, setForm] = useState({ debt: 0 })
 
-  const [rows, setRows] = useState([
-    { id: 'C-001', dealer: 'Dealer A', target: 50, achieved: 38, period: 'Q4', creditLimit: 200000, paid: 188000, debt: 12000, status: 'Active' },
-    { id: 'C-002', dealer: 'Dealer B', target: 35, achieved: 27, period: 'Q4', creditLimit: 150000, paid: 145000, debt: 5000, status: 'Active' },
-    { id: 'C-003', dealer: 'Dealer A', target: 20, achieved: 20, period: 'Q3', creditLimit: 100000, paid: 100000, debt: 0, status: 'Closed' }
-  ])
+  const [rows, setRows] = useState([])
+
+  // Fetch contracts from API
+  const fetchContracts = React.useCallback(async () => {
+    const data = await apiGet('/evm/contracts')
+    setRows(Array.isArray(data) ? data : [])
+  }, [])
+
+  React.useEffect(() => {
+    let cancelled = false
+    ;(async () => { if (!cancelled) await fetchContracts() })()
+    return () => { cancelled = true }
+  }, [fetchContracts])
 
   const filtered = useMemo(() => rows.filter(c =>
     (dealer === 'All' || c.dealer === dealer) &&
@@ -38,30 +108,16 @@ const Contracts = () => {
   const paged = useMemo(() => sorted.slice((page - 1) * pageSize, page * pageSize), [sorted, page])
   const toggleSort = (key) => { if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortKey(key); setSortDir('asc') } }
 
-  const exportCsv = useCallback(() => {
-    const header = 'ContractID,Dealer,Target,Achieved,Debt,Status,Period,CreditLimit,Paid\n'
-    const body = filtered.map(c => [c.id, c.dealer, c.target, c.achieved, c.debt, c.status, c.period, c.creditLimit, c.paid].join(',')).join('\n')
-    const blob = new Blob([header + body], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'contracts.csv'
-    a.click()
-    URL.revokeObjectURL(url)
-  }, [filtered])
+  const handleEdit = useCallback(async (row) => { setEditing(row); setForm({ debt: row.debt }); setShowEdit(true) }, [])
+  const handleView = useCallback((row) => {
+    setViewingContract(row)
+    setShowViewModal(true)
+  }, [])
 
-  const handleEdit = useCallback(async (row) => { setEditing(row); setForm({ target: row.target, debt: row.debt }); setShowEdit(true) }, [])
-  const handleView = useCallback((row) => { window.alert(`Dealer ${row.dealer}\nTarget ${row.target}, Achieved ${row.achieved}\nDebt $${row.debt}`) }, [])
+  
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb */}
-      <div className="flex items-center text-sm text-gray-600">
-        <span className="hover:text-blue-600 cursor-pointer">Dashboard</span>
-        <ChevronRight className="w-4 h-4 mx-2" />
-        <span className="text-gray-900 font-medium">Contracts</span>
-      </div>
-
       {/* Header */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between">
@@ -69,13 +125,6 @@ const Contracts = () => {
             <h1 className="text-2xl font-bold text-gray-900">Contracts</h1>
             <p className="text-sm text-gray-600 mt-1">Revenue targets and receivables by dealer</p>
           </div>
-          <button 
-            onClick={exportCsv}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg flex items-center space-x-2 shadow-sm transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            <span>Export CSV</span>
-          </button>
         </div>
       </div>
 
@@ -198,13 +247,11 @@ const Contracts = () => {
         </div>
       </div>
 
+      <ContractViewModal open={showViewModal} contract={viewingContract} onClose={() => { setShowViewModal(false); setViewingContract(null) }} />
+
       {/* Edit Modal */}
-      <Modal title={`Edit Contract ${editing?.id || ''}`} open={showEdit} onClose={() => setShowEdit(false)} onSubmit={() => { setRows(prev => prev.map(c => c.id === editing.id ? { ...c, target: parseInt(form.target, 10), debt: parseInt(form.debt, 10) } : c)); setShowEdit(false) }}>
+      <Modal title={`Edit Contract ${editing?.id || ''}`} open={showEdit} onClose={() => setShowEdit(false)} onSubmit={async () => { await apiSend(`/evm/contracts/${editing.id}/debt`, 'PATCH', { debt: parseInt(form.debt, 10) }); await fetchContracts(); setShowEdit(false) }}>
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Target</label>
-            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Target" type="number" value={form.target} onChange={(e) => setForm(f => ({ ...f, target: e.target.value }))} />
-          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Debt</label>
             <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Debt" type="number" value={form.debt} onChange={(e) => setForm(f => ({ ...f, debt: e.target.value }))} />

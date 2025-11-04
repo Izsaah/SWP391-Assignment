@@ -18,14 +18,13 @@ import ProtectedRoute from './Dealer/login/ProtectedRoute';
 // EVM area imports
 import EVMLayout from './EVM/layout/EVMLayout';
 import StaffDashboard from './EVM/pages/staff/StaffDashboard';
-import VehicleModels from './EVM/pages/manager/VehicleModels';
-import VehicleVariants from './EVM/pages/manager/VehicleVariants';
 import InventoryEVM from './EVM/pages/manager/Inventory';
 import Promotions from './EVM/pages/manager/Promotions';
 import ContractsEVM from './EVM/pages/manager/Contracts';
 import Users from './EVM/pages/manager/Users';
 import SalesReport from './EVM/pages/manager/SalesReport';
 import InventoryReport from './EVM/pages/manager/InventoryReport';
+import VehicleCatalog from './EVM/pages/manager/VehicleCatalog';
 
 function App() {
   return (
@@ -49,8 +48,9 @@ function App() {
         {/* EVM routes */}
         <Route path="/evm" element={<EVMLayout />}>
           <Route index element={<StaffDashboard />} />
-          <Route path="vehicle-models" element={<VehicleModels />} />
-          <Route path="vehicle-variants" element={<VehicleVariants />} />
+          <Route path="vehicle-catalog" element={<VehicleCatalog />} />
+          <Route path="vehicle-models" element={<Navigate to="/evm/vehicle-catalog?tab=models" replace />} />
+          <Route path="vehicle-variants" element={<Navigate to="/evm/vehicle-catalog?tab=variants" replace />} />
           <Route path="inventory" element={<InventoryEVM />} />
           <Route path="promotions" element={<Promotions />} />
           <Route path="contracts" element={<ContractsEVM />} />

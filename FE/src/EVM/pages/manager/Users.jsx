@@ -1,32 +1,174 @@
 import React, { useMemo, useState, useCallback } from 'react'
-import { ChevronRight, Search, Plus, Edit2, X, UserPlus } from 'lucide-react'
+import { Search, Plus, Edit2, X, UserPlus, Users as UsersIcon, Power, PowerOff } from 'lucide-react'
+
+// Inline API base and helper
+const API_BASE = (typeof import.meta !== 'undefined' ? (import.meta.env?.VITE_EVM_API || import.meta.env?.VITE_API_URL) : undefined)
+  || (typeof process !== 'undefined' ? (process.env?.REACT_APP_EVM_API || process.env?.REACT_APP_API_URL) : undefined)
+  || ''
+const apiGet = async (path) => {
+  const url = `${API_BASE}${path}`
+  if (!API_BASE) {
+    console.error(`[EVM] API_BASE is not set! Please set VITE_EVM_API or VITE_API_URL in .env file. Attempted to fetch: ${path}`)
+    return []
+  }
+  try {
+    const res = await fetch(url, { credentials: 'include' })
+    if (!res.ok) {
+      console.error(`[EVM] API Error: ${res.status} ${res.statusText} for ${url}`)
+      return []
+    }
+    const contentType = res.headers.get('content-type')
+    if (contentType && contentType.includes('application/json')) {
+      return await res.json()
+    } else {
+      console.error(`[EVM] Expected JSON but got ${contentType} for ${url}`)
+      return []
+    }
+  } catch (error) {
+    console.error(`[EVM] Failed to fetch ${url}:`, error)
+    return []
+  }
+}
+const apiSend = async (path, method, body) => {
+  const url = `${API_BASE}${path}`
+  if (!API_BASE) {
+    console.error(`[EVM] API_BASE is not set! Please set VITE_EVM_API or VITE_API_URL in .env file. Attempted to send ${method} to: ${path}`)
+    throw new Error('API_BASE is not configured')
+  }
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: body != null ? JSON.stringify(body) : undefined,
+    })
+    if (!res.ok) {
+      console.error(`[EVM] API Error: ${res.status} ${res.statusText} for ${url}`)
+      const text = await res.text()
+      throw new Error(`API call failed: ${res.status} - ${text.substring(0, 100)}`)
+    }
+    const contentType = res.headers.get('content-type')
+    if (contentType && contentType.includes('application/json')) {
+      return await res.json()
+    } else {
+      // For some endpoints, empty response is OK
+      return {}
+    }
+  } catch (error) {
+    console.error(`[EVM] Failed to send ${method} ${url}:`, error)
+    throw error
+  }
+}
 
 const Users = () => {
   const [role, setRole] = useState('All')
   const [query, setQuery] = useState('')
-  const [rows, setRows] = useState([
-    { id: 'U-100', name: 'Alice Nguyen', dealer: 'Dealer A', role: 'Dealer Admin', status: 'Active' },
-    { id: 'U-101', name: 'Bob Tran', dealer: 'Dealer B', role: 'Dealer Staff', status: 'Active' },
-    { id: 'U-102', name: 'Carol Vo', dealer: 'Dealer A', role: 'Dealer Staff', status: 'Suspended' }
-  ])
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingUser, setEditingUser] = useState(null)
+  const [rows, setRows] = useState([])
+
+  // Load from API
+  const fetchUsers = React.useCallback(async () => {
+    const data = await apiGet('/evm/users')
+    setRows(Array.isArray(data) ? data : [])
+  }, [])
+
+  React.useEffect(() => {
+    let cancelled = false
+    ;(async () => { if (!cancelled) await fetchUsers() })()
+    return () => { cancelled = true }
+  }, [fetchUsers])
+
+  // Form state for new user
+  const [newUser, setNewUser] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    dealer: 'Dealer A',
+    role: 'Dealer Staff',
+    status: 'Active'
+  })
 
   const filtered = useMemo(() => rows.filter(u =>
     (role === 'All' || u.role === role) && (!query || `${u.name} ${u.id}`.toLowerCase().includes(query.toLowerCase()))
   ), [rows, role, query])
 
-  const handleCreate = useCallback(async () => { const name = window.prompt('Name'); const dealer = window.prompt('Dealer', 'Dealer A'); const r = window.prompt('Role', 'Dealer Staff'); if (!name) return; const idNum = Math.max(100, ...rows.map(u => parseInt(u.id.split('-')[1], 10))) + 1; setRows(prev => [...prev, { id: `U-${idNum}`, name, dealer, role: r, status: 'Active' }]) }, [rows])
-  const handleEdit = useCallback(async (row) => { const r = window.prompt('New role', row.role) || row.role; setRows(prev => prev.map(u => u.id === row.id ? { ...u, role: r } : u)) }, [])
-  const handleDisable = useCallback(async (row) => { const ok = window.confirm(`${row.status === 'Active' ? 'Disable' : 'Activate'} user ${row.name}?`); if (ok) setRows(prev => prev.map(u => u.id === row.id ? { ...u, status: row.status === 'Active' ? 'Suspended' : 'Active' } : u)) }, [])
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+    setNewUser(prev => ({
+      ...prev,
+      [name]: value
+    }))
+  }
+
+  const handleCreate = useCallback(() => {
+    setNewUser({
+      name: '',
+      email: '',
+      phone: '',
+      dealer: 'Dealer A',
+      role: 'Dealer Staff',
+      status: 'Active'
+    })
+    setShowCreateModal(true)
+  }, [])
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+      if (editingUser) {
+      // Update existing user
+        setRows(prev => prev.map(u =>
+        u.id === editingUser.id 
+          ? { ...u, name: newUser.name, dealer: newUser.dealer, role: newUser.role, status: newUser.status }
+          : u
+      ))
+        // Persist via API and refresh
+        await apiSend(`/evm/users/${editingUser.id}`, 'PUT', { ...editingUser, ...newUser })
+        await fetchUsers()
+      setShowEditModal(false)
+      setEditingUser(null)
+    } else {
+      // Create new user
+      const created = { name: newUser.name, email: newUser.email, phone: newUser.phone, dealer: newUser.dealer, role: newUser.role, status: newUser.status }
+        await apiSend('/evm/users', 'POST', created)
+        await fetchUsers()
+      setShowCreateModal(false)
+    }
+    setNewUser({
+      name: '',
+      email: '',
+      phone: '',
+      dealer: 'Dealer A',
+      role: 'Dealer Staff',
+      status: 'Active'
+    })
+  }
+
+  const handleEdit = useCallback((row) => {
+    setEditingUser(row)
+    setNewUser({
+      name: row.name,
+      email: row.email || '',
+      phone: row.phone || '',
+      dealer: row.dealer,
+      role: row.role,
+      status: row.status
+    })
+    setShowEditModal(true)
+  }, [])
+  const handleToggleStatus = useCallback(async (row) => {
+    const nextStatus = row.status === 'Active' ? 'Suspended' : 'Active'
+    try {
+      await apiSend(`/evm/users/${row.id}/status`, 'PATCH', { status: nextStatus })
+      await fetchUsers()
+    } catch (error) {
+      console.error('Failed to toggle user status:', error)
+    }
+  }, [fetchUsers])
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb */}
-      <div className="flex items-center text-sm text-gray-600">
-        <span className="hover:text-blue-600 cursor-pointer">Dashboard</span>
-        <ChevronRight className="w-4 h-4 mx-2" />
-        <span className="text-gray-900 font-medium">Users (Dealer Accounts)</span>
-      </div>
-
       {/* Header */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between">
@@ -105,10 +247,15 @@ const Users = () => {
                         <Edit2 className="w-4 h-4 inline" />
                       </button>
                       <button 
-                        onClick={() => handleDisable(u)}
-                        className="text-red-600 hover:text-red-900"
+                        onClick={() => handleToggleStatus(u)}
+                        className="text-gray-600 hover:text-gray-900"
+                        title={u.status === 'Active' ? 'Suspend user' : 'Activate user'}
                       >
-                        <X className="w-4 h-4 inline" />
+                        {u.status === 'Active' ? (
+                          <PowerOff className="w-4 h-4 inline" />
+                        ) : (
+                          <Power className="w-4 h-4 inline" />
+                        )}
                       </button>
                     </div>
                   </td>
@@ -118,6 +265,355 @@ const Users = () => {
           </table>
         </div>
       </div>
+
+      {/* Edit User Modal */}
+      {showEditModal && editingUser && (
+        <div 
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={() => {
+            setShowEditModal(false)
+            setEditingUser(null)
+          }}
+        >
+          <div 
+            className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Edit2 className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Edit User</h2>
+                  <p className="text-sm text-gray-600">Update user information below</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowEditModal(false)
+                  setEditingUser(null)
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleSubmit} className="p-6">
+              <div className="space-y-5">
+                {/* Full Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={newUser.name}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Enter user full name"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                {/* Email and Phone */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email Address <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={newUser.email}
+                      onChange={handleInputChange}
+                      required
+                      placeholder="user@email.com"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Phone Number
+                    </label>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={newUser.phone}
+                      onChange={handleInputChange}
+                      placeholder="0987654321"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                {/* Dealer and Role */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Dealer <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      name="dealer"
+                      value={newUser.dealer}
+                      onChange={handleInputChange}
+                      required
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="Dealer A">Dealer A</option>
+                      <option value="Dealer B">Dealer B</option>
+                      <option value="Dealer C">Dealer C</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Role <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      name="role"
+                      value={newUser.role}
+                      onChange={handleInputChange}
+                      required
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="Dealer Admin">Dealer Admin</option>
+                      <option value="Dealer Staff">Dealer Staff</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="status"
+                    value={newUser.status}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Suspended">Suspended</option>
+                  </select>
+                </div>
+
+                {/* Info Box */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex">
+                    <UsersIcon className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-medium text-blue-900 mb-1">User Information</h4>
+                      <p className="text-xs text-blue-700">
+                        All required fields must be filled. User ID will remain unchanged.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false)
+                    setEditingUser(null)
+                  }}
+                  className="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium flex items-center space-x-2"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  <span>Update User</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create User Modal */}
+      {showCreateModal && (
+        <div 
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={() => setShowCreateModal(false)}
+        >
+          <div 
+            className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <UserPlus className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Create New User</h2>
+                  <p className="text-sm text-gray-600">Fill in the user information below</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowCreateModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleSubmit} className="p-6">
+              <div className="space-y-5">
+                {/* Full Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={newUser.name}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Enter user full name"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                {/* Email and Phone */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email Address <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={newUser.email}
+                      onChange={handleInputChange}
+                      required
+                      placeholder="user@email.com"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Phone Number
+                    </label>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={newUser.phone}
+                      onChange={handleInputChange}
+                      placeholder="0987654321"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                {/* Dealer and Role */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Dealer <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      name="dealer"
+                      value={newUser.dealer}
+                      onChange={handleInputChange}
+                      required
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="Dealer A">Dealer A</option>
+                      <option value="Dealer B">Dealer B</option>
+                      <option value="Dealer C">Dealer C</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Role <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      name="role"
+                      value={newUser.role}
+                      onChange={handleInputChange}
+                      required
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="Dealer Admin">Dealer Admin</option>
+                      <option value="Dealer Staff">Dealer Staff</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="status"
+                    value={newUser.status}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Suspended">Suspended</option>
+                  </select>
+                </div>
+
+                {/* Info Box */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex">
+                    <UsersIcon className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-medium text-blue-900 mb-1">User Information</h4>
+                      <p className="text-xs text-blue-700">
+                        All required fields must be filled. User ID will be automatically generated upon creation.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium flex items-center space-x-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Create User</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Status toggle handled inline; no modal needed */}
     </div>
   )
 }

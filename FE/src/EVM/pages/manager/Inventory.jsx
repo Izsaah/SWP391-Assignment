@@ -1,6 +1,65 @@
 import React, { useMemo, useState, useCallback } from 'react'
-import { ChevronRight, RefreshCw, Download, TrendingUp, Package, Building2, BarChart3, AlertTriangle, Clock } from 'lucide-react'
+import { RefreshCw, Download, TrendingUp, Package, Building2, BarChart3, AlertTriangle, Clock } from 'lucide-react'
 import Modal from '../../components/Modal'
+
+// Inline API base and helpers for EVM
+const API_BASE = (typeof import.meta !== 'undefined' ? (import.meta.env?.VITE_EVM_API || import.meta.env?.VITE_API_URL) : undefined)
+  || (typeof process !== 'undefined' ? (process.env?.REACT_APP_EVM_API || process.env?.REACT_APP_API_URL) : undefined)
+  || ''
+const apiGet = async (path) => {
+  const url = `${API_BASE}${path}`
+  if (!API_BASE) {
+    console.error(`[EVM] API_BASE is not set! Please set VITE_EVM_API or VITE_API_URL in .env file. Attempted to fetch: ${path}`)
+    return []
+  }
+  try {
+    const res = await fetch(url, { credentials: 'include' })
+    if (!res.ok) {
+      console.error(`[EVM] API Error: ${res.status} ${res.statusText} for ${url}`)
+      return []
+    }
+    const contentType = res.headers.get('content-type')
+    if (contentType && contentType.includes('application/json')) {
+      return await res.json()
+    } else {
+      console.error(`[EVM] Expected JSON but got ${contentType} for ${url}`)
+      return []
+    }
+  } catch (error) {
+    console.error(`[EVM] Failed to fetch ${url}:`, error)
+    return []
+  }
+}
+const apiSend = async (path, method, body) => {
+  const url = `${API_BASE}${path}`
+  if (!API_BASE) {
+    console.error(`[EVM] API_BASE is not set! Please set VITE_EVM_API or VITE_API_URL in .env file. Attempted to send ${method} to: ${path}`)
+    throw new Error('API_BASE is not configured')
+  }
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: body != null ? JSON.stringify(body) : undefined,
+    })
+    if (!res.ok) {
+      console.error(`[EVM] API Error: ${res.status} ${res.statusText} for ${url}`)
+      const text = await res.text()
+      throw new Error(`API call failed: ${res.status} - ${text.substring(0, 100)}`)
+    }
+    const contentType = res.headers.get('content-type')
+    if (contentType && contentType.includes('application/json')) {
+      return await res.json()
+    } else {
+      // For some endpoints, empty response is OK
+      return {}
+    }
+  } catch (error) {
+    console.error(`[EVM] Failed to send ${method} ${url}:`, error)
+    throw error
+  }
+}
 
 const Metric = ({ label, value, icon: Icon, iconColor }) => (
   <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
@@ -21,12 +80,7 @@ const Inventory = () => {
   const [page, setPage] = useState(1)
   const pageSize = 8
 
-  const [rows, setRows] = useState([
-    { id: 1, dealer: 'Dealer A', modelId: 1, model: 'Model 3', variant: 'Standard', qty: 12, status: 'in_stock', daysInStock: 18 },
-    { id: 2, dealer: 'Dealer B', modelId: 1, model: 'Model 3', variant: 'Long Range', qty: 3, status: 'in_stock', daysInStock: 62 },
-    { id: 3, dealer: 'Dealer A', modelId: 2, model: 'Model S', variant: 'Performance', qty: 0, status: 'sold', daysInStock: 0 },
-    { id: 4, dealer: 'Total Warehouse', modelId: 2, model: 'Model S', variant: 'Performance', qty: 9, status: 'in_stock', daysInStock: 5 }
-  ])
+  const [rows, setRows] = useState([])
 
   const [allocOpen, setAllocOpen] = useState(false)
   const [adjustOpen, setAdjustOpen] = useState(false)
@@ -64,10 +118,21 @@ const Inventory = () => {
     else { setSortKey(key); setSortDir('asc') }
   }
 
-  const handleRefresh = useCallback(async () => {
-    setLastRefreshed(new Date().toLocaleTimeString())
-    setRows(r => [...r])
+  const fetchInventory = React.useCallback(async () => {
+    const data = await apiGet('/evm/inventory')
+    setRows(Array.isArray(data) ? data : [])
   }, [])
+
+  React.useEffect(() => {
+    let cancelled = false
+    ;(async () => { if (!cancelled) await fetchInventory() })()
+    return () => { cancelled = true }
+  }, [fetchInventory])
+
+  const handleRefresh = useCallback(async () => {
+    await fetchInventory()
+    setLastRefreshed(new Date().toLocaleTimeString())
+  }, [fetchInventory])
 
   const handleAllocate = useCallback(async (row) => { setSelected(row); setAllocForm({ dealer: 'Dealer B', qty: 1 }); setAllocOpen(true) }, [])
   const handleAdjust = useCallback(async (row) => { setSelected(row); setAdjustForm({ qty: row.qty }); setAdjustOpen(true) }, [])
@@ -86,13 +151,6 @@ const Inventory = () => {
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb */}
-      <div className="flex items-center text-sm text-gray-600">
-        <span className="hover:text-blue-600 cursor-pointer">Dashboard</span>
-        <ChevronRight className="w-4 h-4 mx-2" />
-        <span className="text-gray-900 font-medium">Inventory</span>
-      </div>
-
       {/* Header */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between">
@@ -253,7 +311,7 @@ const Inventory = () => {
       </div>
 
       {/* Allocate Modal */}
-      <Modal title={`Allocate from ${selected?.dealer || ''}`} open={allocOpen} onClose={() => setAllocOpen(false)} onSubmit={() => { try { const qty = parseInt(allocForm.qty, 10); setRows(prev => { const from = prev.find(i => i.id === selected.id); if (!from || from.qty < qty) throw new Error('Insufficient stock'); from.qty -= qty; const existing = prev.find(i => i.dealer === allocForm.dealer && i.modelId === from.modelId && i.variant === from.variant); if (existing) existing.qty += qty; else prev.push({ id: Math.max(...prev.map(p => p.id)) + 1, dealer: allocForm.dealer, modelId: from.modelId, model: from.model, variant: from.variant, qty, status: 'in_stock', daysInStock: 0 }); return [...prev] }); setAllocOpen(false) } catch (e) { window.alert(e.message) } }}>
+      <Modal title={`Allocate from ${selected?.dealer || ''}`} open={allocOpen} onClose={() => setAllocOpen(false)} onSubmit={async () => { try { const qty = parseInt(allocForm.qty, 10); await apiSend('/evm/inventory/allocate', 'POST', { fromId: selected?.id, toDealer: allocForm.dealer, qty }); await fetchInventory(); setAllocOpen(false) } catch (e) { window.alert(e.message || 'Allocation failed') } }}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Dealer</label>
@@ -278,7 +336,7 @@ const Inventory = () => {
       </Modal>
 
       {/* Adjust Modal */}
-      <Modal title={`Adjust ${selected?.model || ''} ${selected?.variant || ''}`} open={adjustOpen} onClose={() => setAdjustOpen(false)} onSubmit={() => { setRows(prev => prev.map(i => i.id === selected.id ? { ...i, qty: Math.max(0, parseInt(adjustForm.qty, 10)) } : i)); setAdjustOpen(false) }}>
+      <Modal title={`Adjust ${selected?.model || ''} ${selected?.variant || ''}`} open={adjustOpen} onClose={() => setAdjustOpen(false)} onSubmit={async () => { await apiSend(`/evm/inventory/${selected?.id}`, 'PATCH', { qty: Math.max(0, parseInt(adjustForm.qty, 10)) }); await fetchInventory(); setAdjustOpen(false) }}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">New Quantity</label>
