@@ -53,6 +53,10 @@ public class VehicleVariantDAO {
         return retrieve("model_id = ? and is_active = 1", model_id);
     }
     
+    public List<VehicleVariantDTO> viewVehicleVariant(int model_id){
+        return retrieve("model_id = ?", model_id);
+    }
+    
     public int create(Connection conn, VehicleVariantDTO variant) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(INSERT_SQL, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, variant.getModelId());
@@ -89,6 +93,93 @@ public class VehicleVariantDAO {
             e.printStackTrace();
             return false;
         }
+    }
+    
+    // ===== EVM (Electric Vehicle Management) Methods =====
+
+    public VehicleVariantDTO createVariant(int modelId, String versionName, String color, String image, double price) {
+        String sql = "INSERT INTO " + TABLE_NAME + 
+                " (model_id, version_name, color, image, price, is_active) VALUES (?, ?, ?, ?, ?, 1)";
+        try (Connection conn = DbUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setInt(1, modelId);
+            ps.setString(2, versionName);
+            ps.setString(3, color);
+            ps.setString(4, image);
+            ps.setDouble(5, price);
+            
+            int affectedRows = ps.executeUpdate();
+            if (affectedRows > 0) {
+                ResultSet generatedKeys = ps.getGeneratedKeys();
+                if (generatedKeys.next()) {
+                    int generatedId = generatedKeys.getInt(1);
+                    return new VehicleVariantDTO(generatedId, modelId, versionName, color, image, price, true);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error in createVariant(): " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
+    
+    public boolean updateVariant(int variantId, int modelId, String versionName, String color, String image, double price) {
+        String sql = "UPDATE " + TABLE_NAME + 
+                " SET model_id = ?, version_name = ?, color = ?, image = ?, price = ? WHERE variant_id = ?";
+        try (Connection conn = DbUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, modelId);
+            ps.setString(2, versionName);
+            ps.setString(3, color);
+            ps.setString(4, image);
+            ps.setDouble(5, price);
+            ps.setInt(6, variantId);
+            
+            int affectedRows = ps.executeUpdate();
+            return affectedRows > 0;
+        } catch (Exception e) {
+            System.err.println("Error in updateVariant(): " + e.getMessage());
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public boolean disableVariant(int variantId) {
+        String sql = "UPDATE " + TABLE_NAME + " SET is_active = 0 WHERE variant_id = ?";
+        try (Connection conn = DbUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, variantId);
+            
+            int affectedRows = ps.executeUpdate();
+            return affectedRows > 0;
+        } catch (Exception e) {
+            System.err.println("Error in disableVariant(): " + e.getMessage());
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public boolean enableVariant(int variantId) {
+        String sql = "UPDATE " + TABLE_NAME + " SET is_active = 1 WHERE variant_id = ?";
+        try (Connection conn = DbUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, variantId);
+            
+            int affectedRows = ps.executeUpdate();
+            return affectedRows > 0;
+        } catch (Exception e) {
+            System.err.println("Error in enableVariant(): " + e.getMessage());
+            e.printStackTrace();
+        }
+        return false;
+    }
+    
+    public VehicleVariantDTO getVariantById(int variantId) {
+        List<VehicleVariantDTO> list = retrieve("variant_id = ?", variantId);
+        if (list != null && !list.isEmpty()) {
+            return list.get(0);
+        }
+        return null;
     }
     
 }
