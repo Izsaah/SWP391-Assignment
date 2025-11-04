@@ -132,4 +132,45 @@ public class OrderDAO {
             return ps.executeUpdate() > 0;
         }
     }
+    
+    public List<java.util.Map<String, Object>> retrieveOrdersWithConfirmedDetails(int orderDetailId)
+            throws SQLException, ClassNotFoundException {
+        String sql = "SELECT o.order_id, o.customer_id, o.dealer_staff_id, o.model_id, o.order_date, o.status, "
+                + "d.order_detail_id, d.serial_id, d.quantity, d.unit_price "
+                + "FROM [Order] o "
+                + "JOIN OrderDetail d ON o.order_id = d.order_id "
+                + "WHERE EXISTS (SELECT 1 FROM Confirmation c WHERE c.order_detail_id = d.order_detail_id) "
+                + "AND d.order_detail_id = ?";
+
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, orderDetailId);
+            ResultSet rs = ps.executeQuery();
+
+            List<java.util.Map<String, Object>> list = new ArrayList<>();
+
+            while (rs.next()) {
+                java.util.Map<String, Object> row = new java.util.HashMap<>();
+
+                // Order info
+                row.put("order_id", rs.getInt("order_id"));
+                row.put("customer_id", rs.getInt("customer_id"));
+                row.put("dealer_staff_id", rs.getInt("dealer_staff_id"));
+                row.put("model_id", rs.getInt("model_id"));
+                row.put("order_date", rs.getString("order_date"));
+                row.put("status", rs.getString("status"));
+
+                // Order detail info
+                row.put("order_detail_id", rs.getInt("order_detail_id"));
+                row.put("serial_id", rs.getString("serial_id"));
+                row.put("quantity", rs.getInt("quantity"));
+                row.put("unit_price", rs.getDouble("unit_price"));
+
+                list.add(row);
+            }
+
+            return list;
+        }
+    }
+    
 }
