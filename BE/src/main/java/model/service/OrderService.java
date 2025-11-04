@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import model.dao.ConfirmationDAO;
 import model.dao.OrderDAO;
 import model.dao.OrderDetailDAO;
@@ -301,4 +302,18 @@ public class OrderService {
             return success;
         }
     }
+    public List<Map<String, Object>> retrieveOrdersWithConfirmedDetails(int orderDetailId)
+            throws SQLException, ClassNotFoundException {
+        return orderDAO.retrieveOrdersWithConfirmedDetails(orderDetailId);
+    }
+    
+    public List<ConfirmationDTO> getAllConfirmation() throws SQLException, ClassNotFoundException{
+        return confirmationDAO.viewConfirmations();
+    }
+    
+    public List<ConfirmationDTO> getConfirmationByOrderDetailId(int orderDetailId) 
+            throws SQLException, ClassNotFoundException{
+        return confirmationDAO.viewConfirmationsByOrderDetailId(orderDetailId);
+    }
+            
 }
