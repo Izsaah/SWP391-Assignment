@@ -27,7 +27,7 @@ public class ViewInventoryController extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         try {
-            ResponseUtils.success(response, "success", service.handleViewAllInventory());
+            ResponseUtils.success(response, "success", service.handleViewActiveInventory());
         } catch (Exception e) {
             e.printStackTrace();
             ResponseUtils.error(response, "Fail to retrive inventory: " + e.getMessage());

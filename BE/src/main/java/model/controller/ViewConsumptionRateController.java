@@ -18,7 +18,7 @@ import utils.ResponseUtils;
  *
  * @author khoac
  */
-@WebServlet("/api/staff/viewConsumptionRate")
+@WebServlet("/api/EVM/viewConsumptionRate")
 public class ViewConsumptionRateController extends HttpServlet {
     private final ViewConsumptionRateService service = new ViewConsumptionRateService();
 

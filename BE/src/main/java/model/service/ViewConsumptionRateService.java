@@ -5,6 +5,7 @@
 package model.service;
 
 import java.sql.SQLException;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import model.dao.OrderDAO;
@@ -41,7 +42,10 @@ public class ViewConsumptionRateService {
                 }
             }
         }
-        return totalQuantity / 30.0;
+
+        int daysInMonth = YearMonth.now().lengthOfMonth();
+
+        return totalQuantity / daysInMonth;
     }
 
     public List<String> viewModelConsumptionRate() throws SQLException, ClassNotFoundException {

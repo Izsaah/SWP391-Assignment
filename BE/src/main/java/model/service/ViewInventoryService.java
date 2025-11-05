@@ -20,15 +20,26 @@ public class ViewInventoryService {
     private VehicleModelDAO modelDAO = new VehicleModelDAO();
     private InventoryDAO inventoryDAO = new InventoryDAO();
 
-    public List<InventoryDTO> handleViewAllInventory() {
+    public List<InventoryDTO> handleViewActiveInventory() {
         List<InventoryDTO> inventories = inventoryDAO.viewAllInventory();
+        List<InventoryDTO> activeInventories = new ArrayList<>();
+
         if (inventories != null) {
             for (InventoryDTO inventory : inventories) {
-                List<VehicleModelDTO> model = modelDAO.viewVehicleModelById(inventory.getModelId());
-                inventory.setList(model);
+                List<VehicleModelDTO> modelList = modelDAO.viewVehicleModelById(inventory.getModelId());
+
+                if (modelList != null && !modelList.isEmpty()) {
+                    VehicleModelDTO model = modelList.get(0);
+
+                    if (model.isIsActive()) {
+                        inventory.setList(modelList);
+                        activeInventories.add(inventory);
+                    }
+                }
             }
         }
-        return inventories;
+
+        return activeInventories;
     }
 
     public List<VehicleModelDTO> getInventoryByModelName(String name) {
