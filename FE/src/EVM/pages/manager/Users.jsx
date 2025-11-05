@@ -10,7 +10,15 @@ const Users = () => {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
-  const [rows, setRows] = useState([])
+  const [rows, setRows] = useState([
+    { id: 101, name: 'Nguyen Van A', email: 'nguyenvana@dealer.com', phone: '0901234567', dealer: 'Dealer A', role: 'Dealer Admin', status: 'Active' },
+    { id: 102, name: 'Tran Thi B', email: 'tranthib@dealer.com', phone: '0901234568', dealer: 'Dealer A', role: 'Dealer Staff', status: 'Active' },
+    { id: 103, name: 'Le Van C', email: 'levanc@dealer.com', phone: '0901234569', dealer: 'Dealer B', role: 'Dealer Admin', status: 'Active' },
+    { id: 104, name: 'Pham Thi D', email: 'phamthid@dealer.com', phone: '0901234570', dealer: 'Dealer B', role: 'Dealer Staff', status: 'Suspended' },
+    { id: 105, name: 'Hoang Van E', email: 'hoangvane@dealer.com', phone: '0901234571', dealer: 'Dealer C', role: 'Dealer Staff', status: 'Active' },
+    { id: 106, name: 'Vu Thi F', email: 'vuthif@dealer.com', phone: '0901234572', dealer: 'Dealer A', role: 'Dealer Staff', status: 'Active' },
+    { id: 107, name: 'Do Van G', email: 'dovang@dealer.com', phone: '0901234573', dealer: 'Dealer C', role: 'Dealer Admin', status: 'Active' },
+  ])
   const [loading, setLoading] = useState(false)
 
   // Fetch users from API
@@ -46,9 +54,9 @@ const Users = () => {
     }
   }, [])
 
-  useEffect(() => {
-    fetchUsers()
-  }, [fetchUsers])
+  // useEffect(() => {
+  //   fetchUsers()
+  // }, [fetchUsers])
 
   // Form state for new user
   const [newUser, setNewUser] = useState({

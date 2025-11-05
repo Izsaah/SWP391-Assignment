@@ -18,7 +18,13 @@ const Contracts = () => {
   const [editing, setEditing] = useState(null)
   const [viewingContract, setViewingContract] = useState(null)
   const [form, setForm] = useState({ debt: 0 })
-  const [rows, setRows] = useState([])
+  const [rows, setRows] = useState([
+    { id: 'C-1', dealer: 'Dealer A', target: 50, achieved: 45, debt: 920000000, status: 'Active' },
+    { id: 'C-2', dealer: 'Dealer B', target: 60, achieved: 52, debt: 1200000000, status: 'Active' },
+    { id: 'C-3', dealer: 'Dealer C', target: 40, achieved: 38, debt: 750000000, status: 'Active' },
+    { id: 'C-4', dealer: 'Dealer A', target: 30, achieved: 25, debt: 580000000, status: 'Active' },
+    { id: 'C-5', dealer: 'Dealer B', target: 45, achieved: 40, debt: 980000000, status: 'Active' },
+  ])
   const [loading, setLoading] = useState(false)
 
   // Fetch contracts from API
@@ -44,9 +50,9 @@ const Contracts = () => {
     }
   }, [])
 
-  useEffect(() => {
-    fetchContracts()
-  }, [fetchContracts])
+  // useEffect(() => {
+  //   fetchContracts()
+  // }, [fetchContracts])
 
   const filtered = useMemo(() => rows.filter(c =>
     (dealer === 'All' || c.dealer === dealer) &&

@@ -7,7 +7,16 @@ import ConfirmModal from '../../components/ConfirmModal'
 const API_URL = import.meta.env.VITE_API_URL
 
 const Promotions = () => {
-  const [rows, setRows] = useState([])
+  const [rows, setRows] = useState([
+    { id: 1, dealer: 'Dealer A', name: 'Summer Sale 2025', type: 'Discount', value: '10%', from: '2025-06-01', to: '2025-08-31', active: true },
+    { id: 2, dealer: 'Dealer B', name: 'New Year Promotion', type: 'Discount', value: '15%', from: '2025-01-01', to: '2025-01-31', active: true },
+    { id: 3, dealer: 'Dealer A', name: 'Early Bird Special', type: 'Discount', value: '8%', from: '2025-03-01', to: '2025-03-31', active: true },
+    { id: 4, dealer: 'Dealer C', name: 'Holiday Bonus', type: 'Discount', value: '12%', from: '2025-12-01', to: '2025-12-31', active: false },
+    { id: 5, dealer: 'Dealer B', name: 'Flash Sale', type: 'Discount', value: '20%', from: '2025-11-01', to: '2025-11-05', active: true },
+    { id: 6, dealer: 'Dealer A', name: 'Clearance Event', type: 'Discount', value: '25%', from: '2025-09-01', to: '2025-09-30', active: true },
+    { id: 7, dealer: 'Dealer C', name: 'Member Exclusive', type: 'Discount', value: '5%', from: '2025-04-01', to: '2025-04-30', active: true },
+    { id: 8, dealer: 'Dealer B', name: 'Spring Sale', type: 'Discount', value: '18%', from: '2025-05-01', to: '2025-05-31', active: true },
+  ])
   const [dealer, setDealer] = useState('All')
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState('dealer')
@@ -45,9 +54,9 @@ const Promotions = () => {
     }
   }, [])
 
-  useEffect(() => {
-    fetchPromotions()
-  }, [fetchPromotions])
+  // useEffect(() => {
+  //   fetchPromotions()
+  // }, [fetchPromotions])
 
   const filtered = useMemo(() => rows.filter(p =>
     (dealer === 'All' || p.dealer === dealer) &&

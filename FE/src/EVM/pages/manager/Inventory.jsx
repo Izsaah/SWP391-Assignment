@@ -24,7 +24,16 @@ const Inventory = () => {
   const [page, setPage] = useState(1)
   const pageSize = 8
 
-  const [rows, setRows] = useState([])
+  const [rows, setRows] = useState([
+    { id: '1-1', dealer: 'Dealer A', model: 'Model 3 Standard', variant: 'RWD White', qty: 5, status: 'In Stock', daysInStock: 15 },
+    { id: '1-2', dealer: 'Dealer A', model: 'Model 3 Standard', variant: 'RWD Blue', qty: 3, status: 'In Stock', daysInStock: 8 },
+    { id: '2-1', dealer: 'Dealer B', model: 'Model Y Long Range', variant: 'AWD Red', qty: 2, status: 'In Stock', daysInStock: 45 },
+    { id: '2-2', dealer: 'Dealer B', model: 'Model Y Long Range', variant: 'AWD White', qty: 1, status: 'In Stock', daysInStock: 62 },
+    { id: '3-1', dealer: 'Dealer C', model: 'Model 3 Performance', variant: 'AWD Black', qty: 4, status: 'In Stock', daysInStock: 20 },
+    { id: '1-3', dealer: 'Dealer A', model: 'Model 3 Standard', variant: 'RWD Black', qty: 7, status: 'In Stock', daysInStock: 12 },
+    { id: '2-3', dealer: 'Dealer B', model: 'Model Y Long Range', variant: 'AWD Blue', qty: 6, status: 'In Stock', daysInStock: 30 },
+    { id: '3-2', dealer: 'Dealer C', model: 'Model 3 Performance', variant: 'AWD Silver', qty: 3, status: 'In Stock', daysInStock: 18 },
+  ])
   const [loading, setLoading] = useState(false)
 
   // Fetch inventory from API
@@ -108,9 +117,9 @@ const Inventory = () => {
     }
   }, [])
 
-  useEffect(() => {
-    fetchInventory()
-  }, [fetchInventory])
+  // useEffect(() => {
+  //   fetchInventory()
+  // }, [fetchInventory])
 
   const [allocOpen, setAllocOpen] = useState(false)
   const [adjustOpen, setAdjustOpen] = useState(false)

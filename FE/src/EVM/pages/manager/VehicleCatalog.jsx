@@ -78,7 +78,14 @@ export default VehicleCatalog
 
 // Models Section (inlined from VehicleModels)
 const ModelsSection = () => {
-  const [rows, setRows] = useState([])
+  const [rows, setRows] = useState([
+    { id: 1, name: 'Model 3 Standard', description: 'Entry-level sedan with excellent range', brand: 'EVM', year: 2025, variants: 3, active: true },
+    { id: 2, name: 'Model Y Long Range', description: 'SUV with extended battery life', brand: 'EVM', year: 2025, variants: 4, active: true },
+    { id: 3, name: 'Model 3 Performance', description: 'High-performance sports sedan', brand: 'EVM', year: 2025, variants: 2, active: true },
+    { id: 4, name: 'Model S Premium', description: 'Luxury sedan with premium features', brand: 'EVM', year: 2025, variants: 5, active: true },
+    { id: 5, name: 'Model X SUV', description: 'Full-size electric SUV', brand: 'EVM', year: 2025, variants: 3, active: false },
+    { id: 6, name: 'Model 2 Compact', description: 'Compact city car', brand: 'EVM', year: 2025, variants: 2, active: true },
+  ])
   const [query, setQuery] = useState('')
   const [brand, setBrand] = useState('All')
   const [sortKey, setSortKey] = useState('name')
@@ -117,9 +124,9 @@ const ModelsSection = () => {
     }
   }, [])
 
-  useEffect(() => {
-    fetchModels()
-  }, [fetchModels])
+  // useEffect(() => {
+  //   fetchModels()
+  // }, [fetchModels])
 
 
   const filtered = useMemo(() => rows.filter(m =>
@@ -326,7 +333,18 @@ const ModelsSection = () => {
 
 // Variants Section (inlined from VehicleVariants)
 const VariantsSection = () => {
-  const [rows, setRows] = useState([])
+  const [rows, setRows] = useState([
+    { id: 1, modelId: 1, model: 'Model 3 Standard', version: 'RWD', color: 'White', price: 920000000, active: true },
+    { id: 2, modelId: 1, model: 'Model 3 Standard', version: 'RWD', color: 'Blue', price: 940000000, active: true },
+    { id: 3, modelId: 1, model: 'Model 3 Standard', version: 'RWD', color: 'Black', price: 950000000, active: true },
+    { id: 4, modelId: 2, model: 'Model Y Long Range', version: 'AWD', color: 'Red', price: 1200000000, active: true },
+    { id: 5, modelId: 2, model: 'Model Y Long Range', version: 'AWD', color: 'White', price: 1220000000, active: true },
+    { id: 6, modelId: 2, model: 'Model Y Long Range', version: 'AWD', color: 'Blue', price: 1230000000, active: true },
+    { id: 7, modelId: 3, model: 'Model 3 Performance', version: 'AWD', color: 'Black', price: 1250000000, active: true },
+    { id: 8, modelId: 3, model: 'Model 3 Performance', version: 'AWD', color: 'Silver', price: 1270000000, active: true },
+    { id: 9, modelId: 4, model: 'Model S Premium', version: 'Plaid', color: 'White', price: 2500000000, active: true },
+    { id: 10, modelId: 4, model: 'Model S Premium', version: 'Plaid', color: 'Black', price: 2520000000, active: true },
+  ])
   const [query, setQuery] = useState('')
   const [color, setColor] = useState('All')
   const [page, setPage] = useState(1)
@@ -364,9 +382,9 @@ const VariantsSection = () => {
     }
   }, [])
 
-  useEffect(() => {
-    fetchVariants()
-  }, [fetchVariants])
+  // useEffect(() => {
+  //   fetchVariants()
+  // }, [fetchVariants])
 
   const filtered = useMemo(() => rows.filter(v =>
     (!query || `${v.model} ${v.version}`.toLowerCase().includes(query.toLowerCase())) &&
