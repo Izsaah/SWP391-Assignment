@@ -18,25 +18,37 @@ const Users = () => {
     setLoading(true)
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.post(`${API_URL}/EVM/viewAllDealerAccounts`, {}, {
+      const response = await axios.post(`${API_URL}/EVM/viewAllDealerAccounts`, { _empty: true }, {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
         }
       })
 
       // Backend trả về {status: 'success', message: 'success', data: Array}
       if (response.data && response.data.status === 'success' && response.data.data) {
         // Transform backend data to frontend format
-        const users = (response.data.data || []).map(user => ({
-          id: user.userId || user.id,
-          name: user.username || user.name,
-          email: user.email || '',
-          phone: user.phoneNumber || user.phone || '',
-          dealer: user.dealerName || `Dealer ${user.dealerId || 'A'}`,
-          role: user.roleName || (user.roleId === 2 ? 'Dealer Admin' : 'Dealer Staff'),
-          status: user.isActive ? 'Active' : 'Suspended'
-        }))
+        // Backend đã trả về isActive từ database
+        const users = (response.data.data || []).map(user => {
+          const userId = user.userId || user.id
+          // Backend trả về isActive (true/false) từ database
+          // Database: 1 = true (Active), 0 = false (Suspended)
+          const isActive = user.isActive !== undefined && user.isActive !== null 
+            ? user.isActive 
+            : true // Default là active nếu không có
+          
+          return {
+            id: userId,
+            name: user.username || user.name,
+            email: user.email || '',
+            phone: user.phoneNumber || user.phone || '',
+            dealer: user.dealerName || `Dealer ${user.dealerId || 'A'}`,
+            role: user.roleName || (user.roleId === 2 ? 'Dealer Admin' : 'Dealer Staff'),
+            status: isActive ? 'Active' : 'Suspended'
+          }
+        })
+        
         setRows(users)
       }
     } catch (error) {
@@ -89,26 +101,40 @@ const Users = () => {
     e.preventDefault()
     try {
       const token = localStorage.getItem('token')
+      
+      // Map role string to roleId: "Dealer Admin" -> 2, "Dealer Staff" -> 3
+      const roleIdMap = {
+        'Dealer Admin': 2,
+        'Dealer Staff': 3
+      }
+      const roleId = roleIdMap[newUser.role] || 3
+      
+      // Map dealer string to dealerId: "Dealer A" -> 1, "Dealer B" -> 2, etc.
+      const dealerIdMatch = newUser.dealer.match(/Dealer\s+([A-Z])/i)
+      const dealerId = dealerIdMatch ? dealerIdMatch[1].charCodeAt(0) - 64 : 1 // A=1, B=2, etc.
+      
       if (editingUser) {
         // Update existing user
         const response = await axios.post(
-          `${API_URL}/EVM/users`,
+          `${API_URL}/EVM/updateDealerAccount`,
           {
-            id: editingUser.id,
-            name: newUser.name,
+            userId: editingUser.id,
             email: newUser.email,
-            phone: newUser.phone,
-            dealer: newUser.dealer,
-            role: newUser.role
+            username: newUser.name,
+            phoneNumber: newUser.phone,
+            password: null, // Không update password nếu không có
+            roleId: roleId
           },
           {
             headers: {
               'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              'ngrok-skip-browser-warning': 'true'
             }
           }
         )
-        if (response.data && response.data.success) {
+        // Backend trả về {status: 'success', message: 'success', data: ...}
+        if (response.data && response.data.status === 'success') {
           await fetchUsers()
           setShowEditModal(false)
           setEditingUser(null)
@@ -118,23 +144,25 @@ const Users = () => {
       } else {
         // Create new user
         const response = await axios.post(
-          `${API_URL}/EVM/users`,
+          `${API_URL}/EVM/createDealerAccount`,
           {
-            name: newUser.name,
+            dealerId: dealerId,
             email: newUser.email,
-            phone: newUser.phone,
-            dealer: newUser.dealer,
-            role: newUser.role,
-            password: 'default123' // Default password
+            username: newUser.name,
+            password: 'default123', // Default password
+            phoneNumber: newUser.phone,
+            roleId: roleId
           },
           {
             headers: {
               'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              'ngrok-skip-browser-warning': 'true'
             }
           }
         )
-        if (response.data && response.data.success) {
+        // Backend trả về {status: 'success', message: 'success', data: ...}
+        if (response.data && response.data.status === 'success') {
           await fetchUsers()
           setShowCreateModal(false)
         } else {
@@ -170,20 +198,72 @@ const Users = () => {
   const handleToggleStatus = useCallback(async (row) => {
     try {
       const token = localStorage.getItem('token')
-      const nextStatus = row.status === 'Active' ? 'Suspended' : 'Active'
-      await axios.post(
-        `${API_URL}/EVM/users/${row.id}/status`,
-        { status: nextStatus },
+      const isCurrentlyActive = row.status === 'Active'
+      
+      console.log('Toggle status for user:', {
+        userId: row.id,
+        currentStatus: row.status,
+        isCurrentlyActive,
+        action: isCurrentlyActive ? 'Disable' : 'Enable'
+      })
+      
+      // Gọi đúng endpoint dựa trên status hiện tại
+      // Nếu đang Active -> Disable (suspend)
+      // Nếu đang Suspended -> Enable (activate)
+      const endpoint = isCurrentlyActive 
+        ? `${API_URL}/EVM/disableDealerAccount`  // Active -> Disable
+        : `${API_URL}/EVM/enableDealerAccount`   // Suspended -> Enable
+      
+      console.log('Calling endpoint:', endpoint)
+      
+      // Đảm bảo userId là số
+      const userId = parseInt(row.id, 10)
+      if (isNaN(userId) || userId <= 0) {
+        alert('Invalid user ID')
+        return
+      }
+      
+      const response = await axios.post(
+        endpoint,
+        { userId: userId },
         {
           headers: {
             'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true'
           }
         }
       )
-      await fetchUsers()
+      
+      console.log('Toggle status response:', response.data)
+      
+      // Backend trả về {status: 'success', message: '...', data: ...}
+      if (response.data && response.data.status === 'success') {
+        // Update status ngay lập tức trong UI
+        const newStatus = isCurrentlyActive ? 'Suspended' : 'Active'
+        setRows(prevRows => 
+          prevRows.map(user => 
+            user.id === row.id 
+              ? { ...user, status: newStatus }
+              : user
+          )
+        )
+        
+        // Fetch lại sau 300ms để đồng bộ với backend (backend đã trả về isActive)
+        setTimeout(() => {
+          fetchUsers()
+        }, 300)
+      } else {
+        alert(response.data?.message || 'Failed to update user status')
+      }
     } catch (error) {
       console.error('Error toggling user status:', error)
+      console.error('Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      })
       alert(error.response?.data?.message || 'Failed to update user status')
     }
   }, [fetchUsers])

@@ -18,12 +18,10 @@ public class CorsFilter implements Filter {
 
         String origin = req.getHeader("Origin");
 
-        // ✅ Allow localhost (for your frontend dev) and ngrok domains
+        // ✅ Allow localhost (for your frontend dev) and your current ngrok domain
         if (origin != null && (
                 origin.equals("http://localhost:5173") ||
-                origin.equals("https://localhost:5173") ||
-                origin.contains("ngrok-free.app") ||
-                origin.contains("ngrok.io")
+                origin.equals("https://de5c6309160a.ngrok-free.app")
         )) {
             resp.setHeader("Access-Control-Allow-Origin", origin);
             resp.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");

@@ -40,7 +40,7 @@ const Inventory = () => {
       console.log('Fetching inventory from:', `${API_URL}/EVM/viewInventory`)
       const response = await axios.post(
         `${API_URL}/EVM/viewInventory`,
-        {},
+        { _empty: true },
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -53,31 +53,42 @@ const Inventory = () => {
       // Backend trả về {status: 'success', message: 'success', data: Array}
       if (response.data && response.data.status === 'success' && response.data.data) {
         // Transform backend data to frontend format
+        // handleViewActiveInventory() trả về List<InventoryDTO> với list là modelList (không có variants)
         const inventoryList = []
         const backendData = response.data.data || []
         
         backendData.forEach((inventory) => {
-          if (inventory.list && Array.isArray(inventory.list)) {
-            inventory.list.forEach((model) => {
-              if (model.lists && Array.isArray(model.lists)) {
+          if (inventory.list && Array.isArray(inventory.list) && inventory.list.length > 0) {
+            const model = inventory.list[0] // Service chỉ trả về 1 model trong list
+            const qty = parseInt(inventory.quantity) || 0
+            
+            if (qty > 0 && model) {
+              // Nếu model có variants (lists), tạo entry cho mỗi variant
+              if (model.lists && Array.isArray(model.lists) && model.lists.length > 0) {
                 model.lists.forEach((variant) => {
-                  // Quantity từ InventoryDTO, không phải từ variant
-                  // Variant name là versionName trong backend
-                  const qty = parseInt(inventory.quantity) || 0
-                  if (qty > 0) {
-                    inventoryList.push({
-                      id: `${model.modelId}-${variant.variantId}`,
-                      dealer: 'All Dealers', // InventoryDTO không có dealerName
-                      model: model.modelName || 'N/A',
-                      variant: `${variant.versionName || ''} ${variant.color || ''}`.trim() || 'N/A',
-                      qty: qty,
-                      status: variant.isActive ? 'In Stock' : 'Out of Stock',
-                      daysInStock: variant.daysInStock || 0
-                    })
-                  }
+                  inventoryList.push({
+                    id: `${model.modelId}-${variant.variantId || 'default'}`,
+                    dealer: 'All Dealers',
+                    model: model.modelName || 'N/A',
+                    variant: `${variant.versionName || ''} ${variant.color || ''}`.trim() || 'N/A',
+                    qty: qty,
+                    status: variant.isActive ? 'In Stock' : 'Out of Stock',
+                    daysInStock: variant.daysInStock || 0
+                  })
+                })
+              } else {
+                // Nếu không có variants, chỉ hiển thị model
+                inventoryList.push({
+                  id: `model-${model.modelId}`,
+                  dealer: 'All Dealers',
+                  model: model.modelName || 'N/A',
+                  variant: 'All Variants',
+                  qty: qty,
+                  status: model.isActive ? 'In Stock' : 'Out of Stock',
+                  daysInStock: 0
                 })
               }
-            })
+            }
           }
         })
         

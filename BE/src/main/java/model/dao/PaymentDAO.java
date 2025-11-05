@@ -11,19 +11,12 @@ public class PaymentDAO {
     private static final String TABLE_NAME = "Payment";
 
     private PaymentDTO mapToPayment(ResultSet rs) throws SQLException {
-        PaymentDTO payment = new PaymentDTO(
+        return new PaymentDTO(
                 rs.getInt("order_id"),
                 rs.getString("method"),
                 rs.getDouble("amount"),
                 rs.getString("payment_date")
         );
-        // Thêm dòng này để set payment_id
-        try {
-            payment.setPaymentId(rs.getInt("payment_id"));
-        } catch (SQLException e) {
-            // Nếu không có payment_id trong ResultSet, bỏ qua
-        }
-        return payment;
     }
 
     public List<PaymentDTO> retrieve(String condition, Object... params) {

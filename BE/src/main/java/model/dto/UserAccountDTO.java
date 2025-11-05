@@ -23,6 +23,7 @@ public class UserAccountDTO {
     private String phoneNumber;
     private int roleId;
     private List<RoleDTO> roles;
+    private Boolean isActive;
 
     public UserAccountDTO() {
     }
@@ -107,6 +108,14 @@ public class UserAccountDTO {
 
     public void setRoleId(int roleId) {
         this.roleId = roleId;
+    }
+
+    public Boolean getIsActive() {
+        return isActive;
+    }
+
+    public void setIsActive(Boolean isActive) {
+        this.isActive = isActive;
     }
 
 }

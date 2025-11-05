@@ -98,7 +98,7 @@ const ModelsSection = () => {
     setLoading(true)
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.post(`${API_URL}/EVM/viewVehicleForEVM`, {}, {
+      const response = await axios.post(`${API_URL}/EVM/viewVehicleForEVM`, { _empty: true }, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -351,13 +351,14 @@ const VariantsSection = () => {
 
   const [loading, setLoading] = useState(false)
 
-  // Load variants from API
+  // Load variants from API - Fetch từ models vì models đã có variants trong lists
   const fetchVariants = useCallback(async () => {
     setLoading(true)
     try {
       const token = localStorage.getItem('token')
-      // Get all variants (model_id = 0 means all)
-      const response = await axios.post(`${API_URL}/EVM/viewVehicleVariant`, { model_id: 0 }, {
+      
+      // Fetch models (models đã có variants trong lists)
+      const modelsResponse = await axios.post(`${API_URL}/EVM/viewVehicleForEVM`, { _empty: true }, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -365,23 +366,40 @@ const VariantsSection = () => {
         }
       })
 
-      // Backend trả về {status: 'success', message: 'success', data: Array}
-      if (response.data && response.data.status === 'success' && response.data.data) {
-        // Transform backend data to frontend format
-        const variants = (response.data.data || []).map(variant => ({
-          id: variant.variantId,
-          modelId: variant.modelId,
-          model: 'N/A', // Will need to fetch model name separately or include in response
-          version: variant.versionName,
-          color: variant.color,
-          price: variant.price,
-          active: variant.isActive
-        }))
-        setRows(variants)
+      console.log('Models API response for variants:', modelsResponse.data)
+
+      if (modelsResponse.data && modelsResponse.data.status === 'success' && modelsResponse.data.data) {
+        const models = modelsResponse.data.data || []
+        const allVariants = []
+        
+        // Extract variants từ mỗi model
+        models.forEach(model => {
+          if (model.lists && Array.isArray(model.lists) && model.lists.length > 0) {
+            model.lists.forEach(variant => {
+              allVariants.push({
+                id: variant.variantId,
+                modelId: variant.modelId || model.modelId,
+                model: model.modelName || 'N/A',
+                version: variant.versionName || '',
+                color: variant.color || '',
+                price: variant.price || 0,
+                active: variant.isActive !== undefined ? variant.isActive : true
+              })
+            })
+          }
+        })
+        
+        console.log('Extracted variants from models:', allVariants)
+        setRows(allVariants)
+      } else {
+        console.log('Models response not successful:', modelsResponse.data)
+        setRows([])
       }
     } catch (error) {
       console.error('Error fetching variants:', error)
+      console.error('Error details:', error.response?.data)
       alert(error.response?.data?.message || 'Failed to fetch variants')
+      setRows([])
     } finally {
       setLoading(false)
     }
@@ -391,10 +409,21 @@ const VariantsSection = () => {
     fetchVariants()
   }, [fetchVariants])
 
-  const filtered = useMemo(() => rows.filter(v =>
-    (!query || `${v.model} ${v.version}`.toLowerCase().includes(query.toLowerCase())) &&
-    (color === 'All' || v.color === color)
-  ), [rows, query, color])
+  // Mapping giữa filter (tiếng Anh) và dữ liệu (tiếng Việt)
+  const colorMapping = useMemo(() => ({
+    'All': 'All',
+    'White': 'Trắng',
+    'Blue': 'Xanh dương',
+    'Red': 'Đỏ',
+    'Black': 'Đen',
+    'Silver': 'Bạc'
+  }), [])
+
+  const filtered = useMemo(() => rows.filter(v => {
+    const queryMatch = !query || `${v.model} ${v.version} ${v.color}`.toLowerCase().includes(query.toLowerCase())
+    const colorMatch = color === 'All' || v.color === colorMapping[color] || v.color === color
+    return queryMatch && colorMatch
+  }), [rows, query, color, colorMapping])
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page])
 
@@ -434,6 +463,8 @@ const VariantsSection = () => {
             <option>White</option>
             <option>Blue</option>
             <option>Red</option>
+            <option>Black</option>
+            <option>Silver</option>
           </select>
         </div>
       </div>

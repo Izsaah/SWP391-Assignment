@@ -27,26 +27,53 @@ const Promotions = () => {
     setLoading(true)
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.post(`${API_URL}/EVM/viewPromotionDealerCount`, {}, {
+      const response = await axios.post(`${API_URL}/EVM/viewPromotionDealerCount`, { _empty: true }, {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
         }
       })
 
       // Backend trả về {status: 'success', message: 'success', data: Array}
+      // getAllPromotionsWithDealers() trả về List<Map> với: promoId, description, startDate, endDate, discountRate, type, dealers[]
       if (response.data && response.data.status === 'success' && response.data.data) {
         // Transform backend data to frontend format
-        const promotions = (response.data.data || []).map(promo => ({
-          id: promo.promoId || promo.id,
-          dealer: promo.dealerName || 'All Dealers',
-          name: promo.description || promo.promoName || 'Promotion',
-          type: promo.type || 'Discount',
-          value: promo.discountRate ? `${promo.discountRate}%` : '0%',
-          from: promo.startDate || '',
-          to: promo.endDate || '',
-          active: promo.isActive !== undefined ? promo.isActive : true
-        }))
+        const promotions = []
+        const backendData = response.data.data || []
+        
+        backendData.forEach(promo => {
+          const dealers = promo.dealers || []
+          
+          // Nếu có dealers, tạo một entry cho mỗi dealer
+          if (dealers.length > 0) {
+            dealers.forEach(dealer => {
+              promotions.push({
+                id: `${promo.promoId}-${dealer.dealerId || ''}`,
+                dealer: dealer.dealerName || 'All Dealers',
+                name: promo.description || 'Promotion',
+                type: promo.type || 'Discount',
+                value: promo.discountRate ? `${promo.discountRate}%` : '0%',
+                from: promo.startDate || '',
+                to: promo.endDate || '',
+                active: true // Không có isActive trong response
+              })
+            })
+          } else {
+            // Nếu không có dealers, tạo một entry chung
+            promotions.push({
+              id: promo.promoId || promo.id,
+              dealer: 'All Dealers',
+              name: promo.description || 'Promotion',
+              type: promo.type || 'Discount',
+              value: promo.discountRate ? `${promo.discountRate}%` : '0%',
+              from: promo.startDate || '',
+              to: promo.endDate || '',
+              active: true
+            })
+          }
+        })
+        
         setRows(promotions)
       }
     } catch (error) {

@@ -16,7 +16,7 @@ public class UserAccountDAO {
             + "WHERE ur.role_id in (1,2) AND u.username LIKE ?";
 
     private UserAccountDTO mapToUser(ResultSet rs) throws SQLException {
-        return new UserAccountDTO(
+        UserAccountDTO user = new UserAccountDTO(
                 rs.getInt("user_id"),
                 rs.getInt("role_id"),
                 rs.getInt("dealer_id"),
@@ -24,6 +24,10 @@ public class UserAccountDAO {
                 rs.getString("username"),
                 rs.getString("phone_number")
         );
+        // Đọc is_active từ database (1 = true/active, 0 = false/inactive)
+        boolean isActive = rs.getBoolean("is_active");
+        user.setIsActive(isActive);
+        return user;
     }
 
     public List<UserAccountDTO> retrieve(String condition, Object... params) {

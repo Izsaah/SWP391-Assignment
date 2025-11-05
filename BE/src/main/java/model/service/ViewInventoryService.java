@@ -8,10 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 import model.dao.InventoryDAO;
 import model.dao.VehicleModelDAO;
-import model.dao.VehicleVariantDAO;
 import model.dto.InventoryDTO;
 import model.dto.VehicleModelDTO;
-import model.dto.VehicleVariantDTO;
 
 /**
  *
@@ -21,26 +19,27 @@ public class ViewInventoryService {
 
     private VehicleModelDAO modelDAO = new VehicleModelDAO();
     private InventoryDAO inventoryDAO = new InventoryDAO();
-    private VehicleVariantDAO variantDAO = new VehicleVariantDAO();
 
-    public List<InventoryDTO> handleViewAllInventory() {
+    public List<InventoryDTO> handleViewActiveInventory() {
         List<InventoryDTO> inventories = inventoryDAO.viewAllInventory();
+        List<InventoryDTO> activeInventories = new ArrayList<>();
+
         if (inventories != null) {
             for (InventoryDTO inventory : inventories) {
-                List<VehicleModelDTO> models = modelDAO.viewVehicleModelById(inventory.getModelId());
-                if (models != null) {
-                    // Populate variants for each model
-                    for (VehicleModelDTO model : models) {
-                        List<VehicleVariantDTO> variants = variantDAO.viewVehicleVariantIsActive(model.getModelId());
-                        if (variants != null) {
-                            model.setLists(variants);
-                        }
+                List<VehicleModelDTO> modelList = modelDAO.viewVehicleModelById(inventory.getModelId());
+
+                if (modelList != null && !modelList.isEmpty()) {
+                    VehicleModelDTO model = modelList.get(0);
+
+                    if (model.isIsActive()) {
+                        inventory.setList(modelList);
+                        activeInventories.add(inventory);
                     }
                 }
-                inventory.setList(models);
             }
         }
-        return inventories;
+
+        return activeInventories;
     }
 
     public List<VehicleModelDTO> getInventoryByModelName(String name) {
