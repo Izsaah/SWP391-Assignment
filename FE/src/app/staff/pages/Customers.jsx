@@ -1,0 +1,444 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router';
+import Layout from '../layout/Layout';
+import { 
+  Users, 
+  Search, 
+  Plus, 
+  Eye, 
+  FileText, 
+  Calendar,
+  TrendingUp,
+  UserPlus,
+  RefreshCw,
+  DollarSign,
+  Car,
+  ChevronRight,
+  Filter,
+  X,
+  Loader2
+} from 'lucide-react';
+import { searchCustomersByName, createCustomer } from '../services/customerService';
+
+const Customers = () => {
+  const navigate = useNavigate();
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [customersData, setCustomersData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [searchPerformed, setSearchPerformed] = useState(false);
+  
+  // Form state for new customer
+  const [newCustomer, setNewCustomer] = useState({
+    name: '',
+    email: '',
+    phoneNumber: '',
+    address: ''
+  });
+  const [creating, setCreating] = useState(false);
+
+  // Handle search - call API when user searches
+  const handleSearch = async () => {
+    if (!searchTerm.trim()) {
+      setError('Please enter a customer name to search');
+      setSearchPerformed(false);
+      setCustomersData([]);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setSearchPerformed(true);
+
+    try {
+      const result = await searchCustomersByName(searchTerm.trim());
+      
+      if (result.success) {
+        // Transform backend data to match frontend format
+        const transformedData = (result.data || []).map(customer => ({
+          customerId: customer.customerId || `C-${customer.customer_id || 'N/A'}`,
+          name: customer.name || '',
+          email: customer.email || '',
+          phone: customer.phoneNumber || customer.phone_number || '',
+          phoneNumber: customer.phoneNumber || customer.phone_number || '',
+          address: customer.address || '',
+          // These fields are not available from BE, set defaults
+          type: 'New', // Cannot determine from BE
+          totalOrderForms: 0, // Not available from BE
+          testDrive: '', // Not available from BE
+          status: 'Active' // Cannot determine from BE
+        }));
+        
+        setCustomersData(transformedData);
+        
+        if (transformedData.length === 0) {
+          setError('No customers found with that name');
+        }
+      } else {
+        setError(result.message || 'Failed to search customers');
+        setCustomersData([]);
+      }
+    } catch (err) {
+      console.error('Search error:', err);
+      setError('An error occurred while searching');
+      setCustomersData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle search on Enter key
+  const handleSearchKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
+  // Handle form input changes
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setNewCustomer(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Handle form submission - create customer via API
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!newCustomer.name.trim() || !newCustomer.email.trim()) {
+      alert('Name and Email are required');
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const result = await createCustomer({
+        name: newCustomer.name,
+        email: newCustomer.email,
+        phoneNumber: newCustomer.phoneNumber || '',
+        address: newCustomer.address || ''
+      });
+
+      if (result.success) {
+        alert(result.message || 'Customer created successfully!');
+        // Reset form and close modal
+        setNewCustomer({
+          name: '',
+          email: '',
+          phoneNumber: '',
+          address: ''
+        });
+        setShowCreateModal(false);
+        // Optionally refresh search if we have a search term
+        if (searchTerm.trim()) {
+          handleSearch();
+        }
+      } else {
+        alert(result.message || 'Failed to create customer');
+      }
+    } catch (err) {
+      console.error('Create error:', err);
+      alert('An error occurred while creating customer');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // Helper functions
+  const maskPhone = (phone) => {
+    if (!phone || phone.length < 4) return phone;
+    return phone.substring(0, phone.length - 2).replace(/\d/g, (d, i) => i > 3 ? '*' : d) + phone.substring(phone.length - 2);
+  };
+
+
+
+  // Filter customers based on search (client-side filtering disabled since we search via API)
+  const filteredCustomers = customersData;
+
+  return (
+    <Layout>
+      <div className="space-y-6">
+        {/* Breadcrumb */}
+        <div className="flex items-center text-sm text-gray-600 mb-2">
+          <span className="hover:text-blue-600 cursor-pointer">Dashboard</span>
+          <ChevronRight className="w-4 h-4 mx-2" />
+          <span className="text-gray-900 font-medium">Customers</span>
+        </div>
+
+        {/* Page Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">All Customers</h1>
+            <p className="text-sm text-gray-600 mt-1">Search and manage customer information</p>
+          </div>
+          <button 
+            onClick={() => setShowCreateModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg flex items-center space-x-2 shadow-sm transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Customer</span>
+          </button>
+        </div>
+
+        {/* Note: KPI Cards removed - requires getAllCustomers endpoint which doesn't exist in BE */}
+        {/* Type/Status filters removed - backend doesn't support filtering by these fields */}
+
+        {/* Search Section */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-2">
+              <h3 className="text-sm font-semibold text-gray-900">Search Customers</h3>
+              {searchPerformed && (
+                <span className="text-xs text-gray-500">({filteredCustomers.length} results)</span>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Search */}
+            <div className="md:col-span-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search by customer name (press Enter or click Search)"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyPress={handleSearchKeyPress}
+                  className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Search Button */}
+            <div>
+              <button
+                onClick={handleSearch}
+                disabled={loading}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Searching...</span>
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-4 h-4" />
+                    <span>Search</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          {!searchPerformed && !error && (
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+              💡 Please enter a customer name and click Search to find customers.
+            </div>
+          )}
+        </div>
+
+        {/* Table */}
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                    Customer ID
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                    Name
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                    Phone
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                    Email
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                    Address
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {loading && (
+                  <tr>
+                    <td colSpan="5" className="px-4 py-8 text-center">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-600" />
+                      <p className="text-sm text-gray-600 mt-2">Searching customers...</p>
+                    </td>
+                  </tr>
+                )}
+                
+                {!loading && filteredCustomers.length === 0 && searchPerformed && (
+                  <tr>
+                    <td colSpan="5" className="px-4 py-8 text-center text-gray-500">
+                      No customers found. Try a different search term.
+                    </td>
+                  </tr>
+                )}
+
+                {!loading && filteredCustomers.map((customer, index) => (
+                  <tr 
+                    key={index} 
+                    onClick={() => navigate(`/staff/customers/${customer.customerId}`)}
+                    className="hover:bg-gray-50 transition-colors cursor-pointer"
+                  >
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center mr-3">
+                          <Users className="w-4 h-4 text-gray-600" />
+                        </div>
+                        <span className="text-sm font-medium text-gray-900">{customer.customerId}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <span className="text-sm font-medium text-blue-600">{customer.name}</span>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-700">{customer.phone ? maskPhone(customer.phone) : 'N/A'}</span>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-700">{customer.email || 'N/A'}</span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="text-sm text-gray-700">{customer.address || 'N/A'}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination - Disabled since we don't have pagination from BE */}
+          {!loading && filteredCustomers.length > 0 && (
+            <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                Showing <span className="font-medium">{filteredCustomers.length}</span> customer(s)
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Create Customer Modal */}
+        {showCreateModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-gray-900">Create New Customer</h2>
+                  <button
+                    onClick={() => {
+                      setShowCreateModal(false);
+                      setNewCustomer({ name: '', email: '', phoneNumber: '', address: '' });
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={newCustomer.name}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={newCustomer.email}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    name="phoneNumber"
+                    value={newCustomer.phoneNumber}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Address
+                  </label>
+                  <textarea
+                    name="address"
+                    value={newCustomer.address}
+                    onChange={handleInputChange}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateModal(false);
+                      setNewCustomer({ name: '', email: '', phoneNumber: '', address: '' });
+                    }}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creating}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors flex items-center justify-center space-x-2"
+                  >
+                    {creating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Creating...</span>
+                      </>
+                    ) : (
+                      <span>Create Customer</span>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    </Layout>
+  );
+};
+
+export default Customers;
+
