@@ -22,7 +22,8 @@ public class UserAccountDAO {
                 rs.getInt("dealer_id"),
                 rs.getString("email"),
                 rs.getString("username"),
-                rs.getString("phone_number")
+                rs.getString("phone_number"),
+                rs.getBoolean("is_active")
         );
     }
 

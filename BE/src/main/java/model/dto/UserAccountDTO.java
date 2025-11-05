@@ -23,6 +23,7 @@ public class UserAccountDTO {
     private String phoneNumber;
     private int roleId;
     private List<RoleDTO> roles;
+    private boolean isActive;
 
     public UserAccountDTO() {
     }
@@ -36,13 +37,14 @@ public class UserAccountDTO {
         this.roles = roles;
     }
 
-    public UserAccountDTO(int userId, int roleId, int dealerId, String email, String username, String phoneNumber) {
+    public UserAccountDTO(int userId, int roleId, int dealerId, String email, String username, String phoneNumber, boolean isActive) {
         this.userId = userId;
         this.roleId = roleId;
         this.dealerId = dealerId;
         this.email = email;
         this.username = username;
         this.phoneNumber = phoneNumber;
+        this.isActive = isActive;
     }
 
     public List<RoleDTO> getRoles() {
@@ -107,6 +109,14 @@ public class UserAccountDTO {
 
     public void setRoleId(int roleId) {
         this.roleId = roleId;
+    }
+
+    public boolean isIsActive() {
+        return isActive;
+    }
+
+    public void setIsActive(boolean isActive) {
+        this.isActive = isActive;
     }
 
 }
