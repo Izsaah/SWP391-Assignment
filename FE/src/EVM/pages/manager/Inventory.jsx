@@ -24,16 +24,7 @@ const Inventory = () => {
   const [page, setPage] = useState(1)
   const pageSize = 8
 
-  const [rows, setRows] = useState([
-    { id: '1-1', dealer: 'Dealer A', model: 'Model 3 Standard', variant: 'RWD White', qty: 5, status: 'In Stock', daysInStock: 15 },
-    { id: '1-2', dealer: 'Dealer A', model: 'Model 3 Standard', variant: 'RWD Blue', qty: 3, status: 'In Stock', daysInStock: 8 },
-    { id: '2-1', dealer: 'Dealer B', model: 'Model Y Long Range', variant: 'AWD Red', qty: 2, status: 'In Stock', daysInStock: 45 },
-    { id: '2-2', dealer: 'Dealer B', model: 'Model Y Long Range', variant: 'AWD White', qty: 1, status: 'In Stock', daysInStock: 62 },
-    { id: '3-1', dealer: 'Dealer C', model: 'Model 3 Performance', variant: 'AWD Black', qty: 4, status: 'In Stock', daysInStock: 20 },
-    { id: '1-3', dealer: 'Dealer A', model: 'Model 3 Standard', variant: 'RWD Black', qty: 7, status: 'In Stock', daysInStock: 12 },
-    { id: '2-3', dealer: 'Dealer B', model: 'Model Y Long Range', variant: 'AWD Blue', qty: 6, status: 'In Stock', daysInStock: 30 },
-    { id: '3-2', dealer: 'Dealer C', model: 'Model 3 Performance', variant: 'AWD Silver', qty: 3, status: 'In Stock', daysInStock: 18 },
-  ])
+  const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
 
   // Fetch inventory from API
@@ -59,7 +50,8 @@ const Inventory = () => {
         }
       )
 
-      if (response.data && response.data.success) {
+      // Backend trả về {status: 'success', message: 'success', data: Array}
+      if (response.data && response.data.status === 'success' && response.data.data) {
         // Transform backend data to frontend format
         const inventoryList = []
         const backendData = response.data.data || []
@@ -69,13 +61,16 @@ const Inventory = () => {
             inventory.list.forEach((model) => {
               if (model.lists && Array.isArray(model.lists)) {
                 model.lists.forEach((variant) => {
-                  if (variant.quantity > 0) {
+                  // Quantity từ InventoryDTO, không phải từ variant
+                  // Variant name là versionName trong backend
+                  const qty = parseInt(inventory.quantity) || 0
+                  if (qty > 0) {
                     inventoryList.push({
                       id: `${model.modelId}-${variant.variantId}`,
-                      dealer: inventory.dealerName || 'N/A',
+                      dealer: 'All Dealers', // InventoryDTO không có dealerName
                       model: model.modelName || 'N/A',
-                      variant: variant.variantName || 'N/A',
-                      qty: variant.quantity || 0,
+                      variant: `${variant.versionName || ''} ${variant.color || ''}`.trim() || 'N/A',
+                      qty: qty,
                       status: variant.isActive ? 'In Stock' : 'Out of Stock',
                       daysInStock: variant.daysInStock || 0
                     })
@@ -87,6 +82,8 @@ const Inventory = () => {
         })
         
         setRows(inventoryList)
+      } else {
+        console.log('Response not successful or no data:', response.data)
       }
     } catch (error) {
       console.error('Error fetching inventory:', error)
@@ -117,9 +114,9 @@ const Inventory = () => {
     }
   }, [])
 
-  // useEffect(() => {
-  //   fetchInventory()
-  // }, [fetchInventory])
+  useEffect(() => {
+    fetchInventory()
+  }, [fetchInventory])
 
   const [allocOpen, setAllocOpen] = useState(false)
   const [adjustOpen, setAdjustOpen] = useState(false)

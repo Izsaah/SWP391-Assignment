@@ -20,11 +20,7 @@ const SalesReport = () => {
   const [region, setRegion] = useState('All')
   const [period, setPeriod] = useState('Q4')
 
-  const rows = useMemo(() => ([
-    { dealer: 'Dealer A', region: 'North', sales: 38 },
-    { dealer: 'Dealer B', region: 'South', sales: 27 },
-    { dealer: 'Dealer C', region: 'North', sales: 18 }
-  ]), [])
+  const rows = useMemo(() => [], [])
 
   const filtered = useMemo(() => rows.filter(r => region === 'All' || r.region === region), [rows, region])
   const max = useMemo(() => Math.max(...filtered.map(r => r.sales), 1), [filtered])

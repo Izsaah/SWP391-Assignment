@@ -18,13 +18,7 @@ const Contracts = () => {
   const [editing, setEditing] = useState(null)
   const [viewingContract, setViewingContract] = useState(null)
   const [form, setForm] = useState({ debt: 0 })
-  const [rows, setRows] = useState([
-    { id: 'C-1', dealer: 'Dealer A', target: 50, achieved: 45, debt: 920000000, status: 'Active' },
-    { id: 'C-2', dealer: 'Dealer B', target: 60, achieved: 52, debt: 1200000000, status: 'Active' },
-    { id: 'C-3', dealer: 'Dealer C', target: 40, achieved: 38, debt: 750000000, status: 'Active' },
-    { id: 'C-4', dealer: 'Dealer A', target: 30, achieved: 25, debt: 580000000, status: 'Active' },
-    { id: 'C-5', dealer: 'Dealer B', target: 45, achieved: 40, debt: 980000000, status: 'Active' },
-  ])
+  const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
 
   // Fetch contracts from API
@@ -32,15 +26,25 @@ const Contracts = () => {
     setLoading(true)
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.get(`${API_URL}/evm/contracts`, {
+      const response = await axios.post(`${API_URL}/EVM/dealerSaleRecords`, {}, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       })
 
-      if (response.data && response.data.success) {
-        setRows(response.data.data || [])
+      // Backend trả về {status: 'success', message: 'success', data: Array}
+      if (response.data && response.data.status === 'success' && response.data.data) {
+        // Transform backend data to frontend format
+        const contracts = (response.data.data || []).map(record => ({
+          id: `C-${record.dealerId || record.id}`,
+          dealer: record.dealerName || `Dealer ${record.dealerId || 'A'}`,
+          target: record.target || 0,
+          achieved: record.achieved || record.sales || 0,
+          debt: record.debt || 0,
+          status: 'Active'
+        }))
+        setRows(contracts)
       }
     } catch (error) {
       console.error('Error fetching contracts:', error)
@@ -50,9 +54,9 @@ const Contracts = () => {
     }
   }, [])
 
-  // useEffect(() => {
-  //   fetchContracts()
-  // }, [fetchContracts])
+  useEffect(() => {
+    fetchContracts()
+  }, [fetchContracts])
 
   const filtered = useMemo(() => rows.filter(c =>
     (dealer === 'All' || c.dealer === dealer) &&
@@ -237,7 +241,7 @@ const Contracts = () => {
           try {
             const token = localStorage.getItem('token')
             await axios.post(
-              `${API_URL}/evm/contracts/${editing.id}/debt`,
+              `${API_URL}/EVM/contracts/${editing.id}/debt`,
               { debt: parseInt(form.debt, 10) },
               {
                 headers: {

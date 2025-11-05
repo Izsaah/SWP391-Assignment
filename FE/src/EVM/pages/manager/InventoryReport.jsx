@@ -5,11 +5,7 @@ const InventoryReport = () => {
   const [model, setModel] = useState('All')
   const [period, setPeriod] = useState('Last 30 days')
 
-  const [rows, setRows] = useState([
-    { model: 'Model 3', stock: 60, sold: 45 },
-    { model: 'Model S', stock: 25, sold: 10 },
-    { model: 'E-Urban', stock: 15, sold: 12 }
-  ])
+  const [rows, setRows] = useState([])
 
   const filtered = useMemo(() => rows.filter(r => model === 'All' || r.model === model), [rows, model])
 

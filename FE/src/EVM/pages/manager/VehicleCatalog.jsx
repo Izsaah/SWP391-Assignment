@@ -78,14 +78,7 @@ export default VehicleCatalog
 
 // Models Section (inlined from VehicleModels)
 const ModelsSection = () => {
-  const [rows, setRows] = useState([
-    { id: 1, name: 'Model 3 Standard', description: 'Entry-level sedan with excellent range', brand: 'EVM', year: 2025, variants: 3, active: true },
-    { id: 2, name: 'Model Y Long Range', description: 'SUV with extended battery life', brand: 'EVM', year: 2025, variants: 4, active: true },
-    { id: 3, name: 'Model 3 Performance', description: 'High-performance sports sedan', brand: 'EVM', year: 2025, variants: 2, active: true },
-    { id: 4, name: 'Model S Premium', description: 'Luxury sedan with premium features', brand: 'EVM', year: 2025, variants: 5, active: true },
-    { id: 5, name: 'Model X SUV', description: 'Full-size electric SUV', brand: 'EVM', year: 2025, variants: 3, active: false },
-    { id: 6, name: 'Model 2 Compact', description: 'Compact city car', brand: 'EVM', year: 2025, variants: 2, active: true },
-  ])
+  const [rows, setRows] = useState([])
   const [query, setQuery] = useState('')
   const [brand, setBrand] = useState('All')
   const [sortKey, setSortKey] = useState('name')
@@ -105,7 +98,7 @@ const ModelsSection = () => {
     setLoading(true)
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.get(`${API_URL}/evm/models`, {
+      const response = await axios.post(`${API_URL}/EVM/viewVehicleForEVM`, {}, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -113,8 +106,19 @@ const ModelsSection = () => {
         }
       })
 
-      if (response.data && response.data.success) {
-        setRows(response.data.data || [])
+      // Backend trả về {status: 'success', message: 'success', data: Array}
+      if (response.data && response.data.status === 'success' && response.data.data) {
+        // Transform backend data to frontend format
+        const models = (response.data.data || []).map(model => ({
+          id: model.modelId,
+          name: model.modelName,
+          description: model.description,
+          brand: 'EVM',
+          year: 2025,
+          variants: model.lists ? model.lists.length : 0,
+          active: model.isActive
+        }))
+        setRows(models)
       }
     } catch (error) {
       console.error('Error fetching models:', error)
@@ -124,9 +128,9 @@ const ModelsSection = () => {
     }
   }, [])
 
-  // useEffect(() => {
-  //   fetchModels()
-  // }, [fetchModels])
+  useEffect(() => {
+    fetchModels()
+  }, [fetchModels])
 
 
   const filtered = useMemo(() => rows.filter(m =>
@@ -333,18 +337,7 @@ const ModelsSection = () => {
 
 // Variants Section (inlined from VehicleVariants)
 const VariantsSection = () => {
-  const [rows, setRows] = useState([
-    { id: 1, modelId: 1, model: 'Model 3 Standard', version: 'RWD', color: 'White', price: 920000000, active: true },
-    { id: 2, modelId: 1, model: 'Model 3 Standard', version: 'RWD', color: 'Blue', price: 940000000, active: true },
-    { id: 3, modelId: 1, model: 'Model 3 Standard', version: 'RWD', color: 'Black', price: 950000000, active: true },
-    { id: 4, modelId: 2, model: 'Model Y Long Range', version: 'AWD', color: 'Red', price: 1200000000, active: true },
-    { id: 5, modelId: 2, model: 'Model Y Long Range', version: 'AWD', color: 'White', price: 1220000000, active: true },
-    { id: 6, modelId: 2, model: 'Model Y Long Range', version: 'AWD', color: 'Blue', price: 1230000000, active: true },
-    { id: 7, modelId: 3, model: 'Model 3 Performance', version: 'AWD', color: 'Black', price: 1250000000, active: true },
-    { id: 8, modelId: 3, model: 'Model 3 Performance', version: 'AWD', color: 'Silver', price: 1270000000, active: true },
-    { id: 9, modelId: 4, model: 'Model S Premium', version: 'Plaid', color: 'White', price: 2500000000, active: true },
-    { id: 10, modelId: 4, model: 'Model S Premium', version: 'Plaid', color: 'Black', price: 2520000000, active: true },
-  ])
+  const [rows, setRows] = useState([])
   const [query, setQuery] = useState('')
   const [color, setColor] = useState('All')
   const [page, setPage] = useState(1)
@@ -363,7 +356,8 @@ const VariantsSection = () => {
     setLoading(true)
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.get(`${API_URL}/evm/variants`, {
+      // Get all variants (model_id = 0 means all)
+      const response = await axios.post(`${API_URL}/EVM/viewVehicleVariant`, { model_id: 0 }, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -371,8 +365,19 @@ const VariantsSection = () => {
         }
       })
 
-      if (response.data && response.data.success) {
-        setRows(response.data.data || [])
+      // Backend trả về {status: 'success', message: 'success', data: Array}
+      if (response.data && response.data.status === 'success' && response.data.data) {
+        // Transform backend data to frontend format
+        const variants = (response.data.data || []).map(variant => ({
+          id: variant.variantId,
+          modelId: variant.modelId,
+          model: 'N/A', // Will need to fetch model name separately or include in response
+          version: variant.versionName,
+          color: variant.color,
+          price: variant.price,
+          active: variant.isActive
+        }))
+        setRows(variants)
       }
     } catch (error) {
       console.error('Error fetching variants:', error)
@@ -382,9 +387,9 @@ const VariantsSection = () => {
     }
   }, [])
 
-  // useEffect(() => {
-  //   fetchVariants()
-  // }, [fetchVariants])
+  useEffect(() => {
+    fetchVariants()
+  }, [fetchVariants])
 
   const filtered = useMemo(() => rows.filter(v =>
     (!query || `${v.model} ${v.version}`.toLowerCase().includes(query.toLowerCase())) &&

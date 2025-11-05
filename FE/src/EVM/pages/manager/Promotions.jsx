@@ -7,16 +7,7 @@ import ConfirmModal from '../../components/ConfirmModal'
 const API_URL = import.meta.env.VITE_API_URL
 
 const Promotions = () => {
-  const [rows, setRows] = useState([
-    { id: 1, dealer: 'Dealer A', name: 'Summer Sale 2025', type: 'Discount', value: '10%', from: '2025-06-01', to: '2025-08-31', active: true },
-    { id: 2, dealer: 'Dealer B', name: 'New Year Promotion', type: 'Discount', value: '15%', from: '2025-01-01', to: '2025-01-31', active: true },
-    { id: 3, dealer: 'Dealer A', name: 'Early Bird Special', type: 'Discount', value: '8%', from: '2025-03-01', to: '2025-03-31', active: true },
-    { id: 4, dealer: 'Dealer C', name: 'Holiday Bonus', type: 'Discount', value: '12%', from: '2025-12-01', to: '2025-12-31', active: false },
-    { id: 5, dealer: 'Dealer B', name: 'Flash Sale', type: 'Discount', value: '20%', from: '2025-11-01', to: '2025-11-05', active: true },
-    { id: 6, dealer: 'Dealer A', name: 'Clearance Event', type: 'Discount', value: '25%', from: '2025-09-01', to: '2025-09-30', active: true },
-    { id: 7, dealer: 'Dealer C', name: 'Member Exclusive', type: 'Discount', value: '5%', from: '2025-04-01', to: '2025-04-30', active: true },
-    { id: 8, dealer: 'Dealer B', name: 'Spring Sale', type: 'Discount', value: '18%', from: '2025-05-01', to: '2025-05-31', active: true },
-  ])
+  const [rows, setRows] = useState([])
   const [dealer, setDealer] = useState('All')
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState('dealer')
@@ -36,15 +27,27 @@ const Promotions = () => {
     setLoading(true)
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.get(`${API_URL}/evm/promotions`, {
+      const response = await axios.post(`${API_URL}/EVM/viewPromotionDealerCount`, {}, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       })
 
-      if (response.data && response.data.success) {
-        setRows(response.data.data || [])
+      // Backend trả về {status: 'success', message: 'success', data: Array}
+      if (response.data && response.data.status === 'success' && response.data.data) {
+        // Transform backend data to frontend format
+        const promotions = (response.data.data || []).map(promo => ({
+          id: promo.promoId || promo.id,
+          dealer: promo.dealerName || 'All Dealers',
+          name: promo.description || promo.promoName || 'Promotion',
+          type: promo.type || 'Discount',
+          value: promo.discountRate ? `${promo.discountRate}%` : '0%',
+          from: promo.startDate || '',
+          to: promo.endDate || '',
+          active: promo.isActive !== undefined ? promo.isActive : true
+        }))
+        setRows(promotions)
       }
     } catch (error) {
       console.error('Error fetching promotions:', error)
@@ -54,9 +57,9 @@ const Promotions = () => {
     }
   }, [])
 
-  // useEffect(() => {
-  //   fetchPromotions()
-  // }, [fetchPromotions])
+  useEffect(() => {
+    fetchPromotions()
+  }, [fetchPromotions])
 
   const filtered = useMemo(() => rows.filter(p =>
     (dealer === 'All' || p.dealer === dealer) &&
@@ -88,7 +91,7 @@ const Promotions = () => {
     try {
       const token = localStorage.getItem('token')
       await axios.post(
-        `${API_URL}/evm/promotions/${disablingPromotion.id}`,
+        `${API_URL}/EVM/promotions/${disablingPromotion.id}`,
         { active: false },
         {
           headers: {
@@ -284,7 +287,7 @@ const Promotions = () => {
             const token = localStorage.getItem('token')
             const valueWithoutPercent = form.value.replace('%', '')
             const response = await axios.post(
-              `${API_URL}/evm/promotions`,
+              `${API_URL}/EVM/promotions`,
               {
                 name: form.name,
                 type: form.type,
@@ -350,7 +353,7 @@ const Promotions = () => {
             const token = localStorage.getItem('token')
             const valueWithoutPercent = form.value.replace('%', '')
             const response = await axios.post(
-              `${API_URL}/evm/promotions`,
+              `${API_URL}/EVM/promotions`,
               {
                 id: editing.id,
                 name: form.name,

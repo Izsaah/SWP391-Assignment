@@ -8,8 +8,10 @@ import java.util.ArrayList;
 import java.util.List;
 import model.dao.InventoryDAO;
 import model.dao.VehicleModelDAO;
+import model.dao.VehicleVariantDAO;
 import model.dto.InventoryDTO;
 import model.dto.VehicleModelDTO;
+import model.dto.VehicleVariantDTO;
 
 /**
  *
@@ -19,13 +21,23 @@ public class ViewInventoryService {
 
     private VehicleModelDAO modelDAO = new VehicleModelDAO();
     private InventoryDAO inventoryDAO = new InventoryDAO();
+    private VehicleVariantDAO variantDAO = new VehicleVariantDAO();
 
     public List<InventoryDTO> handleViewAllInventory() {
         List<InventoryDTO> inventories = inventoryDAO.viewAllInventory();
         if (inventories != null) {
             for (InventoryDTO inventory : inventories) {
-                List<VehicleModelDTO> model = modelDAO.viewVehicleModelById(inventory.getModelId());
-                inventory.setList(model);
+                List<VehicleModelDTO> models = modelDAO.viewVehicleModelById(inventory.getModelId());
+                if (models != null) {
+                    // Populate variants for each model
+                    for (VehicleModelDTO model : models) {
+                        List<VehicleVariantDTO> variants = variantDAO.viewVehicleVariantIsActive(model.getModelId());
+                        if (variants != null) {
+                            model.setLists(variants);
+                        }
+                    }
+                }
+                inventory.setList(models);
             }
         }
         return inventories;
