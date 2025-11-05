@@ -22,7 +22,27 @@ export default function LoginPage() {
         try {
           const res = await login(email, password);
           if (res.success) {
-            navigate('/dashboard');
+            // Lấy user từ response hoặc từ localStorage
+            const user = res.user || JSON.parse(localStorage.getItem('user') || '{}');
+            const userRoles = user.roles || [];
+            
+            // Kiểm tra role để redirect đúng dashboard
+            // Roles có thể là array of objects {roleId, roleName} hoặc array of strings
+            const roleNames = userRoles.map(role => {
+              if (typeof role === 'string') return role.toUpperCase();
+              return (role.roleName || role.role_name || '').toUpperCase();
+            }).filter(r => r); // Remove empty strings
+            
+            console.log('User roles:', roleNames);
+            console.log('User object:', user);
+            
+            // Nếu có role EVM hoặc ADMIN → redirect đến EVM dashboard
+            if (roleNames.includes('EVM') || roleNames.includes('ADMIN')) {
+              navigate('/evm');
+            } else {
+              // Các role khác (STAFF, MANAGER, DEALER_STAFF) → redirect đến Dealer dashboard
+              navigate('/dashboard');
+            }
           } else {
             setError(res.message || 'Login failed. Please check your credentials.');
           }

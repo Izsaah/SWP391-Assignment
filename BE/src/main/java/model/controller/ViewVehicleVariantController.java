@@ -4,7 +4,6 @@
  */
 package model.controller;
 
-import static com.sun.corba.se.spi.presentation.rmi.StubAdapter.request;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;

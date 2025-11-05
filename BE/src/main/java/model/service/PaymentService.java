@@ -202,4 +202,66 @@ public class PaymentService {
         }
         return responseList;
     }
+
+    public List<Map<String, Object>> getCompletedPayments() {
+        List<Map<String, Object>> responseList = new ArrayList<>();
+        try {
+            // Lấy tất cả payments với method = "TT" (trả xong - full payment)
+            List<PaymentDTO> payments = paymentDAO.retrieve("method = ?", "TT");
+
+            if (payments != null && !payments.isEmpty()) {
+                for (PaymentDTO payment : payments) {
+                    try {
+                        // Lấy Order từ payment
+                        OrderDTO order = orderDAO.getById(payment.getOrderId());
+                        if (order == null) {
+                            continue;
+                        }
+                        // Lấy Customer từ order
+                        int customerId = order.getCustomerId();
+                        List<CustomerDTO> customerList = customerDAO.findById(customerId);
+                        if (customerList == null || customerList.isEmpty()) {
+                            continue;
+                        }
+                        CustomerDTO customer = customerList.get(0);
+
+                        // Lấy OrderDetail để có thể lấy vehicle info sau này
+                        OrderDetailDTO orderDetail = orderDetailDAO.getOrderDetailByOrderId(order.getOrderId());
+
+                        // Lấy VehicleModel để có tên xe
+                        String vehicleName = "N/A";
+                        try {
+                            VehicleModelDAO vehicleModelDAO = new VehicleModelDAO();
+                            List<VehicleModelDTO> models = vehicleModelDAO.retrieve("model_id = ?", order.getModelId());
+                            if (models != null && !models.isEmpty()) {
+                                vehicleName = models.get(0).getModelName();
+                            }
+                        } catch (Exception e) {
+                            System.err.println("Error getting vehicle model: " + e.getMessage());
+                        }
+                        // Tạo map response
+                        Map<String, Object> map = new LinkedHashMap<>();
+                        map.put("paymentId", payment.getPaymentId());
+                        map.put("orderId", payment.getOrderId());
+                        map.put("customerId", customer.getCustomerId());
+                        map.put("customerName", customer.getName());
+                        map.put("customerEmail", customer.getEmail());
+                        map.put("phoneNumber", customer.getPhoneNumber());
+                        map.put("amount", payment.getAmount());
+                        map.put("paymentDate", payment.getPaymentDate());
+                        map.put("method", payment.getMethod());
+                        map.put("vehicleName", vehicleName);
+                        map.put("serialId", orderDetail != null ? orderDetail.getSerialId() : "N/A");
+                        responseList.add(map);
+                    } catch (Exception e) {
+                        System.err.println("Error processing payment ID " + payment.getPaymentId() + ": " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return responseList;
+    }
 }

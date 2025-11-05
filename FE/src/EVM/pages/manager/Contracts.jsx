@@ -1,66 +1,10 @@
-import React, { useMemo, useState, useCallback } from 'react'
+import React, { useMemo, useState, useCallback, useEffect } from 'react'
 import { Edit2, Eye, ChevronLeft, ChevronDown } from 'lucide-react'
+import axios from 'axios'
 import Modal from '../../components/Modal'
 import ContractViewModal from '../../components/ContractViewModal'
 
-// Inline API base and helpers
-const API_BASE = (typeof import.meta !== 'undefined' ? (import.meta.env?.VITE_EVM_API || import.meta.env?.VITE_API_URL) : undefined)
-  || (typeof process !== 'undefined' ? (process.env?.REACT_APP_EVM_API || process.env?.REACT_APP_API_URL) : undefined)
-  || ''
-const apiGet = async (path) => {
-  const url = `${API_BASE}${path}`
-  if (!API_BASE) {
-    console.error(`[EVM] API_BASE is not set! Please set VITE_EVM_API or VITE_API_URL in .env file. Attempted to fetch: ${path}`)
-    return []
-  }
-  try {
-    const res = await fetch(url, { credentials: 'include' })
-    if (!res.ok) {
-      console.error(`[EVM] API Error: ${res.status} ${res.statusText} for ${url}`)
-      return []
-    }
-    const contentType = res.headers.get('content-type')
-    if (contentType && contentType.includes('application/json')) {
-      return await res.json()
-    } else {
-      console.error(`[EVM] Expected JSON but got ${contentType} for ${url}`)
-      return []
-    }
-  } catch (error) {
-    console.error(`[EVM] Failed to fetch ${url}:`, error)
-    return []
-  }
-}
-const apiSend = async (path, method, body) => {
-  const url = `${API_BASE}${path}`
-  if (!API_BASE) {
-    console.error(`[EVM] API_BASE is not set! Please set VITE_EVM_API or VITE_API_URL in .env file. Attempted to send ${method} to: ${path}`)
-    throw new Error('API_BASE is not configured')
-  }
-  try {
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: body != null ? JSON.stringify(body) : undefined,
-    })
-    if (!res.ok) {
-      console.error(`[EVM] API Error: ${res.status} ${res.statusText} for ${url}`)
-      const text = await res.text()
-      throw new Error(`API call failed: ${res.status} - ${text.substring(0, 100)}`)
-    }
-    const contentType = res.headers.get('content-type')
-    if (contentType && contentType.includes('application/json')) {
-      return await res.json()
-    } else {
-      // For some endpoints, empty response is OK
-      return {}
-    }
-  } catch (error) {
-    console.error(`[EVM] Failed to send ${method} ${url}:`, error)
-    throw error
-  }
-}
+const API_URL = import.meta.env.VITE_API_URL
 
 const Contracts = () => {
   const [dealer, setDealer] = useState('All')
@@ -74,19 +18,34 @@ const Contracts = () => {
   const [editing, setEditing] = useState(null)
   const [viewingContract, setViewingContract] = useState(null)
   const [form, setForm] = useState({ debt: 0 })
-
   const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
 
   // Fetch contracts from API
-  const fetchContracts = React.useCallback(async () => {
-    const data = await apiGet('/evm/contracts')
-    setRows(Array.isArray(data) ? data : [])
+  const fetchContracts = useCallback(async () => {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await axios.get(`${API_URL}/evm/contracts`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.data && response.data.success) {
+        setRows(response.data.data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching contracts:', error)
+      alert(error.response?.data?.message || 'Failed to fetch contracts')
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  React.useEffect(() => {
-    let cancelled = false
-    ;(async () => { if (!cancelled) await fetchContracts() })()
-    return () => { cancelled = true }
+  useEffect(() => {
+    fetchContracts()
   }, [fetchContracts])
 
   const filtered = useMemo(() => rows.filter(c =>
@@ -175,7 +134,20 @@ const Contracts = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {paged.map(c => (
+              {loading ? (
+                <tr>
+                  <td colSpan="7" className="px-6 py-4 text-center text-sm text-gray-500">
+                    Loading...
+                  </td>
+                </tr>
+              ) : paged.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="px-6 py-4 text-center text-sm text-gray-500">
+                    No contracts found
+                  </td>
+                </tr>
+              ) : (
+                paged.map(c => (
                 <tr key={c.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{c.id}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{c.dealer}</td>
@@ -216,7 +188,8 @@ const Contracts = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+              )}
             </tbody>
           </table>
         </div>
@@ -250,7 +223,31 @@ const Contracts = () => {
       <ContractViewModal open={showViewModal} contract={viewingContract} onClose={() => { setShowViewModal(false); setViewingContract(null) }} />
 
       {/* Edit Modal */}
-      <Modal title={`Edit Contract ${editing?.id || ''}`} open={showEdit} onClose={() => setShowEdit(false)} onSubmit={async () => { await apiSend(`/evm/contracts/${editing.id}/debt`, 'PATCH', { debt: parseInt(form.debt, 10) }); await fetchContracts(); setShowEdit(false) }}>
+      <Modal 
+        title={`Edit Contract ${editing?.id || ''}`} 
+        open={showEdit} 
+        onClose={() => setShowEdit(false)} 
+        onSubmit={async () => {
+          try {
+            const token = localStorage.getItem('token')
+            await axios.post(
+              `${API_URL}/evm/contracts/${editing.id}/debt`,
+              { debt: parseInt(form.debt, 10) },
+              {
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            )
+            await fetchContracts()
+            setShowEdit(false)
+          } catch (error) {
+            console.error('Error updating contract debt:', error)
+            alert(error.response?.data?.message || 'Failed to update contract debt')
+          }
+        }}
+      >
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Debt</label>

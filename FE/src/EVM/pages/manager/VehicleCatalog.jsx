@@ -1,72 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { Car, Palette, Plus, Search, Edit2, Trash2, Power, PowerOff, ChevronLeft, ChevronDown } from 'lucide-react'
+import axios from 'axios'
 import Modal from '../../components/Modal'
 import ConfirmModal from '../../components/ConfirmModal'
 
-// Inline API base and helpers
-const API_BASE = (typeof import.meta !== 'undefined' ? (import.meta.env?.VITE_EVM_API || import.meta.env?.VITE_API_URL) : undefined)
-  || (typeof process !== 'undefined' ? (process.env?.REACT_APP_EVM_API || process.env?.REACT_APP_API_URL) : undefined)
-  || ''
-// Debug: Log API_BASE on load
-if (typeof window !== 'undefined' && !window._API_BASE_LOGGED) {
-  console.log('[EVM] API_BASE:', API_BASE || '(empty - check .env file)')
-  window._API_BASE_LOGGED = true
-}
-const apiGet = async (path) => {
-  const url = `${API_BASE}${path}`
-  if (!API_BASE) {
-    console.error(`[EVM] API_BASE is not set! Please set VITE_EVM_API or VITE_API_URL in .env file. Attempted to fetch: ${path}`)
-    return []
-  }
-  try {
-    const res = await fetch(url, { credentials: 'include' })
-    if (!res.ok) {
-      console.error(`[EVM] API Error: ${res.status} ${res.statusText} for ${url}`)
-      return []
-    }
-    const contentType = res.headers.get('content-type')
-    if (contentType && contentType.includes('application/json')) {
-      return await res.json()
-    } else {
-      console.error(`[EVM] Expected JSON but got ${contentType} for ${url}`)
-      return []
-    }
-  } catch (error) {
-    console.error(`[EVM] Failed to fetch ${url}:`, error)
-    return []
-  }
-}
-const apiSend = async (path, method, body) => {
-  const url = `${API_BASE}${path}`
-  if (!API_BASE) {
-    console.error(`[EVM] API_BASE is not set! Please set VITE_EVM_API or VITE_API_URL in .env file. Attempted to send ${method} to: ${path}`)
-    throw new Error('API_BASE is not configured')
-  }
-  try {
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: body != null ? JSON.stringify(body) : undefined,
-    })
-    if (!res.ok) {
-      console.error(`[EVM] API Error: ${res.status} ${res.statusText} for ${url}`)
-      const text = await res.text()
-      throw new Error(`API call failed: ${res.status} - ${text.substring(0, 100)}`)
-    }
-    const contentType = res.headers.get('content-type')
-    if (contentType && contentType.includes('application/json')) {
-      return await res.json()
-    } else {
-      // For some endpoints, empty response is OK
-      return {}
-    }
-  } catch (error) {
-    console.error(`[EVM] Failed to send ${method} ${url}:`, error)
-    throw error
-  }
-}
+const API_URL = import.meta.env.VITE_API_URL
 
 const VehicleCatalog = () => {
   const location = useLocation()
@@ -152,17 +91,36 @@ const ModelsSection = () => {
   const [form, setForm] = useState({ name: '', brand: 'EVM', year: 2025 })
   const [editing, setEditing] = useState(null)
   const [deletingModel, setDeletingModel] = useState(null)
+  const [loading, setLoading] = useState(false)
 
-  // Load models from API
-  const fetchModels = React.useCallback(async () => {
-    const data = await apiGet('/evm/models')
-    setRows(Array.isArray(data) ? data : [])
+  // Fetch models from API
+  const fetchModels = useCallback(async () => {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await axios.get(`${API_URL}/evm/models`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        }
+      })
+
+      if (response.data && response.data.success) {
+        setRows(response.data.data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching models:', error)
+      alert(error.response?.data?.message || 'Failed to fetch models')
+    } finally {
+      setLoading(false)
+    }
   }, [])
-  React.useEffect(() => {
-    let cancelled = false
-    ;(async () => { if (!cancelled) await fetchModels() })()
-    return () => { cancelled = true }
+
+  useEffect(() => {
+    fetchModels()
   }, [fetchModels])
+
 
   const filtered = useMemo(() => rows.filter(m =>
     (brand === 'All' || m.brand === brand) &&
@@ -188,10 +146,9 @@ const ModelsSection = () => {
   const handleAdd = () => { setForm({ name: '', brand: 'EVM', year: 2025 }); setShowAdd(true) }
   const handleEdit = (row) => { setEditing(row); setForm({ name: row.name, brand: row.brand, year: row.year }); setShowEdit(true) }
   const handleDelete = (row) => { setDeletingModel(row); setShowDeleteModal(true) }
-  const confirmDelete = async () => {
+  const confirmDelete = () => {
     if (!deletingModel) return
-    await apiSend(`/evm/models/${deletingModel.id}`, 'DELETE')
-    await fetchModels()
+    setRows(prev => prev.filter(m => m.id !== deletingModel.id))
     setShowDeleteModal(false)
     setDeletingModel(null)
   }
@@ -249,7 +206,20 @@ const ModelsSection = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {paged.map(row => (
+              {loading ? (
+                <tr>
+                  <td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">
+                    Loading...
+                  </td>
+                </tr>
+              ) : paged.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">
+                    No models found
+                  </td>
+                </tr>
+              ) : (
+                paged.map(row => (
                 <tr key={row.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.id}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -280,7 +250,8 @@ const ModelsSection = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+              )}
             </tbody>
           </table>
         </div>
@@ -300,7 +271,7 @@ const ModelsSection = () => {
         </div>
       </div>
 
-      <Modal title="Add Model" open={showAdd} onClose={() => setShowAdd(false)} onSubmit={async () => { await apiSend('/evm/models', 'POST', { name: form.name, brand: form.brand, year: parseInt(form.year, 10) }); await fetchModels(); setShowAdd(false) }}>
+      <Modal title="Add Model" open={showAdd} onClose={() => setShowAdd(false)} onSubmit={() => { setRows(prev => [...prev, { id: `M-${Date.now()}`, name: form.name, brand: form.brand, year: parseInt(form.year, 10), variants: 0, active: true, description: '' }]); setShowAdd(false) }}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Model Name <span className="text-red-500">*</span></label>
@@ -317,7 +288,7 @@ const ModelsSection = () => {
         </div>
       </Modal>
 
-      <Modal title={`Edit Model #${editing?.id || ''}`} open={showEdit} onClose={() => setShowEdit(false)} onSubmit={async () => { await apiSend(`/evm/models/${editing.id}`, 'PUT', { name: form.name, brand: form.brand, year: parseInt(form.year, 10) }); await fetchModels(); setShowEdit(false) }}>
+      <Modal title={`Edit Model #${editing?.id || ''}`} open={showEdit} onClose={() => setShowEdit(false)} onSubmit={() => { setRows(prev => prev.map(m => m.id === editing.id ? { ...m, name: form.name, brand: form.brand, year: parseInt(form.year, 10) } : m)); setShowEdit(false) }}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Model Name <span className="text-red-500">*</span></label>
@@ -367,15 +338,34 @@ const VariantsSection = () => {
   const [editing, setEditing] = useState(null)
   const [deletingVariant, setDeletingVariant] = useState(null)
 
+  const [loading, setLoading] = useState(false)
+
   // Load variants from API
-  const fetchVariants = React.useCallback(async () => {
-    const data = await apiGet('/evm/variants')
-    setRows(Array.isArray(data) ? data : [])
+  const fetchVariants = useCallback(async () => {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await axios.get(`${API_URL}/evm/variants`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        }
+      })
+
+      if (response.data && response.data.success) {
+        setRows(response.data.data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching variants:', error)
+      alert(error.response?.data?.message || 'Failed to fetch variants')
+    } finally {
+      setLoading(false)
+    }
   }, [])
-  React.useEffect(() => {
-    let cancelled = false
-    ;(async () => { if (!cancelled) await fetchVariants() })()
-    return () => { cancelled = true }
+
+  useEffect(() => {
+    fetchVariants()
   }, [fetchVariants])
 
   const filtered = useMemo(() => rows.filter(v =>
@@ -388,10 +378,9 @@ const VariantsSection = () => {
   const handleAdd = () => { setForm({ modelId: 1, version: '', color: 'White', price: 30000 }); setShowAdd(true) }
   const handleEdit = (row) => { setEditing(row); setForm({ modelId: row.modelId, version: row.version, color: row.color, price: row.price }); setShowEdit(true) }
   const handleDelete = (row) => { setDeletingVariant(row); setShowDeleteModal(true) }
-  const confirmDelete = async () => {
+  const confirmDelete = () => {
     if (!deletingVariant) return
-    await apiSend(`/evm/variants/${deletingVariant.id}`, 'DELETE')
-    await fetchVariants()
+    setRows(prev => prev.filter(v => v.id !== deletingVariant.id))
     setShowDeleteModal(false)
     setDeletingVariant(null)
   }
@@ -441,7 +430,20 @@ const VariantsSection = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {paged.map(v => (
+              {loading ? (
+                <tr>
+                  <td colSpan="7" className="px-6 py-4 text-center text-sm text-gray-500">
+                    Loading...
+                  </td>
+                </tr>
+              ) : paged.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="px-6 py-4 text-center text-sm text-gray-500">
+                    No variants found
+                  </td>
+                </tr>
+              ) : (
+                paged.map(v => (
                 <tr key={v.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.id}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{v.model}</td>
@@ -470,7 +472,8 @@ const VariantsSection = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+              )}
             </tbody>
           </table>
         </div>
@@ -490,7 +493,7 @@ const VariantsSection = () => {
         </div>
       </div>
 
-      <Modal title="Add Variant" open={showAdd} onClose={() => setShowAdd(false)} onSubmit={async () => { await apiSend('/evm/variants', 'POST', { modelId: parseInt(form.modelId, 10), version: form.version, color: form.color, price: parseInt(form.price, 10) }); await fetchVariants(); setShowAdd(false) }}>
+      <Modal title="Add Variant" open={showAdd} onClose={() => setShowAdd(false)} onSubmit={() => { setRows(prev => [...prev, { id: `V-${Date.now()}`, modelId: parseInt(form.modelId, 10), version: form.version, color: form.color, price: parseInt(form.price, 10), modelName: 'Model', active: true }]); setShowAdd(false) }}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Model ID <span className="text-red-500">*</span></label>
@@ -511,7 +514,7 @@ const VariantsSection = () => {
         </div>
       </Modal>
 
-      <Modal title={`Edit Variant #${editing?.id || ''}`} open={showEdit} onClose={() => setShowEdit(false)} onSubmit={async () => { await apiSend(`/evm/variants/${editing.id}`, 'PUT', { modelId: parseInt(form.modelId, 10), version: form.version, color: form.color, price: parseInt(form.price, 10) }); await fetchVariants(); setShowEdit(false) }}>
+      <Modal title={`Edit Variant #${editing?.id || ''}`} open={showEdit} onClose={() => setShowEdit(false)} onSubmit={() => { setRows(prev => prev.map(v => v.id === editing.id ? { ...v, modelId: parseInt(form.modelId, 10), version: form.version, color: form.color, price: parseInt(form.price, 10) } : v)); setShowEdit(false) }}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Model ID <span className="text-red-500">*</span></label>

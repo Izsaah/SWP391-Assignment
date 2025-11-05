@@ -1,65 +1,9 @@
-import React, { useMemo, useState, useCallback } from 'react'
+import React, { useMemo, useState, useCallback, useEffect } from 'react'
 import { RefreshCw, Download, TrendingUp, Package, Building2, BarChart3, AlertTriangle, Clock } from 'lucide-react'
+import axios from 'axios'
 import Modal from '../../components/Modal'
 
-// Inline API base and helpers for EVM
-const API_BASE = (typeof import.meta !== 'undefined' ? (import.meta.env?.VITE_EVM_API || import.meta.env?.VITE_API_URL) : undefined)
-  || (typeof process !== 'undefined' ? (process.env?.REACT_APP_EVM_API || process.env?.REACT_APP_API_URL) : undefined)
-  || ''
-const apiGet = async (path) => {
-  const url = `${API_BASE}${path}`
-  if (!API_BASE) {
-    console.error(`[EVM] API_BASE is not set! Please set VITE_EVM_API or VITE_API_URL in .env file. Attempted to fetch: ${path}`)
-    return []
-  }
-  try {
-    const res = await fetch(url, { credentials: 'include' })
-    if (!res.ok) {
-      console.error(`[EVM] API Error: ${res.status} ${res.statusText} for ${url}`)
-      return []
-    }
-    const contentType = res.headers.get('content-type')
-    if (contentType && contentType.includes('application/json')) {
-      return await res.json()
-    } else {
-      console.error(`[EVM] Expected JSON but got ${contentType} for ${url}`)
-      return []
-    }
-  } catch (error) {
-    console.error(`[EVM] Failed to fetch ${url}:`, error)
-    return []
-  }
-}
-const apiSend = async (path, method, body) => {
-  const url = `${API_BASE}${path}`
-  if (!API_BASE) {
-    console.error(`[EVM] API_BASE is not set! Please set VITE_EVM_API or VITE_API_URL in .env file. Attempted to send ${method} to: ${path}`)
-    throw new Error('API_BASE is not configured')
-  }
-  try {
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: body != null ? JSON.stringify(body) : undefined,
-    })
-    if (!res.ok) {
-      console.error(`[EVM] API Error: ${res.status} ${res.statusText} for ${url}`)
-      const text = await res.text()
-      throw new Error(`API call failed: ${res.status} - ${text.substring(0, 100)}`)
-    }
-    const contentType = res.headers.get('content-type')
-    if (contentType && contentType.includes('application/json')) {
-      return await res.json()
-    } else {
-      // For some endpoints, empty response is OK
-      return {}
-    }
-  } catch (error) {
-    console.error(`[EVM] Failed to send ${method} ${url}:`, error)
-    throw error
-  }
-}
+const API_URL = import.meta.env.VITE_API_URL
 
 const Metric = ({ label, value, icon: Icon, iconColor }) => (
   <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
@@ -81,6 +25,92 @@ const Inventory = () => {
   const pageSize = 8
 
   const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  // Fetch inventory from API
+  const fetchInventory = useCallback(async () => {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        alert('No authentication token found. Please login again.')
+        return
+      }
+      
+      console.log('Fetching inventory from:', `${API_URL}/EVM/viewInventory`)
+      const response = await axios.post(
+        `${API_URL}/EVM/viewInventory`,
+        {},
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true'
+          }
+        }
+      )
+
+      if (response.data && response.data.success) {
+        // Transform backend data to frontend format
+        const inventoryList = []
+        const backendData = response.data.data || []
+        
+        backendData.forEach((inventory) => {
+          if (inventory.list && Array.isArray(inventory.list)) {
+            inventory.list.forEach((model) => {
+              if (model.lists && Array.isArray(model.lists)) {
+                model.lists.forEach((variant) => {
+                  if (variant.quantity > 0) {
+                    inventoryList.push({
+                      id: `${model.modelId}-${variant.variantId}`,
+                      dealer: inventory.dealerName || 'N/A',
+                      model: model.modelName || 'N/A',
+                      variant: variant.variantName || 'N/A',
+                      qty: variant.quantity || 0,
+                      status: variant.isActive ? 'In Stock' : 'Out of Stock',
+                      daysInStock: variant.daysInStock || 0
+                    })
+                  }
+                })
+              }
+            })
+          }
+        })
+        
+        setRows(inventoryList)
+      }
+    } catch (error) {
+      console.error('Error fetching inventory:', error)
+      console.error('Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: `${API_URL}/EVM/viewInventory`,
+        message: error.message
+      })
+      
+      let errorMessage = 'Failed to fetch inventory'
+      if (error.response?.data) {
+        if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data
+        } else if (error.response.data.message) {
+          errorMessage = error.response.data.message
+        } else if (error.response.data.error) {
+          errorMessage = error.response.data.error
+        }
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      alert(errorMessage)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchInventory()
+  }, [fetchInventory])
 
   const [allocOpen, setAllocOpen] = useState(false)
   const [adjustOpen, setAdjustOpen] = useState(false)
@@ -118,24 +148,13 @@ const Inventory = () => {
     else { setSortKey(key); setSortDir('asc') }
   }
 
-  const fetchInventory = React.useCallback(async () => {
-    const data = await apiGet('/evm/inventory')
-    setRows(Array.isArray(data) ? data : [])
-  }, [])
-
-  React.useEffect(() => {
-    let cancelled = false
-    ;(async () => { if (!cancelled) await fetchInventory() })()
-    return () => { cancelled = true }
-  }, [fetchInventory])
-
   const handleRefresh = useCallback(async () => {
-    await fetchInventory()
     setLastRefreshed(new Date().toLocaleTimeString())
+    await fetchInventory()
   }, [fetchInventory])
 
-  const handleAllocate = useCallback(async (row) => { setSelected(row); setAllocForm({ dealer: 'Dealer B', qty: 1 }); setAllocOpen(true) }, [])
-  const handleAdjust = useCallback(async (row) => { setSelected(row); setAdjustForm({ qty: row.qty }); setAdjustOpen(true) }, [])
+  const handleAllocate = useCallback((row) => { setSelected(row); setAllocForm({ dealer: 'Dealer B', qty: 1 }); setAllocOpen(true) }, [])
+  const handleAdjust = useCallback((row) => { setSelected(row); setAdjustForm({ qty: row.qty }); setAdjustOpen(true) }, [])
 
   const exportCsv = useCallback(() => {
     const header = 'Dealer,Model,Variant,Quantity,Status,DaysInStock\n'
@@ -242,7 +261,20 @@ const Inventory = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {paged.map(r => (
+              {loading ? (
+                <tr>
+                  <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
+                    Loading...
+                  </td>
+                </tr>
+              ) : paged.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
+                    No inventory found
+                  </td>
+                </tr>
+              ) : (
+                paged.map(r => (
                 <tr key={r.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{r.dealer}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{r.model}</td>
@@ -281,7 +313,8 @@ const Inventory = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+              )}
             </tbody>
           </table>
         </div>
@@ -311,7 +344,7 @@ const Inventory = () => {
       </div>
 
       {/* Allocate Modal */}
-      <Modal title={`Allocate from ${selected?.dealer || ''}`} open={allocOpen} onClose={() => setAllocOpen(false)} onSubmit={async () => { try { const qty = parseInt(allocForm.qty, 10); await apiSend('/evm/inventory/allocate', 'POST', { fromId: selected?.id, toDealer: allocForm.dealer, qty }); await fetchInventory(); setAllocOpen(false) } catch (e) { window.alert(e.message || 'Allocation failed') } }}>
+      <Modal title={`Allocate from ${selected?.dealer || ''}`} open={allocOpen} onClose={() => setAllocOpen(false)} onSubmit={() => { setAllocOpen(false) }}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Dealer</label>
@@ -336,7 +369,7 @@ const Inventory = () => {
       </Modal>
 
       {/* Adjust Modal */}
-      <Modal title={`Adjust ${selected?.model || ''} ${selected?.variant || ''}`} open={adjustOpen} onClose={() => setAdjustOpen(false)} onSubmit={async () => { await apiSend(`/evm/inventory/${selected?.id}`, 'PATCH', { qty: Math.max(0, parseInt(adjustForm.qty, 10)) }); await fetchInventory(); setAdjustOpen(false) }}>
+      <Modal title={`Adjust ${selected?.model || ''} ${selected?.variant || ''}`} open={adjustOpen} onClose={() => setAdjustOpen(false)} onSubmit={() => { setRows(prev => prev.map(r => r.id === selected?.id ? { ...r, qty: Math.max(0, parseInt(adjustForm.qty, 10)) } : r)); setAdjustOpen(false) }}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">New Quantity</label>

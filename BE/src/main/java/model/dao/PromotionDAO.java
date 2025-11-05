@@ -47,4 +47,51 @@ public class PromotionDAO {
   public List<PromotionDTO> GetAllPromotion(int id) {
     return retrieve("promo_id = ?", id);
 }
+
+    public PromotionDTO create(String description, String startDate, String endDate, String discountRate, String type) {
+        String sql = "INSERT INTO " + TABLE_NAME + " (description, start_date, end_date, discount_rate, type) VALUES (?, ?, ?, ?, ?)";
+        try (Connection conn = DbUtils.getConnection(); 
+             PreparedStatement ps = conn.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, description);
+            ps.setString(2, startDate);
+            ps.setString(3, endDate);
+            ps.setString(4, discountRate);
+            ps.setString(5, type);
+            
+            int affectedRows = ps.executeUpdate();
+            if (affectedRows > 0) {
+                try (ResultSet rs = ps.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        int promoId = rs.getInt(1);
+                        List<PromotionDTO> list = retrieve("promo_id = ?", promoId);
+                        if (list != null && !list.isEmpty()) {
+                            return list.get(0);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public boolean update(int promoId, String description, String startDate, String endDate, String discountRate, String type) {
+        String sql = "UPDATE " + TABLE_NAME + " SET description = ?, start_date = ?, end_date = ?, discount_rate = ?, type = ? WHERE promo_id = ?";
+        try (Connection conn = DbUtils.getConnection(); 
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, description);
+            ps.setString(2, startDate);
+            ps.setString(3, endDate);
+            ps.setString(4, discountRate);
+            ps.setString(5, type);
+            ps.setInt(6, promoId);
+            
+            int affectedRows = ps.executeUpdate();
+            return affectedRows > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
 }

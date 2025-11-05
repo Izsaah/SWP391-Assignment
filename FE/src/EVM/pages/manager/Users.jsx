@@ -1,64 +1,8 @@
-import React, { useMemo, useState, useCallback } from 'react'
+import React, { useMemo, useState, useCallback, useEffect } from 'react'
 import { Search, Plus, Edit2, X, UserPlus, Users as UsersIcon, Power, PowerOff } from 'lucide-react'
+import axios from 'axios'
 
-// Inline API base and helper
-const API_BASE = (typeof import.meta !== 'undefined' ? (import.meta.env?.VITE_EVM_API || import.meta.env?.VITE_API_URL) : undefined)
-  || (typeof process !== 'undefined' ? (process.env?.REACT_APP_EVM_API || process.env?.REACT_APP_API_URL) : undefined)
-  || ''
-const apiGet = async (path) => {
-  const url = `${API_BASE}${path}`
-  if (!API_BASE) {
-    console.error(`[EVM] API_BASE is not set! Please set VITE_EVM_API or VITE_API_URL in .env file. Attempted to fetch: ${path}`)
-    return []
-  }
-  try {
-    const res = await fetch(url, { credentials: 'include' })
-    if (!res.ok) {
-      console.error(`[EVM] API Error: ${res.status} ${res.statusText} for ${url}`)
-      return []
-    }
-    const contentType = res.headers.get('content-type')
-    if (contentType && contentType.includes('application/json')) {
-      return await res.json()
-    } else {
-      console.error(`[EVM] Expected JSON but got ${contentType} for ${url}`)
-      return []
-    }
-  } catch (error) {
-    console.error(`[EVM] Failed to fetch ${url}:`, error)
-    return []
-  }
-}
-const apiSend = async (path, method, body) => {
-  const url = `${API_BASE}${path}`
-  if (!API_BASE) {
-    console.error(`[EVM] API_BASE is not set! Please set VITE_EVM_API or VITE_API_URL in .env file. Attempted to send ${method} to: ${path}`)
-    throw new Error('API_BASE is not configured')
-  }
-  try {
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: body != null ? JSON.stringify(body) : undefined,
-    })
-    if (!res.ok) {
-      console.error(`[EVM] API Error: ${res.status} ${res.statusText} for ${url}`)
-      const text = await res.text()
-      throw new Error(`API call failed: ${res.status} - ${text.substring(0, 100)}`)
-    }
-    const contentType = res.headers.get('content-type')
-    if (contentType && contentType.includes('application/json')) {
-      return await res.json()
-    } else {
-      // For some endpoints, empty response is OK
-      return {}
-    }
-  } catch (error) {
-    console.error(`[EVM] Failed to send ${method} ${url}:`, error)
-    throw error
-  }
-}
+const API_URL = import.meta.env.VITE_API_URL
 
 const Users = () => {
   const [role, setRole] = useState('All')
@@ -67,17 +11,43 @@ const Users = () => {
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
   const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
 
-  // Load from API
-  const fetchUsers = React.useCallback(async () => {
-    const data = await apiGet('/evm/users')
-    setRows(Array.isArray(data) ? data : [])
+  // Fetch users from API
+  const fetchUsers = useCallback(async () => {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await axios.get(`${API_URL}/evm/users`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.data && response.data.success) {
+        // Transform backend data to frontend format
+        const users = (response.data.data || []).map(user => ({
+          id: user.userId || user.id,
+          name: user.username || user.name,
+          email: user.email || '',
+          phone: user.phoneNumber || user.phone || '',
+          dealer: user.dealerName || `Dealer ${user.dealerId || 'A'}`,
+          role: user.roleName || (user.roleId === 2 ? 'Dealer Admin' : 'Dealer Staff'),
+          status: user.isActive ? 'Active' : 'Suspended'
+        }))
+        setRows(users)
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error)
+      alert(error.response?.data?.message || 'Failed to fetch users')
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  React.useEffect(() => {
-    let cancelled = false
-    ;(async () => { if (!cancelled) await fetchUsers() })()
-    return () => { cancelled = true }
+  useEffect(() => {
+    fetchUsers()
   }, [fetchUsers])
 
   // Form state for new user
@@ -116,33 +86,72 @@ const Users = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    try {
+      const token = localStorage.getItem('token')
       if (editingUser) {
-      // Update existing user
-        setRows(prev => prev.map(u =>
-        u.id === editingUser.id 
-          ? { ...u, name: newUser.name, dealer: newUser.dealer, role: newUser.role, status: newUser.status }
-          : u
-      ))
-        // Persist via API and refresh
-        await apiSend(`/evm/users/${editingUser.id}`, 'PUT', { ...editingUser, ...newUser })
-        await fetchUsers()
-      setShowEditModal(false)
-      setEditingUser(null)
-    } else {
-      // Create new user
-      const created = { name: newUser.name, email: newUser.email, phone: newUser.phone, dealer: newUser.dealer, role: newUser.role, status: newUser.status }
-        await apiSend('/evm/users', 'POST', created)
-        await fetchUsers()
-      setShowCreateModal(false)
+        // Update existing user
+        const response = await axios.post(
+          `${API_URL}/evm/users`,
+          {
+            id: editingUser.id,
+            name: newUser.name,
+            email: newUser.email,
+            phone: newUser.phone,
+            dealer: newUser.dealer,
+            role: newUser.role
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        )
+        if (response.data && response.data.success) {
+          await fetchUsers()
+          setShowEditModal(false)
+          setEditingUser(null)
+        } else {
+          alert(response.data?.message || 'Failed to update user')
+        }
+      } else {
+        // Create new user
+        const response = await axios.post(
+          `${API_URL}/evm/users`,
+          {
+            name: newUser.name,
+            email: newUser.email,
+            phone: newUser.phone,
+            dealer: newUser.dealer,
+            role: newUser.role,
+            password: 'default123' // Default password
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        )
+        if (response.data && response.data.success) {
+          await fetchUsers()
+          setShowCreateModal(false)
+        } else {
+          alert(response.data?.message || 'Failed to create user')
+        }
+      }
+      setNewUser({
+        name: '',
+        email: '',
+        phone: '',
+        dealer: 'Dealer A',
+        role: 'Dealer Staff',
+        status: 'Active'
+      })
+    } catch (error) {
+      console.error('Error saving user:', error)
+      alert(error.response?.data?.message || 'Failed to save user')
     }
-    setNewUser({
-      name: '',
-      email: '',
-      phone: '',
-      dealer: 'Dealer A',
-      role: 'Dealer Staff',
-      status: 'Active'
-    })
   }
 
   const handleEdit = useCallback((row) => {
@@ -158,12 +167,23 @@ const Users = () => {
     setShowEditModal(true)
   }, [])
   const handleToggleStatus = useCallback(async (row) => {
-    const nextStatus = row.status === 'Active' ? 'Suspended' : 'Active'
     try {
-      await apiSend(`/evm/users/${row.id}/status`, 'PATCH', { status: nextStatus })
+      const token = localStorage.getItem('token')
+      const nextStatus = row.status === 'Active' ? 'Suspended' : 'Active'
+      await axios.post(
+        `${API_URL}/evm/users/${row.id}/status`,
+        { status: nextStatus },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
       await fetchUsers()
     } catch (error) {
-      console.error('Failed to toggle user status:', error)
+      console.error('Error toggling user status:', error)
+      alert(error.response?.data?.message || 'Failed to update user status')
     }
   }, [fetchUsers])
 
@@ -225,7 +245,20 @@ const Users = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filtered.map(u => (
+              {loading ? (
+                <tr>
+                  <td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">
+                    Loading...
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">
+                    No users found
+                  </td>
+                </tr>
+              ) : (
+                filtered.map(u => (
                 <tr key={u.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{u.id}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{u.name}</td>
@@ -260,7 +293,8 @@ const Users = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+              )}
             </tbody>
           </table>
         </div>

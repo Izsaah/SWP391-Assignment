@@ -102,7 +102,9 @@ public class DealerPromotionDAO {
                     Map<String, Object> dealer = new LinkedHashMap<>(); // preserve order
                     dealer.put("dealerId", dealerId);
                     dealer.put("dealerName", dealerName);
-                    ((List<Map<String, Object>>) promo.get("dealers")).add(dealer);
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> dealersList = (List<Map<String, Object>>) promo.get("dealers");
+                    dealersList.add(dealer);
                 }
             }
 

@@ -1,81 +1,13 @@
-import React, { useMemo, useState, useCallback } from 'react'
+import React, { useMemo, useState, useCallback, useEffect } from 'react'
 import { Plus, Search, Edit2, X, Download, ChevronLeft, ChevronDown } from 'lucide-react'
+import axios from 'axios'
 import Modal from '../../components/Modal'
 import ConfirmModal from '../../components/ConfirmModal'
 
-// Inline API base and helpers
-const API_BASE = (typeof import.meta !== 'undefined' ? (import.meta.env?.VITE_EVM_API || import.meta.env?.VITE_API_URL) : undefined)
-  || (typeof process !== 'undefined' ? (process.env?.REACT_APP_EVM_API || process.env?.REACT_APP_API_URL) : undefined)
-  || ''
-const apiGet = async (path) => {
-  const url = `${API_BASE}${path}`
-  if (!API_BASE) {
-    console.error(`[EVM] API_BASE is not set! Please set VITE_EVM_API or VITE_API_URL in .env file. Attempted to fetch: ${path}`)
-    return []
-  }
-  try {
-    const res = await fetch(url, { credentials: 'include' })
-    if (!res.ok) {
-      console.error(`[EVM] API Error: ${res.status} ${res.statusText} for ${url}`)
-      return []
-    }
-    const contentType = res.headers.get('content-type')
-    if (contentType && contentType.includes('application/json')) {
-      return await res.json()
-    } else {
-      console.error(`[EVM] Expected JSON but got ${contentType} for ${url}`)
-      return []
-    }
-  } catch (error) {
-    console.error(`[EVM] Failed to fetch ${url}:`, error)
-    return []
-  }
-}
-const apiSend = async (path, method, body) => {
-  const url = `${API_BASE}${path}`
-  if (!API_BASE) {
-    console.error(`[EVM] API_BASE is not set! Please set VITE_EVM_API or VITE_API_URL in .env file. Attempted to send ${method} to: ${path}`)
-    throw new Error('API_BASE is not configured')
-  }
-  try {
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: body != null ? JSON.stringify(body) : undefined,
-    })
-    if (!res.ok) {
-      console.error(`[EVM] API Error: ${res.status} ${res.statusText} for ${url}`)
-      const text = await res.text()
-      throw new Error(`API call failed: ${res.status} - ${text.substring(0, 100)}`)
-    }
-    const contentType = res.headers.get('content-type')
-    if (contentType && contentType.includes('application/json')) {
-      return await res.json()
-    } else {
-      // For some endpoints, empty response is OK
-      return {}
-    }
-  } catch (error) {
-    console.error(`[EVM] Failed to send ${method} ${url}:`, error)
-    throw error
-  }
-}
+const API_URL = import.meta.env.VITE_API_URL
 
 const Promotions = () => {
   const [rows, setRows] = useState([])
-
-  // Load from API
-  const fetchPromotions = React.useCallback(async () => {
-    const data = await apiGet('/evm/promotions')
-    setRows(Array.isArray(data) ? data : [])
-  }, [])
-
-  React.useEffect(() => {
-    let cancelled = false
-    ;(async () => { if (!cancelled) await fetchPromotions() })()
-    return () => { cancelled = true }
-  }, [fetchPromotions])
   const [dealer, setDealer] = useState('All')
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState('dealer')
@@ -88,6 +20,34 @@ const Promotions = () => {
   const [form, setForm] = useState({ dealer: 'Dealer A', name: '', type: 'Discount', value: '5%', from: '2025-10-01', to: '2025-12-31' })
   const [editing, setEditing] = useState(null)
   const [disablingPromotion, setDisablingPromotion] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  // Fetch promotions from API
+  const fetchPromotions = useCallback(async () => {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await axios.get(`${API_URL}/evm/promotions`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.data && response.data.success) {
+        setRows(response.data.data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching promotions:', error)
+      alert(error.response?.data?.message || 'Failed to fetch promotions')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchPromotions()
+  }, [fetchPromotions])
 
   const filtered = useMemo(() => rows.filter(p =>
     (dealer === 'All' || p.dealer === dealer) &&
@@ -116,10 +76,25 @@ const Promotions = () => {
 
   const confirmDisable = useCallback(async () => {
     if (!disablingPromotion) return
-    await apiSend(`/evm/promotions/${disablingPromotion.id}/status`, 'PATCH', { active: false })
-    await fetchPromotions()
-    setShowDisableModal(false)
-    setDisablingPromotion(null)
+    try {
+      const token = localStorage.getItem('token')
+      await axios.post(
+        `${API_URL}/evm/promotions/${disablingPromotion.id}`,
+        { active: false },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+      await fetchPromotions()
+      setShowDisableModal(false)
+      setDisablingPromotion(null)
+    } catch (error) {
+      console.error('Error disabling promotion:', error)
+      alert(error.response?.data?.message || 'Failed to disable promotion')
+    }
   }, [disablingPromotion, fetchPromotions])
 
   const exportCsv = () => {
@@ -213,7 +188,20 @@ const Promotions = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {paged.map(p => (
+              {loading ? (
+                <tr>
+                  <td colSpan="8" className="px-6 py-4 text-center text-sm text-gray-500">
+                    Loading...
+                  </td>
+                </tr>
+              ) : paged.length === 0 ? (
+                <tr>
+                  <td colSpan="8" className="px-6 py-4 text-center text-sm text-gray-500">
+                    No promotions found
+                  </td>
+                </tr>
+              ) : (
+                paged.map(p => (
                 <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{p.dealer}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{p.name}</td>
@@ -245,7 +233,8 @@ const Promotions = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+              )}
             </tbody>
           </table>
         </div>
@@ -277,7 +266,43 @@ const Promotions = () => {
       </div>
 
       {/* Create Modal */}
-      <Modal title="Create Promotion" open={showCreate} onClose={() => setShowCreate(false)} onSubmit={async () => { await apiSend('/evm/promotions', 'POST', { ...form, active: true }); await fetchPromotions(); setShowCreate(false) }}>
+      <Modal 
+        title="Create Promotion" 
+        open={showCreate} 
+        onClose={() => setShowCreate(false)} 
+        onSubmit={async () => {
+          try {
+            const token = localStorage.getItem('token')
+            const valueWithoutPercent = form.value.replace('%', '')
+            const response = await axios.post(
+              `${API_URL}/evm/promotions`,
+              {
+                name: form.name,
+                type: form.type,
+                value: valueWithoutPercent,
+                from: form.from,
+                to: form.to,
+                dealer: form.dealer
+              },
+              {
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            )
+            if (response.data && response.data.success) {
+              await fetchPromotions()
+              setShowCreate(false)
+            } else {
+              alert(response.data?.message || 'Failed to create promotion')
+            }
+          } catch (error) {
+            console.error('Error creating promotion:', error)
+            alert(error.response?.data?.message || 'Failed to create promotion')
+          }
+        }}
+      >
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Dealer</label>
@@ -307,7 +332,44 @@ const Promotions = () => {
       </Modal>
 
       {/* Edit Modal */}
-      <Modal title={`Edit Promotion #${editing?.id || ''}`} open={showEdit} onClose={() => setShowEdit(false)} onSubmit={async () => { await apiSend(`/evm/promotions/${editing.id}`, 'PUT', form); await fetchPromotions(); setShowEdit(false) }}>
+      <Modal 
+        title={`Edit Promotion #${editing?.id || ''}`} 
+        open={showEdit} 
+        onClose={() => setShowEdit(false)} 
+        onSubmit={async () => {
+          try {
+            const token = localStorage.getItem('token')
+            const valueWithoutPercent = form.value.replace('%', '')
+            const response = await axios.post(
+              `${API_URL}/evm/promotions`,
+              {
+                id: editing.id,
+                name: form.name,
+                type: form.type,
+                value: valueWithoutPercent,
+                from: form.from,
+                to: form.to,
+                dealer: form.dealer
+              },
+              {
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            )
+            if (response.data && response.data.success) {
+              await fetchPromotions()
+              setShowEdit(false)
+            } else {
+              alert(response.data?.message || 'Failed to update promotion')
+            }
+          } catch (error) {
+            console.error('Error updating promotion:', error)
+            alert(error.response?.data?.message || 'Failed to update promotion')
+          }
+        }}
+      >
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Dealer</label>

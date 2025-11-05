@@ -44,7 +44,11 @@ export function useAuth() {
                 setCurrentUser(user);
                 setIsAuthenticated(true);
 
-          return { success: true, message: res.data.message || 'Đăng nhập thành công' };
+          return { 
+            success: true, 
+            message: res.data.message || 'Đăng nhập thành công',
+            user: user // Trả về user để có thể check role ngay
+          };
         } else {
           return { success: false, message: 'Dữ liệu phản hồi không hợp lệ' };
     }
