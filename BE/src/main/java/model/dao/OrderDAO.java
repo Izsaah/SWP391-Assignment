@@ -29,8 +29,7 @@ public class OrderDAO {
 
     public List<OrderDTO> retrieve(String condition, Object... params) throws SQLException, ClassNotFoundException {
         String sql = "SELECT * FROM " + TABLE_NAME + " WHERE " + condition;
-        try (Connection conn = DbUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
             for (int i = 0; i < params.length; i++) {
                 ps.setObject(i + 1, params[i]);
             }
@@ -44,7 +43,7 @@ public class OrderDAO {
     }
 
     public int create(Connection conn, OrderDTO order) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(INSERT_ORDER, Statement.RETURN_GENERATED_KEYS)) {
+        try ( PreparedStatement ps = conn.prepareStatement(INSERT_ORDER, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, order.getCustomerId());
             ps.setInt(2, order.getDealerStaffId());
             ps.setInt(3, order.getModelId());
@@ -56,7 +55,7 @@ public class OrderDAO {
                 throw new SQLException("Creating order failed, no rows affected.");
             }
 
-            try (ResultSet generatedKeys = ps.getGeneratedKeys()) {
+            try ( ResultSet generatedKeys = ps.getGeneratedKeys()) {
                 if (generatedKeys.next()) {
                     return generatedKeys.getInt(1);
                 } else {
@@ -97,8 +96,7 @@ public class OrderDAO {
         }
 
         String sql = "SELECT * FROM [Order] WHERE dealer_staff_id IN (" + inClause + ")";
-        try (Connection conn = DbUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
             for (int i = 0; i < staffIds.size(); i++) {
                 ps.setInt(i + 1, staffIds.get(i));
@@ -111,12 +109,12 @@ public class OrderDAO {
         }
         return orders;
     }
-    
+
     public int countOrdersByDealerStaffId(int dealerStaffId) throws ClassNotFoundException, SQLException {
         List<OrderDTO> list = retrieve("dealer_staff_id = ?", dealerStaffId);
         return list.size();
     }
-    
+
     public boolean deleteById(Connection conn, int orderId) throws SQLException {
         String sql = "DELETE FROM [Order] WHERE order_id = ?";
         try ( PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -125,4 +123,54 @@ public class OrderDAO {
             return rows > 0;
         }
     }
+
+    public boolean updateStatus(int orderId, String newStatus) throws SQLException, ClassNotFoundException {
+        String sql = "UPDATE [Order] SET status = ? WHERE order_id = ?";
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, newStatus);
+            ps.setInt(2, orderId);
+            return ps.executeUpdate() > 0;
+        }
+    }
+    
+    public List<java.util.Map<String, Object>> retrieveOrdersWithConfirmedDetails(int orderDetailId)
+            throws SQLException, ClassNotFoundException {
+        String sql = "SELECT o.order_id, o.customer_id, o.dealer_staff_id, o.model_id, o.order_date, o.status, "
+                + "d.order_detail_id, d.serial_id, d.quantity, d.unit_price "
+                + "FROM [Order] o "
+                + "JOIN OrderDetail d ON o.order_id = d.order_id "
+                + "WHERE EXISTS (SELECT 1 FROM Confirmation c WHERE c.order_detail_id = d.order_detail_id) "
+                + "AND d.order_detail_id = ?";
+
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, orderDetailId);
+            ResultSet rs = ps.executeQuery();
+
+            List<java.util.Map<String, Object>> list = new ArrayList<>();
+
+            while (rs.next()) {
+                java.util.Map<String, Object> row = new java.util.HashMap<>();
+
+                // Order info
+                row.put("order_id", rs.getInt("order_id"));
+                row.put("customer_id", rs.getInt("customer_id"));
+                row.put("dealer_staff_id", rs.getInt("dealer_staff_id"));
+                row.put("model_id", rs.getInt("model_id"));
+                row.put("order_date", rs.getString("order_date"));
+                row.put("status", rs.getString("status"));
+
+                // Order detail info
+                row.put("order_detail_id", rs.getInt("order_detail_id"));
+                row.put("serial_id", rs.getString("serial_id"));
+                row.put("quantity", rs.getInt("quantity"));
+                row.put("unit_price", rs.getDouble("unit_price"));
+
+                list.add(row);
+            }
+
+            return list;
+        }
+    }
+    
 }

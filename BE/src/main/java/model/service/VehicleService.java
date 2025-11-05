@@ -28,5 +28,16 @@ public class VehicleService {
         }
         return models;
     }
+    
+    public List<VehicleModelDTO> HandlingViewVehicle() {
+        List<VehicleModelDTO> models = modelDAO.viewAllVehicleModel();
+        if (models != null) {
+            for (VehicleModelDTO model : models) {
+                List<VehicleVariantDTO> variants = variantDAO.viewVehicleVariantIsActive(model.getModelId());
+                model.setLists(variants);
+            }
+        }
+        return models;
+    }
 
 }

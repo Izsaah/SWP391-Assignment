@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import model.dao.ConfirmationDAO;
 import model.dao.OrderDAO;
 import model.dao.OrderDetailDAO;
@@ -282,4 +283,37 @@ public class OrderService {
             return Collections.emptyList();
         }
     }
+    public boolean updateOrderStatus(int orderId, String newStatus)
+            throws SQLException, ClassNotFoundException {
+
+        // Validate trực tiếp trong code — chỉ 3 status hợp lệ
+        if (!newStatus.equalsIgnoreCase("pending")
+                && !newStatus.equalsIgnoreCase("delivered")
+                && !newStatus.equalsIgnoreCase("cancelled")) {
+            throw new IllegalArgumentException("Invalid status: " + newStatus);
+        }
+
+        try (Connection conn = DbUtils.getConnection()) {
+            conn.setAutoCommit(false);
+
+            boolean success = orderDAO.updateStatus(orderId, newStatus);
+
+            conn.commit();
+            return success;
+        }
+    }
+    public List<Map<String, Object>> retrieveOrdersWithConfirmedDetails(int orderDetailId)
+            throws SQLException, ClassNotFoundException {
+        return orderDAO.retrieveOrdersWithConfirmedDetails(orderDetailId);
+    }
+    
+    public List<ConfirmationDTO> getAllConfirmation() throws SQLException, ClassNotFoundException{
+        return confirmationDAO.viewConfirmations();
+    }
+    
+    public List<ConfirmationDTO> getConfirmationByOrderDetailId(int orderDetailId) 
+            throws SQLException, ClassNotFoundException{
+        return confirmationDAO.viewConfirmationsByOrderDetailId(orderDetailId);
+    }
+            
 }

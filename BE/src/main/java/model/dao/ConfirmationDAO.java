@@ -41,6 +41,14 @@ public class ConfirmationDAO {
             return list;
         }
     }
+    
+    public List<ConfirmationDTO> viewConfirmations() throws SQLException, ClassNotFoundException {
+        return retrieve("1 = 1");
+    }
+    
+    public List<ConfirmationDTO> viewConfirmationsByOrderDetailId(int orderDetailId) throws SQLException, ClassNotFoundException {
+        return retrieve("order_detail_id = ?", orderDetailId);
+    }
 
     public ConfirmationDTO insert(Connection conn, Integer staff_admin_id, int order_detail_id, String agreement, String date) {
         String sql = "INSERT INTO " + TABLE_NAME + " (staff_admin_id, order_detail_id, agreement, date_time) VALUES(?, ?, ?, ?)";

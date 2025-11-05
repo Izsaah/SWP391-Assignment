@@ -18,7 +18,7 @@ public class ViewCustomerWithActiveInstallmentsController extends HttpServlet {
     private final PaymentService paymentService = new PaymentService();
 
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         try {
             List<Map<String, Object>> customers = paymentService.getCustomersWithActiveInstallments();

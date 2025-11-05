@@ -4,34 +4,33 @@
  */
 package model.controller;
 
-import java.io.IOException;
-import java.io.PrintWriter;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import model.service.ViewInventoryService;
+import java.io.IOException;
+import model.service.VehicleService;
 import utils.ResponseUtils;
+
 
 /**
  *
- * @author khoac
+ * @author Admin
  */
-@WebServlet("/api/EVM/viewInventory")
-public class ViewInventoryController extends HttpServlet {
-
-    private final ViewInventoryService service = new ViewInventoryService();
-
+@WebServlet("/api/EVM/viewVehicleForEVM")
+public class ViewVehicleForEVMController extends HttpServlet {
+    private final VehicleService service = new VehicleService();
+   
     @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) 
             throws ServletException, IOException {
         try {
-            ResponseUtils.success(response, "success", service.handleViewAllInventory());
+            ResponseUtils.success(resp, "success", service.HandlingViewVehicle());
         } catch (Exception e) {
             e.printStackTrace();
-            ResponseUtils.error(response, "Fail to retrive inventory: " + e.getMessage());
+            ResponseUtils.error(resp, "An error occurred while retrieving vehicles: " + e.getMessage());
         }
     }
-
+ 
 }
