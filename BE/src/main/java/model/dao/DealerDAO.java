@@ -55,4 +55,9 @@ public class DealerDAO {
     public List<DealerDTO> findByName(String name) {
         return retrieve("dealer_name = ?", name);
     }
+    
+    public List<DealerDTO> getAllDealers() {
+        return retrieve("1 = 1");
+    }
+    
 }
