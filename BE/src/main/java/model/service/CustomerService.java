@@ -6,6 +6,7 @@ package model.service;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.List;
 import model.dao.CustomerDAO;
 import model.dto.CustomerDTO;
 import utils.DbUtils;
@@ -50,5 +51,9 @@ public class CustomerService {
                 try { conn.setAutoCommit(true); conn.close(); } catch (SQLException e) { e.printStackTrace(); }
             }
         }
+    }
+    
+    public List<CustomerDTO> getAll(){
+        return customerDAO.getAllCustomer();
     }
 }

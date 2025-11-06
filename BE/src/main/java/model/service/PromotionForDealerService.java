@@ -59,6 +59,10 @@ public class PromotionForDealerService {
     public List<Map<String, Object>> getAllPromotionsWithDealers() {
         return dealerPromotionDAO.getAllPromotionsWithDealers();
     }
+    
+    public List<DealerDTO> getAllDealers(){
+        return dealerDAO.getAllDealers();
+    }
 
     public PromotionDTO createPromotion(PromotionDTO promotion) throws SQLException, ClassNotFoundException {
         // Validate dữ liệu
