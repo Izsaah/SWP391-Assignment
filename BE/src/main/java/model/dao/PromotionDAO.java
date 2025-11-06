@@ -53,45 +53,61 @@ public class PromotionDAO {
     public List<PromotionDTO> GetAllPromotion() {
         return retrieve("1 = 1");
     }
-    
+
     public List<PromotionDTO> GetPromotionById(int promoId) {
         return retrieve("promo_id = ?", promoId);
     }
-    
+
     public PromotionDTO create(PromotionDTO promotion) throws SQLException, ClassNotFoundException {
-        String sql = "INSERT INTO " + TABLE_NAME + 
-                     " (description, start_date, end_date, discount_rate, type) " +
-                     "VALUES (?, ?, ?, ?, ?)";
-        
-        try (Connection conn = DbUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql, 
-                     PreparedStatement.RETURN_GENERATED_KEYS)) {
-            
+        String sql = "INSERT INTO " + TABLE_NAME
+                + " (description, start_date, end_date, discount_rate, type) "
+                + "VALUES (?, ?, ?, ?, ?)";
+
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql,
+                PreparedStatement.RETURN_GENERATED_KEYS)) {
+
             ps.setString(1, promotion.getDescription());
             ps.setString(2, promotion.getStartDate());
             ps.setString(3, promotion.getEndDate());
             ps.setString(4, promotion.getDiscountRate());
             ps.setString(5, promotion.getType());
-            
+
             int rowsAffected = ps.executeUpdate();
-            
+
             if (rowsAffected > 0) {
                 ResultSet rs = ps.getGeneratedKeys();
                 if (rs.next()) {
                     return new PromotionDTO(
-                        rs.getInt(1),
-                        promotion.getDescription(),
-                        promotion.getStartDate(),
-                        promotion.getEndDate(),
-                        promotion.getDiscountRate(),
-                        promotion.getType()
+                            rs.getInt(1),
+                            promotion.getDescription(),
+                            promotion.getStartDate(),
+                            promotion.getEndDate(),
+                            promotion.getDiscountRate(),
+                            promotion.getType()
                     );
                 }
             }
-            
+
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return null;
+    }
+
+    public boolean deletePromotion(int promoId) throws SQLException, ClassNotFoundException {
+        String sql = "DELETE FROM " + TABLE_NAME + " WHERE promo_id = ?";
+
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, promoId);
+
+            int rowsAffected = ps.executeUpdate();
+
+            return rowsAffected > 0;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw e;
+        }
     }
 }

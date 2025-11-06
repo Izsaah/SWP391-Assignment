@@ -80,6 +80,21 @@ public class PromotionForDealerService {
 
         return promotionDAO.create(promotion);
     }
+    
+    public boolean deletePromotion(int promoId) {
+        try {
+            // Check if promotion exists before deleting
+            PromotionDTO existing = (PromotionDTO) promotionDAO.GetPromotionById(promoId);
+            if (existing == null) {
+                return false;
+            }
+            
+            return promotionDAO.deletePromotion(promoId);
+        } catch (SQLException | ClassNotFoundException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
 
     public List<PromotionDTO> getPromotionById(int promoId) {
         return promotionDAO.GetPromotionById(promoId);
