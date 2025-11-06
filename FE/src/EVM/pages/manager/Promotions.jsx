@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react'
-import { Plus, Search, Edit2, X, Download, ChevronLeft, ChevronDown } from 'lucide-react'
+import { Plus, Search, X, ChevronLeft, ChevronDown } from 'lucide-react'
 import axios from 'axios'
 import Modal from '../../components/Modal'
 import ConfirmModal from '../../components/ConfirmModal'
@@ -15,11 +15,9 @@ const Promotions = () => {
   const [page, setPage] = useState(1)
   const pageSize = 8
   const [showCreate, setShowCreate] = useState(false)
-  const [showEdit, setShowEdit] = useState(false)
-  const [showDisableModal, setShowDisableModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [form, setForm] = useState({ dealer: 'Dealer A', name: '', type: 'Discount', value: '5%', from: '2025-10-01', to: '2025-12-31' })
-  const [editing, setEditing] = useState(null)
-  const [disablingPromotion, setDisablingPromotion] = useState(null)
+  const [deletingPromotion, setDeletingPromotion] = useState(null)
   const [loading, setLoading] = useState(false)
 
   // Fetch promotions from API
@@ -45,6 +43,32 @@ const Promotions = () => {
         backendData.forEach(promo => {
           const dealers = promo.dealers || []
           
+          // Convert backend format to frontend display format
+          // Xử lý cả data cũ (số nguyên + type mô tả) và data mới (decimal + PERCENTAGE/FIXED)
+          let displayType = promo.type || 'Discount'
+          if (displayType === 'PERCENTAGE') {
+            displayType = 'Discount'
+          } else if (displayType === 'FIXED') {
+            displayType = 'Fixed'
+          }
+          // Data cũ: type là string mô tả như "Model Discount", "High Value Order" → giữ nguyên
+          
+          // Convert discountRate: xử lý cả data cũ (số nguyên) và data mới (decimal)
+          let displayValue = '0%'
+          if (promo.discountRate) {
+            const rateValue = parseFloat(promo.discountRate)
+            
+            // Data mới: PERCENTAGE + rate < 1 (ví dụ: 0.05 → 5%)
+            if (promo.type === 'PERCENTAGE' && rateValue < 1) {
+              displayValue = `${(rateValue * 100).toFixed(0)}%`
+            } 
+            // Data cũ: số nguyên hoặc type không phải PERCENTAGE (ví dụ: 5, 3 → 5%, 3%)
+            // Hoặc data mới nhưng rate >= 1 (đã được convert sẵn)
+            else {
+              displayValue = `${rateValue}%`
+            }
+          }
+          
           // Nếu có dealers, tạo một entry cho mỗi dealer
           if (dealers.length > 0) {
             dealers.forEach(dealer => {
@@ -52,8 +76,8 @@ const Promotions = () => {
                 id: `${promo.promoId}-${dealer.dealerId || ''}`,
                 dealer: dealer.dealerName || 'All Dealers',
                 name: promo.description || 'Promotion',
-                type: promo.type || 'Discount',
-                value: promo.discountRate ? `${promo.discountRate}%` : '0%',
+                type: displayType,
+                value: displayValue,
                 from: promo.startDate || '',
                 to: promo.endDate || '',
                 active: true // Không có isActive trong response
@@ -65,8 +89,8 @@ const Promotions = () => {
               id: promo.promoId || promo.id,
               dealer: 'All Dealers',
               name: promo.description || 'Promotion',
-              type: promo.type || 'Discount',
-              value: promo.discountRate ? `${promo.discountRate}%` : '0%',
+              type: displayType,
+              value: displayValue,
               from: promo.startDate || '',
               to: promo.endDate || '',
               active: true
@@ -107,46 +131,56 @@ const Promotions = () => {
   const toggleSort = (key) => { if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortKey(key); setSortDir('asc') } }
 
   const handleCreate = useCallback(async () => { setForm({ dealer: 'Dealer A', name: '', type: 'Discount', value: '5%', from: '2025-10-01', to: '2025-12-31' }); setShowCreate(true) }, [])
-  const handleEdit = useCallback(async (row) => { setEditing(row); setForm({ dealer: row.dealer, name: row.name, type: row.type, value: row.value, from: row.from, to: row.to }); setShowEdit(true) }, [])
-  const handleDisable = useCallback((row) => {
-    setDisablingPromotion(row)
-    setShowDisableModal(true)
+  const handleDelete = useCallback((row) => {
+    // Extract promoId from row.id (format: "promoId-dealerId" or just "promoId")
+    const promoId = row.id.split('-')[0]
+    setDeletingPromotion({ ...row, promoId: promoId })
+    setShowDeleteModal(true)
   }, [])
 
-  const confirmDisable = useCallback(async () => {
-    if (!disablingPromotion) return
+  const confirmDelete = useCallback(async () => {
+    if (!deletingPromotion) return
     try {
       const token = localStorage.getItem('token')
-      await axios.post(
-        `${API_URL}/EVM/promotions/${disablingPromotion.id}`,
-        { active: false },
+      const promoId = deletingPromotion.promoId || deletingPromotion.id?.split('-')[0]
+      
+      if (!promoId) {
+        alert('Không tìm thấy Promotion ID')
+        return
+      }
+
+      // Call disable promotion endpoint (similar to disable vehicle model/variant)
+      const response = await axios.post(
+        `${API_URL}/EVM/disablePromotion`,
+        { promoId: parseInt(promoId) },
         {
           headers: {
             'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true'
           }
         }
       )
-      await fetchPromotions()
-      setShowDisableModal(false)
-      setDisablingPromotion(null)
+      
+      if (response.data && response.data.status === 'success') {
+        await fetchPromotions()
+        setShowDeleteModal(false)
+        setDeletingPromotion(null)
+        alert('Promotion deleted successfully')
+      } else {
+        alert(response.data?.message || 'Failed to delete promotion')
+      }
     } catch (error) {
-      console.error('Error disabling promotion:', error)
-      alert(error.response?.data?.message || 'Failed to disable promotion')
+      console.error('Error deleting promotion:', error)
+      // Nếu endpoint chưa tồn tại, thử hard delete hoặc show message
+      if (error.response?.status === 404) {
+        alert('Delete endpoint chưa được implement. Vui lòng liên hệ admin.')
+      } else {
+        alert(error.response?.data?.message || 'Failed to delete promotion')
+      }
     }
-  }, [disablingPromotion, fetchPromotions])
+  }, [deletingPromotion, fetchPromotions])
 
-  const exportCsv = () => {
-    const header = 'Dealer,Name,Type,Value,Active,From,To\n'
-    const body = filtered.map(p => [p.dealer, p.name, p.type, p.value, p.active, p.from, p.to].join(',')).join('\n')
-    const blob = new Blob([header + body], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'promotions.csv'
-    a.click()
-    URL.revokeObjectURL(url)
-  }
 
   return (
     <div className="space-y-6">
@@ -164,13 +198,6 @@ const Promotions = () => {
             >
               <Plus className="w-4 h-4" />
               <span>Create promotion</span>
-            </button>
-            <button 
-              onClick={exportCsv}
-              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2.5 rounded-lg flex items-center space-x-2 shadow-sm transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              <span>Export CSV</span>
             </button>
           </div>
         </div>
@@ -216,7 +243,7 @@ const Promotions = () => {
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                   onClick={() => toggleSort('name')}
                 >
-                  Name
+                  Description
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
@@ -256,20 +283,12 @@ const Promotions = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center gap-3">
-                      <button 
-                        onClick={() => handleEdit(p)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        <Edit2 className="w-4 h-4 inline" />
-                      </button>
-                      <button 
-                        onClick={() => handleDisable(p)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <X className="w-4 h-4 inline" />
-                      </button>
-                    </div>
+                    <button 
+                      onClick={() => handleDelete(p)}
+                      className="text-red-600 hover:text-red-900"
+                    >
+                      <X className="w-4 h-4 inline" />
+                    </button>
                   </td>
                 </tr>
               ))
@@ -311,28 +330,126 @@ const Promotions = () => {
         onClose={() => setShowCreate(false)} 
         onSubmit={async () => {
           try {
+            // Validate required fields trước khi gửi
+            if (!form.name || !form.name.trim()) {
+              alert('Vui lòng nhập Description')
+              return
+            }
+            if (!form.type || !form.type.trim()) {
+              alert('Vui lòng nhập Type')
+              return
+            }
+            if (!form.value || !form.value.trim()) {
+              alert('Vui lòng nhập Value')
+              return
+            }
+            if (!form.from || !form.from.trim()) {
+              alert('Vui lòng nhập From date')
+              return
+            }
+            if (!form.to || !form.to.trim()) {
+              alert('Vui lòng nhập To date')
+              return
+            }
+            
             const token = localStorage.getItem('token')
-            const valueWithoutPercent = form.value.replace('%', '')
+            // Map frontend format to backend format
+            // Backend validation expect: type phải là "PERCENTAGE" hoặc "FIXED"
+            // Nếu PERCENTAGE, discountRate phải là 0-1 (0.05 cho 5%)
+            const valueWithoutPercent = form.value.replace('%', '').trim()
+            
+            // Validate discountRate là số hợp lệ
+            if (!valueWithoutPercent || isNaN(parseFloat(valueWithoutPercent))) {
+              alert('Value phải là số hợp lệ')
+              return
+            }
+            
+            // Convert type để pass backend validation
+            let backendType = form.type.trim()
+            if (backendType.toLowerCase() === 'discount' || backendType.toLowerCase().includes('percent')) {
+              backendType = 'PERCENTAGE'
+            } else if (backendType.toLowerCase() === 'fixed') {
+              backendType = 'FIXED'
+            } else {
+              // Default to PERCENTAGE nếu không match
+              backendType = 'PERCENTAGE'
+            }
+            
+            // Convert discountRate: nếu PERCENTAGE, convert từ 5 → 0.05 (chia 100)
+            let discountRate = valueWithoutPercent
+            if (backendType === 'PERCENTAGE') {
+              const rateValue = parseFloat(valueWithoutPercent)
+              if (rateValue > 1) {
+                // Frontend nhập "5" (5%), convert thành "0.05" để pass backend validation
+                discountRate = (rateValue / 100.0).toString()
+              }
+            }
+            
+            // Create promotion với đúng format mà backend validation expect
             const response = await axios.post(
-              `${API_URL}/EVM/promotions`,
+              `${API_URL}/EVM/createPromotion`,
               {
-                name: form.name,
-                type: form.type,
-                value: valueWithoutPercent,
-                from: form.from,
-                to: form.to,
-                dealer: form.dealer
+                description: form.name.trim(),        // description (required)
+                startDate: form.from.trim(),          // startDate (required)
+                endDate: form.to.trim(),              // endDate (required)
+                discountRate: discountRate,           // discountRate (0.05 cho PERCENTAGE, hoặc số nguyên cho FIXED)
+                type: backendType                     // type (PERCENTAGE hoặc FIXED)
               },
               {
                 headers: {
                   'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json'
+                  'Content-Type': 'application/json',
+                  'ngrok-skip-browser-warning': 'true'
                 }
               }
             )
-            if (response.data && response.data.success) {
+            
+            if (response.data && response.data.status === 'success') {
+              // Link promotion with dealer if dealer is specified
+              if (form.dealer && form.dealer !== 'All Dealers') {
+                try {
+                  // First, get dealer ID by name
+                  const dealerResponse = await axios.post(
+                    `${API_URL}/staff/searchDealer`,
+                    { name: form.dealer },
+                    {
+                      headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true'
+                      }
+                    }
+                  )
+                  
+                  if (dealerResponse.data && dealerResponse.data.status === 'success' && dealerResponse.data.data && dealerResponse.data.data.length > 0) {
+                    const dealerId = dealerResponse.data.data[0].dealerId
+                    const promoId = response.data.data.promoId
+                    
+                    // Link promotion with dealer
+                    await axios.post(
+                      `${API_URL}/EVM/createDealerPromotions`,
+                      {
+                        promoId: promoId,
+                        dealerId: dealerId
+                      },
+                      {
+                        headers: {
+                          'Authorization': `Bearer ${token}`,
+                          'Content-Type': 'application/json',
+                          'ngrok-skip-browser-warning': 'true'
+                        }
+                      }
+                    )
+                  }
+                } catch (dealerError) {
+                  console.error('Error linking dealer:', dealerError)
+                  // Continue anyway, promotion was created successfully
+                }
+              }
+              
               await fetchPromotions()
               setShowCreate(false)
+              alert('Promotion created successfully')
             } else {
               alert(response.data?.message || 'Failed to create promotion')
             }
@@ -348,8 +465,8 @@ const Promotions = () => {
             <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Dealer" value={form.dealer} onChange={(e) => setForm(f => ({ ...f, dealer: e.target.value }))} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
-            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Name" value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} />
+            <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Description" value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
@@ -370,87 +487,22 @@ const Promotions = () => {
         </div>
       </Modal>
 
-      {/* Edit Modal */}
-      <Modal 
-        title={`Edit Promotion #${editing?.id || ''}`} 
-        open={showEdit} 
-        onClose={() => setShowEdit(false)} 
-        onSubmit={async () => {
-          try {
-            const token = localStorage.getItem('token')
-            const valueWithoutPercent = form.value.replace('%', '')
-            const response = await axios.post(
-              `${API_URL}/EVM/promotions`,
-              {
-                id: editing.id,
-                name: form.name,
-                type: form.type,
-                value: valueWithoutPercent,
-                from: form.from,
-                to: form.to,
-                dealer: form.dealer
-              },
-              {
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json'
-                }
-              }
-            )
-            if (response.data && response.data.success) {
-              await fetchPromotions()
-              setShowEdit(false)
-            } else {
-              alert(response.data?.message || 'Failed to update promotion')
-            }
-          } catch (error) {
-            console.error('Error updating promotion:', error)
-            alert(error.response?.data?.message || 'Failed to update promotion')
-          }
-        }}
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Dealer</label>
-            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Dealer" value={form.dealer} onChange={(e) => setForm(f => ({ ...f, dealer: e.target.value }))} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
-            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Name" value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
-            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Type" value={form.type} onChange={(e) => setForm(f => ({ ...f, type: e.target.value }))} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Value</label>
-            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Value" value={form.value} onChange={(e) => setForm(f => ({ ...f, value: e.target.value }))} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">From (YYYY-MM-DD)</label>
-            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="From (YYYY-MM-DD)" value={form.from} onChange={(e) => setForm(f => ({ ...f, from: e.target.value }))} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">To (YYYY-MM-DD)</label>
-            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="To (YYYY-MM-DD)" value={form.to} onChange={(e) => setForm(f => ({ ...f, to: e.target.value }))} />
-          </div>
-        </div>
-      </Modal>
-
+      {/* Delete Confirmation Modal */}
       <ConfirmModal
-        open={showDisableModal && !!disablingPromotion}
-        title="Disable Promotion"
-        description={disablingPromotion ? (
+        open={showDeleteModal && !!deletingPromotion}
+        title="Delete Promotion"
+        description={deletingPromotion ? (
           <div>
-            <p className="text-gray-700 mb-2">Are you sure you want to disable <span className="font-semibold text-gray-900">{disablingPromotion.name}</span>?</p>
-            <p className="text-sm text-gray-500">The promotion will be deactivated and no longer available for use.</p>
+            <p className="text-gray-700 mb-2">Are you sure you want to delete <span className="font-semibold text-gray-900">{deletingPromotion.name}</span>?</p>
+            <p className="text-sm text-gray-500">This action cannot be undone. The promotion will be permanently removed.</p>
           </div>
         ) : ''}
-        onCancel={() => { setShowDisableModal(false); setDisablingPromotion(null) }}
-        onConfirm={confirmDisable}
-        confirmText="Disable Promotion"
-        tone="yellow"
+        onCancel={() => { setShowDeleteModal(false); setDeletingPromotion(null) }}
+        onConfirm={confirmDelete}
+        confirmText="Delete Promotion"
+        tone="red"
       />
+
     </div>
   )
 }

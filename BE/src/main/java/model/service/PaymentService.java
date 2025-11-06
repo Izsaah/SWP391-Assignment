@@ -186,17 +186,26 @@ public class PaymentService {
                     double outstanding = Math.max(0, monthlyPay * termMonth);
 
                     Map<String, Object> map = new LinkedHashMap<>();
+
                     map.put("customerId", customer.getCustomerId());
                     map.put("name", customer.getName());
                     map.put("address", customer.getAddress());
                     map.put("email", customer.getEmail());
                     map.put("phoneNumber", customer.getPhoneNumber());
-                    map.put("outstandingAmount", outstanding);
+
                     map.put("planId", plan.getPlanId());
                     map.put("interestRate", plan.getInterestRate());
                     map.put("termMonth", plan.getTermMonth());
                     map.put("monthlyPay", plan.getMonthlyPay());
                     map.put("status", plan.getStatus());
+
+                    map.put("outstandingAmount", outstanding);
+                    map.put("paymentId", payment.getPaymentId());
+                    map.put("orderId", payment.getOrderId());
+                    map.put("totalAmount", payment.getAmount()); // ⭐ CRITICAL: totalAmount from Payment table
+                    map.put("paymentDate", payment.getPaymentDate());
+                    map.put("method", payment.getMethod());
+                    map.put("paidAmount", payment.getAmount() - outstanding);
 
                     responseList.add(map);
                     addedCustomerIds.add(customerId);

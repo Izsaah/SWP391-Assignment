@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from 'react'
-import { Download } from 'lucide-react'
 
 const Bar = ({ label, value, max }) => (
   <div className="mb-4">
@@ -26,17 +25,6 @@ const SalesReport = () => {
   const max = useMemo(() => Math.max(...filtered.map(r => r.sales), 1), [filtered])
   const total = useMemo(() => filtered.reduce((s, r) => s + r.sales, 0), [filtered])
 
-  const exportCsv = () => {
-    const header = 'Dealer,Region,Sales\n'
-    const body = filtered.map(r => `${r.dealer},${r.region},${r.sales}`).join('\n')
-    const blob = new Blob([header + body], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'sales_report.csv'
-    a.click()
-    URL.revokeObjectURL(url)
-  }
 
   return (
     <div className="space-y-6">
@@ -67,13 +55,6 @@ const SalesReport = () => {
               <option>North</option>
               <option>South</option>
             </select>
-            <button 
-              onClick={exportCsv}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg flex items-center space-x-2 shadow-sm transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              <span>Export CSV</span>
-            </button>
           </div>
         </div>
       </div>

@@ -1,7 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react'
-import { RefreshCw, Download, TrendingUp, Package, Building2, BarChart3, AlertTriangle, Clock } from 'lucide-react'
+import { RefreshCw, TrendingUp, Package, Building2, BarChart3, AlertTriangle, Clock } from 'lucide-react'
 import axios from 'axios'
-import Modal from '../../components/Modal'
 
 const API_URL = import.meta.env.VITE_API_URL
 
@@ -129,11 +128,6 @@ const Inventory = () => {
     fetchInventory()
   }, [fetchInventory])
 
-  const [allocOpen, setAllocOpen] = useState(false)
-  const [adjustOpen, setAdjustOpen] = useState(false)
-  const [selected, setSelected] = useState(null)
-  const [allocForm, setAllocForm] = useState({ dealer: 'Dealer B', qty: 1 })
-  const [adjustForm, setAdjustForm] = useState({ qty: 0 })
   const [lastRefreshed, setLastRefreshed] = useState(null)
 
   const summary = useMemo(() => ({
@@ -170,20 +164,6 @@ const Inventory = () => {
     await fetchInventory()
   }, [fetchInventory])
 
-  const handleAllocate = useCallback((row) => { setSelected(row); setAllocForm({ dealer: 'Dealer B', qty: 1 }); setAllocOpen(true) }, [])
-  const handleAdjust = useCallback((row) => { setSelected(row); setAdjustForm({ qty: row.qty }); setAdjustOpen(true) }, [])
-
-  const exportCsv = useCallback(() => {
-    const header = 'Dealer,Model,Variant,Quantity,Status,DaysInStock\n'
-    const body = filtered.map(r => [r.dealer, r.model, r.variant, r.qty, r.status, r.daysInStock].join(',')).join('\n')
-    const blob = new Blob([header + body], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'inventory.csv'
-    a.click()
-    URL.revokeObjectURL(url)
-  }, [filtered])
 
   return (
     <div className="space-y-6">
@@ -201,13 +181,6 @@ const Inventory = () => {
             >
               <RefreshCw className="w-4 h-4" />
               <span>Refresh</span>
-            </button>
-            <button 
-              onClick={exportCsv}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg flex items-center space-x-2 shadow-sm transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              <span>Export CSV</span>
             </button>
           </div>
         </div>
@@ -274,19 +247,18 @@ const Inventory = () => {
                 >
                   Quantity
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
                     Loading...
                   </td>
                 </tr>
               ) : paged.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
                     No inventory found
                   </td>
                 </tr>
@@ -311,22 +283,6 @@ const Inventory = () => {
                           Long stock
                         </span>
                       )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center gap-3">
-                      <button 
-                        onClick={() => handleAllocate(r)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        Allocate
-                      </button>
-                      <button 
-                        onClick={() => handleAdjust(r)}
-                        className="text-gray-600 hover:text-gray-900"
-                      >
-                        Adjust
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -360,46 +316,6 @@ const Inventory = () => {
         </div>
       </div>
 
-      {/* Allocate Modal */}
-      <Modal title={`Allocate from ${selected?.dealer || ''}`} open={allocOpen} onClose={() => setAllocOpen(false)} onSubmit={() => { setAllocOpen(false) }}>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Dealer</label>
-            <input 
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
-              placeholder="Dealer" 
-              value={allocForm.dealer} 
-              onChange={(e) => setAllocForm(f => ({ ...f, dealer: e.target.value }))} 
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
-            <input 
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
-              placeholder="Quantity" 
-              type="number" 
-              value={allocForm.qty} 
-              onChange={(e) => setAllocForm(f => ({ ...f, qty: e.target.value }))} 
-            />
-          </div>
-        </div>
-      </Modal>
-
-      {/* Adjust Modal */}
-      <Modal title={`Adjust ${selected?.model || ''} ${selected?.variant || ''}`} open={adjustOpen} onClose={() => setAdjustOpen(false)} onSubmit={() => { setRows(prev => prev.map(r => r.id === selected?.id ? { ...r, qty: Math.max(0, parseInt(adjustForm.qty, 10)) } : r)); setAdjustOpen(false) }}>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">New Quantity</label>
-            <input 
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
-              placeholder="New quantity" 
-              type="number" 
-              value={adjustForm.qty} 
-              onChange={(e) => setAdjustForm({ qty: e.target.value })} 
-            />
-          </div>
-        </div>
-      </Modal>
     </div>
   )
 }

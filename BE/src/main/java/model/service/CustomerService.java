@@ -9,6 +9,8 @@ import java.sql.SQLException;
 import model.dao.CustomerDAO;
 import model.dto.CustomerDTO;
 import utils.DbUtils;
+import java.util.Collections;
+import java.util.List;
 
 /**
  *
@@ -49,6 +51,18 @@ public class CustomerService {
             if (conn != null) {
                 try { conn.setAutoCommit(true); conn.close(); } catch (SQLException e) { e.printStackTrace(); }
             }
+        }
+    }
+    public List<CustomerDTO> getAllCustomers() {
+        try {
+            List<CustomerDTO> customers = customerDAO.getAllCustomers();
+            if (customers == null || customers.isEmpty()) {
+                return Collections.emptyList();
+            }
+            return customers;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Collections.emptyList();
         }
     }
 }

@@ -68,6 +68,8 @@ const Users = () => {
     name: '',
     email: '',
     phone: '',
+    password: '',
+    confirmPassword: '',
     dealer: 'Dealer A',
     role: 'Dealer Staff',
     status: 'Active'
@@ -90,6 +92,8 @@ const Users = () => {
       name: '',
       email: '',
       phone: '',
+      password: '',
+      confirmPassword: '',
       dealer: 'Dealer A',
       role: 'Dealer Staff',
       status: 'Active'
@@ -114,6 +118,20 @@ const Users = () => {
       const dealerId = dealerIdMatch ? dealerIdMatch[1].charCodeAt(0) - 64 : 1 // A=1, B=2, etc.
       
       if (editingUser) {
+        // Validate password if provided
+        let passwordToUpdate = null
+        if (newUser.password || newUser.confirmPassword) {
+          if (newUser.password !== newUser.confirmPassword) {
+            alert('Password and Confirm Password do not match')
+            return
+          }
+          if (newUser.password.length < 6) {
+            alert('Password must be at least 6 characters long')
+            return
+          }
+          passwordToUpdate = newUser.password
+        }
+        
         // Update existing user
         const response = await axios.post(
           `${API_URL}/EVM/updateDealerAccount`,
@@ -122,7 +140,7 @@ const Users = () => {
             email: newUser.email,
             username: newUser.name,
             phoneNumber: newUser.phone,
-            password: null, // Không update password nếu không có
+            password: passwordToUpdate, // Update password if provided, otherwise null
             roleId: roleId
           },
           {
@@ -142,6 +160,16 @@ const Users = () => {
           alert(response.data?.message || 'Failed to update user')
         }
       } else {
+        // Validate password match
+        if (newUser.password !== newUser.confirmPassword) {
+          alert('Password and Confirm Password do not match')
+          return
+        }
+        if (!newUser.password || newUser.password.length < 6) {
+          alert('Password must be at least 6 characters long')
+          return
+        }
+        
         // Create new user
         const response = await axios.post(
           `${API_URL}/EVM/createDealerAccount`,
@@ -149,7 +177,7 @@ const Users = () => {
             dealerId: dealerId,
             email: newUser.email,
             username: newUser.name,
-            password: 'default123', // Default password
+            password: newUser.password,
             phoneNumber: newUser.phone,
             roleId: roleId
           },
@@ -173,6 +201,8 @@ const Users = () => {
         name: '',
         email: '',
         phone: '',
+        password: '',
+        confirmPassword: '',
         dealer: 'Dealer A',
         role: 'Dealer Staff',
         status: 'Active'
@@ -189,6 +219,8 @@ const Users = () => {
       name: row.name,
       email: row.email || '',
       phone: row.phone || '',
+      password: '',
+      confirmPassword: '',
       dealer: row.dealer,
       role: row.role,
       status: row.status
@@ -467,6 +499,39 @@ const Users = () => {
                   </div>
                 </div>
 
+                {/* Password and Confirm Password */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      New Password
+                    </label>
+                    <input
+                      type="password"
+                      name="password"
+                      value={newUser.password}
+                      onChange={handleInputChange}
+                      placeholder="Leave blank to keep current password"
+                      minLength={6}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Confirm New Password
+                    </label>
+                    <input
+                      type="password"
+                      name="confirmPassword"
+                      value={newUser.confirmPassword}
+                      onChange={handleInputChange}
+                      placeholder="Confirm new password"
+                      minLength={6}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
                 {/* Dealer and Role */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -527,7 +592,7 @@ const Users = () => {
                     <div>
                       <h4 className="text-sm font-medium text-blue-900 mb-1">User Information</h4>
                       <p className="text-xs text-blue-700">
-                        All required fields must be filled. User ID will remain unchanged.
+                        All required fields must be filled. User ID will remain unchanged. Leave password fields blank to keep current password.
                       </p>
                     </div>
                   </div>
@@ -634,6 +699,41 @@ const Users = () => {
                       value={newUser.phone}
                       onChange={handleInputChange}
                       placeholder="0987654321"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                {/* Password and Confirm Password */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Password <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      name="password"
+                      value={newUser.password}
+                      onChange={handleInputChange}
+                      required
+                      placeholder="Enter password (min 6 characters)"
+                      minLength={6}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Confirm Password <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      name="confirmPassword"
+                      value={newUser.confirmPassword}
+                      onChange={handleInputChange}
+                      required
+                      placeholder="Confirm password"
+                      minLength={6}
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
