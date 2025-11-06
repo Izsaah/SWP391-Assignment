@@ -69,7 +69,9 @@ public class CustomerDAO {
         return retrieve("customer_id = ?", customerId);
     }
     
-    public List<CustomerDTO> getAllCustomers() {
-        return retrieve("1 = 1"); // Retrieve all customers
+    public List<CustomerDTO> getAllCustomer(){
+        return retrieve("1 = 1");
     }
+    
+    
 }

@@ -6,11 +6,10 @@ package model.service;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.List;
 import model.dao.CustomerDAO;
 import model.dto.CustomerDTO;
 import utils.DbUtils;
-import java.util.Collections;
-import java.util.List;
 
 /**
  *
@@ -53,16 +52,8 @@ public class CustomerService {
             }
         }
     }
-    public List<CustomerDTO> getAllCustomers() {
-        try {
-            List<CustomerDTO> customers = customerDAO.getAllCustomers();
-            if (customers == null || customers.isEmpty()) {
-                return Collections.emptyList();
-            }
-            return customers;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return Collections.emptyList();
-        }
+    
+    public List<CustomerDTO> getAll(){
+        return customerDAO.getAllCustomer();
     }
 }
