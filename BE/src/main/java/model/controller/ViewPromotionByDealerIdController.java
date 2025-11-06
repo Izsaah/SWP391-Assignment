@@ -10,39 +10,57 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Map;
+import model.dto.DealerDTO;
+import model.dto.UserAccountDTO;
 import model.service.PromotionForDealerService;
-import utils.RequestUtils;
+import model.service.UserAccountService;
+import utils.JwtUtil;
 import utils.ResponseUtils;
 
 /**
  *
  * @author ACER
  */
-@WebServlet("/api/staff/viewPromotionDealerIdController")
+@WebServlet("/api/staff/viewPromotionDealerId")
 public class ViewPromotionByDealerIdController extends HttpServlet {
-    private final static PromotionForDealerService service = new PromotionForDealerService();
-
+    private final PromotionForDealerService promotionService = new PromotionForDealerService();
+    private final UserAccountService userAccountService = new UserAccountService();
+    
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
         try {
-            Map<String, Object> params = RequestUtils.extractParams(req);
+            // Extract token and get dealer staff ID from JWT
+            String token = JwtUtil.extractToken(req);
+            int dealerStaffId = JwtUtil.extractUserId(token);
             
-            Object idObj = params.get("dealerId");
-            String idParam = (idObj == null) ? null : idObj.toString();
-
-            if (idParam == null || idParam.trim().isEmpty()) {
-                ResponseUtils.error(resp, "Dealer ID is required");
+            // Get dealer staff user account using service layer
+            UserAccountDTO staff = userAccountService.getDealerStaffById(dealerStaffId);
+            
+            if (staff == null) {
+                ResponseUtils.error(resp, "Staff account not found");
                 return;
             }
-
-            int id = Integer.parseInt(idParam);
-
-            ResponseUtils.success(resp, "success", service.HandlingViewPromotionForDealer(id));
             
-        } catch (NumberFormatException e) {
-            ResponseUtils.error(resp, "Invalid dealer ID format");
+            // Get dealer ID from staff account
+            int dealerId = staff.getDealerId();
+            
+            if (dealerId <= 0) {
+                ResponseUtils.error(resp, "No dealer associated with this staff account");
+                return;
+            }
+            
+            // Get dealer with promotions using service layer
+            DealerDTO dealer = promotionService.HandlingViewPromotionForDealer(dealerId);
+            
+            if (dealer != null) {
+                ResponseUtils.success(resp, "Promotions retrieved successfully", dealer);
+            } else {
+                ResponseUtils.error(resp, "Dealer not found or no promotions available");
+            }
+            
+        } catch (utils.AuthException e) {
+            ResponseUtils.error(resp, "Authentication failed: " + e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
             ResponseUtils.error(resp, "An error occurred while retrieving promotions: " + e.getMessage());
