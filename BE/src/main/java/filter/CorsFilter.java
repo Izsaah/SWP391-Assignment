@@ -25,7 +25,7 @@ public class CorsFilter implements Filter {
         )) {
             resp.setHeader("Access-Control-Allow-Origin", origin);
             resp.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-            resp.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+            resp.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, ngrok-skip-browser-warning");
             resp.setHeader("Access-Control-Allow-Credentials", "true");
         }
 

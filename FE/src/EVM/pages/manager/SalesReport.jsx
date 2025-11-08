@@ -1,15 +1,18 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useCallback, useEffect } from 'react'
+import axios from 'axios'
 
-const Bar = ({ label, value, max }) => (
+const API_URL = import.meta.env.VITE_API_URL
+
+const Bar = ({ label, value, max, formatCurrency }) => (
   <div className="mb-4">
     <div className="flex justify-between items-center mb-2">
       <span className="text-sm font-medium text-gray-900">{label}</span>
-      <span className="text-sm text-gray-600">{value}</span>
+      <span className="text-sm text-gray-600">{formatCurrency ? formatCurrency(value) : value}</span>
     </div>
     <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
       <div 
         className="h-full bg-blue-600 transition-all duration-300" 
-        style={{ width: `${(value / max) * 100}%` }}
+        style={{ width: `${max > 0 ? (value / max) * 100 : 0}%` }}
       />
     </div>
   </div>
@@ -18,12 +21,84 @@ const Bar = ({ label, value, max }) => (
 const SalesReport = () => {
   const [region, setRegion] = useState('All')
   const [period, setPeriod] = useState('Q4')
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
 
-  const rows = useMemo(() => [], [])
+  // Fetch sales data from API
+  const fetchSalesData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        alert('No authentication token found. Please login again.')
+        return
+      }
+
+      const response = await axios.post(
+        `${API_URL}/EVM/dealerSaleRecords`,
+        { _empty: true },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true'
+          }
+        }
+      )
+
+      // Backend trả về {status: 'success', message: '...', data: Array}
+      // data là List<Map> với: dealerId, dealerName, address, phoneNumber, totalSales, totalOrders
+      if (response.data && response.data.status === 'success' && response.data.data) {
+        const backendData = response.data.data || []
+        
+        // Transform backend data to frontend format
+        const salesData = backendData.map(dealer => ({
+          dealer: dealer.dealerName || 'Unknown Dealer',
+          sales: parseFloat(dealer.totalSales || 0),
+          orders: parseInt(dealer.totalOrders || 0),
+          region: 'All' // Backend không có region, để "All" hoặc extract từ address nếu cần
+        }))
+
+        setRows(salesData)
+      } else {
+        console.log('Response not successful or no data:', response.data)
+        setRows([])
+      }
+    } catch (error) {
+      console.error('Error fetching sales data:', error)
+      console.error('Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: `${API_URL}/EVM/dealerSaleRecords`,
+        message: error.message
+      })
+      alert(error.response?.data?.message || 'Failed to fetch sales data')
+      setRows([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchSalesData()
+  }, [fetchSalesData])
 
   const filtered = useMemo(() => rows.filter(r => region === 'All' || r.region === region), [rows, region])
-  const max = useMemo(() => Math.max(...filtered.map(r => r.sales), 1), [filtered])
+  const max = useMemo(() => {
+    if (filtered.length === 0) return 1
+    return Math.max(...filtered.map(r => r.sales), 1)
+  }, [filtered])
   const total = useMemo(() => filtered.reduce((s, r) => s + r.sales, 0), [filtered])
+  
+  // Format currency
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+      minimumFractionDigits: 0,
+    }).format(amount)
+  }
 
 
   return (
@@ -64,9 +139,18 @@ const SalesReport = () => {
         {/* Top Dealers */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="text-sm font-semibold text-gray-900 mb-4">Top Dealers</div>
-          {filtered.map(r => (
-            <Bar key={r.dealer} label={r.dealer} value={r.sales} max={max} />
-          ))}
+          {loading ? (
+            <div className="text-sm text-gray-500 text-center py-4">Loading...</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-sm text-gray-500 text-center py-4">No sales data available</div>
+          ) : (
+            filtered
+              .sort((a, b) => b.sales - a.sales)
+              .slice(0, 5)
+              .map(r => (
+                <Bar key={r.dealer} label={r.dealer} value={r.sales} max={max} formatCurrency={formatCurrency} />
+              ))
+          )}
         </div>
 
         {/* Summary */}
@@ -75,7 +159,7 @@ const SalesReport = () => {
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">Total sales</span>
-              <span className="text-lg font-bold text-gray-900">{total}</span>
+              <span className="text-lg font-bold text-gray-900">{formatCurrency(total)}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">Dealers</span>
@@ -85,6 +169,12 @@ const SalesReport = () => {
               <span className="text-sm text-gray-600">Period</span>
               <span className="text-lg font-bold text-gray-900">{period}</span>
             </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Total Orders</span>
+              <span className="text-lg font-bold text-gray-900">
+                {filtered.reduce((sum, r) => sum + (r.orders || 0), 0)}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -93,6 +183,7 @@ const SalesReport = () => {
           <div className="text-sm font-semibold text-gray-900 mb-4">Notes</div>
           <div className="text-sm text-gray-600">
             Use filters to analyze performance by region and quarter.
+            {loading && <div className="mt-2 text-blue-600">Loading data...</div>}
           </div>
         </div>
       </div>

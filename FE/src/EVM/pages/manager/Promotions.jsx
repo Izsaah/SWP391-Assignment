@@ -133,25 +133,55 @@ const Promotions = () => {
   const handleCreate = useCallback(async () => { setForm({ dealer: 'Dealer A', name: '', type: 'Discount', value: '5%', from: '2025-10-01', to: '2025-12-31' }); setShowCreate(true) }, [])
   const handleDelete = useCallback((row) => {
     // Extract promoId from row.id (format: "promoId-dealerId" or just "promoId")
-    const promoId = row.id.split('-')[0]
+    // Convert to string first to avoid split error if row.id is number or undefined
+    if (!row || !row.id) {
+      console.error('Invalid row data:', row)
+      alert('Không tìm thấy thông tin promotion')
+      return
+    }
+    
+    const idString = String(row.id)
+    const promoId = idString.includes('-') ? idString.split('-')[0] : idString
+    
+    if (!promoId || promoId === 'undefined' || promoId === 'null') {
+      console.error('Invalid promoId extracted:', promoId, 'from row.id:', row.id)
+      alert('Không tìm thấy Promotion ID')
+      return
+    }
+    
     setDeletingPromotion({ ...row, promoId: promoId })
     setShowDeleteModal(true)
   }, [])
 
   const confirmDelete = useCallback(async () => {
-    if (!deletingPromotion) return
+    if (!deletingPromotion) {
+      console.error('No promotion selected for deletion')
+      return
+    }
+    
     try {
       const token = localStorage.getItem('token')
-      const promoId = deletingPromotion.promoId || deletingPromotion.id?.split('-')[0]
+      // Extract promoId - đã được set trong handleDelete, hoặc extract từ id
+      let promoId = deletingPromotion.promoId
       
-      if (!promoId) {
-        alert('Không tìm thấy Promotion ID')
+      // Fallback: extract từ id nếu promoId chưa được set
+      if (!promoId && deletingPromotion.id) {
+        const idString = String(deletingPromotion.id || '')
+        if (idString && idString !== 'undefined' && idString !== 'null') {
+          promoId = idString.includes('-') ? idString.split('-')[0] : idString
+        }
+      }
+      
+      // Validate promoId
+      if (!promoId || promoId === 'undefined' || promoId === 'null' || isNaN(parseInt(promoId))) {
+        console.error('Invalid promoId:', promoId, 'from deletingPromotion:', deletingPromotion)
+        alert('Không tìm thấy Promotion ID hợp lệ')
         return
       }
 
-      // Call disable promotion endpoint (similar to disable vehicle model/variant)
+      // Call delete promotion endpoint (matches BE: /api/EVM/deletePromotion)
       const response = await axios.post(
-        `${API_URL}/EVM/disablePromotion`,
+        `${API_URL}/EVM/deletePromotion`,
         { promoId: parseInt(promoId) },
         {
           headers: {

@@ -59,7 +59,7 @@ public class PromotionForDealerService {
     public List<Map<String, Object>> getAllPromotionsWithDealers() {
         return dealerPromotionDAO.getAllPromotionsWithDealers();
     }
-    
+
     public List<DealerDTO> getAllDealers(){
         return dealerDAO.getAllDealers();
     }
@@ -84,8 +84,8 @@ public class PromotionForDealerService {
     public boolean deletePromotion(int promoId) {
         try {
             // Check if promotion exists before deleting
-            PromotionDTO existing = (PromotionDTO) promotionDAO.GetPromotionById(promoId);
-            if (existing == null) {
+            List<PromotionDTO> promotionList = promotionDAO.GetPromotionById(promoId);
+            if (promotionList == null || promotionList.isEmpty()) {
                 return false;
             }
             
