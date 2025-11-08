@@ -65,10 +65,55 @@ public class VehicleSerialDAO {
             return ps.executeUpdate();
         }
     }
-    
-    public VehicleSerialDTO getSerialBySerialId(String serialId){
+
+    public VehicleSerialDTO getSerialBySerialId(String serialId) {
         List<VehicleSerialDTO> lists = retrieve("serial_id = ?", serialId);
         return lists.get(0);
+    }
+
+    public int batchCreate(Connection conn, List<VehicleSerialDTO> serials) throws SQLException {
+        if (serials == null || serials.isEmpty()) {
+            return 0;
+        }
+        String sql = "INSERT INTO VehicleSerial (serial_id, variant_id) VALUES (?, ?)";
+        try ( PreparedStatement ps = conn.prepareStatement(sql)) {
+            for (VehicleSerialDTO s : serials) {
+                ps.setString(1, s.getSerialId());
+                ps.setInt(2, s.getVariantId());
+                ps.addBatch();
+            }
+            int[] results = ps.executeBatch();
+            return results.length;
+        }
+    }
+
+    public List<VehicleSerialDTO> getAvailableSerialsByVariantId(Connection conn, int variantId) {
+        String sql = "SELECT vs.serial_id, vs.variant_id "
+                + "FROM VehicleSerial vs "
+                + "WHERE vs.variant_id = ? "
+                + "AND vs.serial_id NOT IN ("
+                + "    SELECT od.serial_id "
+                + "    FROM OrderDetail od "
+                + "    INNER JOIN [Order] o ON od.order_id = o.order_id "
+                + "    WHERE od.serial_id IS NOT NULL "
+                + "    AND o.customer_id > 0"
+                + ")";
+
+        List<VehicleSerialDTO> list = new ArrayList<>();
+        try ( PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, variantId);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                VehicleSerialDTO serial = new VehicleSerialDTO();
+                serial.setSerialId(rs.getString("serial_id"));
+                serial.setVariantId(rs.getInt("variant_id"));
+                list.add(serial);
+            }
+            return list;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
     }
 
 }

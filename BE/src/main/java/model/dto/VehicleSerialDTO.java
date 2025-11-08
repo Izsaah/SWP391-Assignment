@@ -12,6 +12,9 @@ public class VehicleSerialDTO {
     private String serialId;
     private int variantId;
 
+    public VehicleSerialDTO() {
+    }
+
     public VehicleSerialDTO(String serialId, int variantId) {
         this.serialId = serialId;
         this.variantId = variantId;

@@ -4,7 +4,9 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import model.dao.ConfirmationDAO;
@@ -26,7 +28,7 @@ public class OrderService {
     private final VehicleVariantDAO variantDAO = new VehicleVariantDAO();
     private final VehicleSerialDAO vehicleSerialDAO = new VehicleSerialDAO();
     private final OrderDetailDAO orderDetailDAO = new OrderDetailDAO();
-    
+
     public int HandlingCreateOrder(
             int customerId,
             int dealerstaffId,
@@ -51,10 +53,10 @@ public class OrderService {
                 throw new SQLException("Failed to create order");
             }
 
+            // Determine variant
             int finalVariantId;
             double finalUnitPrice;
 
-            // Auto-generate variant if missing
             if (variantId == null || variantId <= 0) {
                 VehicleVariantDTO newVariant = new VehicleVariantDTO();
                 newVariant.setModelId(modelId);
@@ -77,59 +79,106 @@ public class OrderService {
                 finalUnitPrice = variant.getPrice();
             }
 
-            // Order details
-            String serialId = null;
+            // Fetch available serials (not assigned to any customer) for this variant
+            List<VehicleSerialDTO> availableSerials = new ArrayList<>();
             if (!isCustom) {
-                // Normal order: reuse or generate serial
-                List<VehicleSerialDTO> existingSerials = vehicleSerialDAO.retrieve("variant_id = ?", finalVariantId);
-                if (existingSerials != null && !existingSerials.isEmpty()) {
-                    serialId = existingSerials.get(0).getSerialId();
+                // Get serials that are not assigned to customers (customer_id = 0 or not in order_detail)
+                availableSerials = vehicleSerialDAO.getAvailableSerialsByVariantId(conn, finalVariantId);
+
+                // **CHECK: If not enough available serials, throw exception**
+                if (availableSerials == null || availableSerials.size() < quantity) {
+                    int availableCount = (availableSerials != null) ? availableSerials.size() : 0;
+                    throw new IllegalStateException(
+                            "Not enough vehicles available for variant ID " + finalVariantId
+                            + ". Requested: " + quantity + ", Available: " + availableCount
+                            + ". This variant is sold out!"
+                    );
+                }
+            }
+
+            // Prepare batch lists
+            List<VehicleSerialDTO> batchSerials = new ArrayList<>();
+            List<OrderDetailDTO> batchDetails = new ArrayList<>();
+            List<ConfirmationDTO> batchConfirmations = new ArrayList<>();
+
+            // Generate required entries
+            for (int i = 0; i < quantity; i++) {
+                String currentSerialId;
+
+                if (!isCustom && i < availableSerials.size()) {
+                    // Reuse available serial (not assigned to any customer)
+                    currentSerialId = availableSerials.get(i).getSerialId();
+                } else if (isCustom) {
+                    // Generate new serial for custom orders
+                    currentSerialId = vehicleSerialDAO.generateSerialId();
+                    VehicleSerialDTO serial = new VehicleSerialDTO(currentSerialId, finalVariantId);
+                    batchSerials.add(serial);
                 } else {
-                    serialId = vehicleSerialDAO.generateSerialId();
-                    VehicleSerialDTO serial = new VehicleSerialDTO(serialId, finalVariantId);
-                    int createdSerial = vehicleSerialDAO.create(conn, serial);
-                    if (createdSerial != 1) {
-                        throw new SQLException("Failed to create vehicle serial");
+                    // This should never happen due to the check above, but just in case
+                    throw new IllegalStateException("Insufficient serials available");
+                }
+
+                // Add OrderDetail
+                OrderDetailDTO detail = new OrderDetailDTO();
+                detail.setOrderId(orderId);
+                detail.setSerialId(currentSerialId);
+                detail.setQuantity("1");
+                detail.setUnitPrice(finalUnitPrice);
+                batchDetails.add(detail);
+            }
+
+            // Batch insert serials (only for custom orders)
+            if (!batchSerials.isEmpty()) {
+                int insertedSerials = vehicleSerialDAO.batchCreate(conn, batchSerials);
+                if (insertedSerials != batchSerials.size()) {
+                    throw new SQLException("Failed to batch insert vehicle serials");
+                }
+            }
+
+            // Batch insert order details
+            int[] orderDetailIds = orderDetailDAO.batchCreateAndReturnIds(conn, batchDetails);
+            if (orderDetailIds.length != batchDetails.size()) {
+                throw new SQLException("Failed to batch insert order details");
+            }
+
+            // Insert confirmations for custom orders
+            if (isCustom) {
+                for (int i = 0; i < orderDetailIds.length; i++) {
+                    ConfirmationDTO confirm = new ConfirmationDTO();
+                    confirm.setUserId(1);
+                    confirm.setOrderDetailId(orderDetailIds[i]);
+                    confirm.setAgreement("Pending");
+                    confirm.setDate(order.getOrderDate());
+                    batchConfirmations.add(confirm);
+                }
+
+                if (!batchConfirmations.isEmpty()) {
+                    int insertedConfirms = confirmationDAO.batchInsert(conn, batchConfirmations);
+                    if (insertedConfirms != batchConfirmations.size()) {
+                        throw new SQLException("Failed to batch insert confirmations");
                     }
                 }
-            } else {
-                // Custom order: generate temporary serial
-                serialId = vehicleSerialDAO.generateSerialId();
-                VehicleSerialDTO serial = new VehicleSerialDTO(serialId, finalVariantId);
-                vehicleSerialDAO.create(conn, serial);
             }
 
-            // Insert OrderDetail
-            OrderDetailDTO detail = new OrderDetailDTO();
-            detail.setOrderId(orderId);
-            detail.setSerialId(serialId);
-            detail.setQuantity(String.valueOf(quantity));
-            detail.setUnitPrice(finalUnitPrice);
-            int orderDetailId = orderDetailDAO.create(conn, detail);
-            if (orderDetailId <= 0) {
-                throw new SQLException("Failed to insert order detail");
-            }
-
-            System.out.println("DEBUG: orderDetailId = " + orderDetailId);
-
-            // Insert confirmation for custom orders (use the order_detail_id we just got)
-            if (isCustom) {
-                String agreement = "Pending";
-                ConfirmationDTO confirmation = confirmationDAO.insert(conn, 1, orderDetailId, agreement, currentDate);
-                if (confirmation == null) {
-                    throw new SQLException("Failed to insert confirmation");
-                }
-                System.out.println("DEBUG: Confirmation inserted, ID = " + confirmation.getConfirmationId());
-            }
-
+            // Commit transaction
             conn.commit();
             return orderId;
 
+        } catch (IllegalStateException e) {
+            // Sold out exception - rollback and rethrow with clear message
+            System.err.println("SOLD OUT: " + e.getMessage());
+            if (conn != null) try {
+                conn.rollback();
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+            }
+            throw e; // Rethrow to be handled by controller
         } catch (Exception e) {
             e.printStackTrace();
             if (conn != null) try {
                 conn.rollback();
             } catch (SQLException ex) {
+                ex.printStackTrace();
             }
             return -1;
         } finally {
@@ -137,6 +186,7 @@ public class OrderService {
                 conn.setAutoCommit(true);
                 conn.close();
             } catch (SQLException ex) {
+                ex.printStackTrace();
             }
         }
     }
@@ -148,66 +198,77 @@ public class OrderService {
             conn = DbUtils.getConnection();
             conn.setAutoCommit(false);
 
-            // Get order detail
-            OrderDetailDTO detail = orderDetailDAO.getOrderDetailByOrderId(orderId);
-            if (detail == null) {
-                throw new SQLException("No OrderDetail found for order_id = " + orderId);
+            // FIX: Get ALL order details for this order, not just one
+            List<OrderDetailDTO> orderDetails = orderDetailDAO.getOrderDetailListByOrderId(orderId);
+            if (orderDetails == null || orderDetails.isEmpty()) {
+                throw new SQLException("No OrderDetails found for order_id = " + orderId);
             }
 
-            int orderDetailId = detail.getOrderDetailId();
-            String serialId = detail.getSerialId();
-            if (serialId == null) {
-                throw new SQLException("OrderDetail " + orderDetailId + " has no serial_id");
-            }
-            
-            boolean updatedPrice = orderDetailDAO.updateUnitPrice(orderDetailId, unitPrice);
-            if (!updatedPrice) {
-                throw new SQLException("Failed to update unit_price for order_detail_id = " + orderDetailId);
-            }
+            System.out.println("INFO: Processing " + orderDetails.size() + " order details for order_id = " + orderId);
 
-            // Get variantId via VehicleSerial
-            VehicleSerialDTO serial = vehicleSerialDAO.getSerialBySerialId(serialId);
-            if (serial == null) {
-                throw new SQLException("No variant found for serial_id = " + serialId);
-            }
-            int variantId = serial.getVariantId();
+            // Process each order detail
+            for (OrderDetailDTO detail : orderDetails) {
+                int orderDetailId = detail.getOrderDetailId();
+                String serialId = detail.getSerialId();
 
-            // Get confirmation for this order detail
-            ConfirmationDTO confirmation = confirmationDAO.getConfirmationByOrderDetailId(orderDetailId);
-            if (confirmation == null) {
-                throw new SQLException("No confirmation found for order_detail_id = " + orderDetailId);
-            }
-
-            // Update confirmation with decision & staff_admin_id
-            ConfirmationDTO updatedConfirmation = confirmationDAO.updateStatus(
-                    confirmation.getConfirmationId(),
-                    decision,
-                    staffAdminId
-            );
-
-            if (updatedConfirmation == null) {
-                throw new SQLException("Failed to update confirmation for confirmation_id = " + confirmation.getConfirmationId());
-            }
-
-            // Take action based on decision
-            if (decision.equalsIgnoreCase("Agree")) {
-                // Update VehicleVariant
-                boolean updated = variantDAO.updateVariantById(variantId, versionName, color);
-                if (!updated) {
-                    throw new SQLException("Failed to update VehicleVariant for variant_id = " + variantId);
+                if (serialId == null) {
+                    System.err.println("WARNING: OrderDetail " + orderDetailId + " has no serial_id, skipping...");
+                    continue;
                 }
-                System.out.println("INFO: Custom order approved. Updated variant_id = " + variantId);
 
-            } else if (decision.equalsIgnoreCase("Disagree")) {
+                // Update unit price for this order detail
+                boolean updatedPrice = orderDetailDAO.updateUnitPrice(orderDetailId, unitPrice);
+                if (!updatedPrice) {
+                    throw new SQLException("Failed to update unit_price for order_detail_id = " + orderDetailId);
+                }
 
-                // Delete Order
+                // Get variantId via VehicleSerial
+                VehicleSerialDTO serial = vehicleSerialDAO.getSerialBySerialId(serialId);
+                if (serial == null) {
+                    throw new SQLException("No variant found for serial_id = " + serialId);
+                }
+                int variantId = serial.getVariantId();
+
+                // Get confirmation for this order detail
+                ConfirmationDTO confirmation = confirmationDAO.getConfirmationByOrderDetailId(orderDetailId);
+                if (confirmation == null) {
+                    System.err.println("WARNING: No confirmation found for order_detail_id = " + orderDetailId);
+                    continue;
+                }
+
+                // Update confirmation with decision & staff_admin_id
+                ConfirmationDTO updatedConfirmation = confirmationDAO.updateStatus(
+                        confirmation.getConfirmationId(),
+                        decision,
+                        staffAdminId
+                );
+
+                if (updatedConfirmation == null) {
+                    throw new SQLException("Failed to update confirmation for confirmation_id = " + confirmation.getConfirmationId());
+                }
+
+                // Take action based on decision (only for "Agree")
+                if (decision.equalsIgnoreCase("Agree")) {
+                    // Update VehicleVariant for this order detail
+                    boolean updated = variantDAO.updateVariantById(variantId, versionName, color);
+                    if (!updated) {
+                        throw new SQLException("Failed to update VehicleVariant for variant_id = " + variantId);
+                    }
+                    System.out.println("INFO: Updated variant_id = " + variantId + " for order_detail_id = " + orderDetailId);
+                }
+            }
+
+            // Handle "Disagree" - delete the entire order after processing all details
+            if (decision.equalsIgnoreCase("Disagree")) {
                 boolean orderDeleted = orderDAO.deleteById(conn, orderId);
                 if (!orderDeleted) {
                     throw new SQLException("Failed to delete order_id = " + orderId);
                 }
-                System.out.println("INFO: Custom order rejected. Deleted order_id = " + orderId);
+                System.out.println("INFO: Custom order rejected. Deleted order_id = " + orderId + " with all its details");
+            } else if (decision.equalsIgnoreCase("Agree")) {
+                System.out.println("INFO: Custom order approved for order_id = " + orderId + " with " + orderDetails.size() + " items");
             } else {
-                System.out.println("INFO: Custom order decision is pending. No action taken.");
+                System.out.println("INFO: Custom order decision is pending for order_id = " + orderId + ". No action taken.");
             }
 
             conn.commit();
@@ -231,9 +292,16 @@ public class OrderService {
         }
     }
 
-    public List<OrderDTO> GetListOrderByDealerStaffId(int dealerStaffId) {
+    public List<OrderDTO> GetListOrderByDealerStaffId(int userId, int roleId, int dealerId) {
         try {
-            List<OrderDTO> orderList = orderDAO.getByStaffId(dealerStaffId);
+            List<OrderDTO> orderList;
+
+            if (roleId == 2) {
+                orderList = orderDAO.getAllByDealerId(dealerId);
+            } else {
+                // If staff, get only their orders
+                orderList = orderDAO.getByStaffId(userId);
+            }
 
             if (orderList == null || orderList.isEmpty()) {
                 return Collections.emptyList();
@@ -248,6 +316,36 @@ public class OrderService {
         } catch (Exception e) {
             e.printStackTrace();
             return Collections.emptyList();
+        }
+    }
+
+    public List<OrderDTO> GetAllOrdersFromDealer(int dealerId) {
+        try {
+            List<OrderDTO> orderList = orderDAO.getAllOrderFromDealer(dealerId);
+
+            if (orderList == null || orderList.isEmpty()) {
+                return Collections.emptyList();
+            }
+
+            // Populate order details for each order
+            for (OrderDTO order : orderList) {
+                OrderDetailDTO detail = orderDetailDAO.getOrderDetailByOrderId(order.getOrderId());
+                order.setDetail(detail);
+            }
+
+            return orderList;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Collections.emptyList();
+        }
+    }
+
+    public List<OrderDTO> getAllApprovedOrdersFromDealers() {
+        try {
+            return orderDAO.getAllApprovedOrdersFromAllDealers();
+        } catch (SQLException | ClassNotFoundException e) {
+            e.printStackTrace();
+            return null;
         }
     }
 
@@ -283,6 +381,7 @@ public class OrderService {
             return Collections.emptyList();
         }
     }
+
     public boolean updateOrderStatus(int orderId, String newStatus)
             throws SQLException, ClassNotFoundException {
 
@@ -293,7 +392,7 @@ public class OrderService {
             throw new IllegalArgumentException("Invalid status: " + newStatus);
         }
 
-        try (Connection conn = DbUtils.getConnection()) {
+        try ( Connection conn = DbUtils.getConnection()) {
             conn.setAutoCommit(false);
 
             boolean success = orderDAO.updateStatus(orderId, newStatus);
@@ -302,18 +401,44 @@ public class OrderService {
             return success;
         }
     }
-    public List<Map<String, Object>> retrieveOrdersWithConfirmedDetails(int orderDetailId)
+
+    public List<Map<String, Object>> retrieveOrdersWithConfirmedDetails()
             throws SQLException, ClassNotFoundException {
-        return orderDAO.retrieveOrdersWithConfirmedDetails(orderDetailId);
+        return orderDAO.retrieveOrdersWithConfirmedDetails();
     }
-    
-    public List<ConfirmationDTO> getAllConfirmation() throws SQLException, ClassNotFoundException{
+
+    public List<ConfirmationDTO> getAllConfirmation() throws SQLException, ClassNotFoundException {
         return confirmationDAO.viewConfirmations();
     }
-    
-    public List<ConfirmationDTO> getConfirmationByOrderDetailId(int orderDetailId) 
-            throws SQLException, ClassNotFoundException{
+
+    public List<ConfirmationDTO> getConfirmationByOrderDetailId(int orderDetailId)
+            throws SQLException, ClassNotFoundException {
         return confirmationDAO.viewConfirmationsByOrderDetailId(orderDetailId);
     }
-            
+
+    public Map<String, Object> getCompanyYearlySalesTarget(Integer year) {
+        try {
+            return orderDAO.calculateCompanyYearlySalesTarget(year);
+        } catch (SQLException | ClassNotFoundException e) {
+            e.printStackTrace();
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("year", year);
+            errorResult.put("totalOrders", 0);
+            errorResult.put("totalCars", 0);
+            errorResult.put("totalQuantity", 0);
+            errorResult.put("totalRevenue", 0.0);
+            errorResult.put("error", e.getMessage());
+            return errorResult;
+        }
+    }
+
+    public List<Map<String, Object>> getCompanyMonthlyBreakdown(Integer year) {
+        try {
+            return orderDAO.calculateCompanyMonthlyBreakdown(year);
+        } catch (SQLException | ClassNotFoundException e) {
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+    }
+
 }
