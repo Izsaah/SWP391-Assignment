@@ -11,7 +11,6 @@ import {
   ChevronDown,
   ChevronRight,
   Car,
-  GitCompare,
   FileText,
   ScrollText,
   CreditCard,
@@ -19,7 +18,15 @@ import {
   List,
   Calendar,
   MessageSquare,
+  UserCog,
+  TrendingUp,
+  Building2,
+  PieChart,
+  Boxes,
+  TruckIcon,
+  UserCheck,
   Truck,
+  Tag,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router";
 
@@ -44,14 +51,17 @@ export default function Sidebar() {
   return (
     <aside className="min-h-screen">
       <nav className="h-full flex flex-col bg-gray-800 text-white shadow-sm relative">
-        <div className="p-3 pb-2 flex justify-between items-center">
-          <h2
-            className={`uppercase tracking-wider text-sm font-medium text-gray-400 overflow-hidden transition-all ${
-              expanded ? "w-24" : "w-0"
+        <div className="p-3 pb-2 flex justify-between items-center border-b border-gray-700">
+          <div
+            className={`flex items-center space-x-2 overflow-hidden transition-all ${
+              expanded ? "w-48" : "w-0"
             }`}
           >
-            Menu
-          </h2>
+            <span className="text-xl">🚘</span>
+            <h2 className="text-sm font-bold text-white whitespace-nowrap">
+              EVDMS - Manager
+            </h2>
+          </div>
           <button
             onClick={() => setExpanded((curr) => !curr)}
             className="p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700"
@@ -77,8 +87,8 @@ export default function Sidebar() {
         </SidebarContext.Provider>
 
         <div className="border-t border-gray-700 flex p-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-            <Users className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center">
+            <UserCog className="w-4 h-4 text-white" />
           </div>
           <div
             className={`flex justify-between items-center overflow-hidden transition-all ${
@@ -86,7 +96,7 @@ export default function Sidebar() {
             }`}
           >
             <div className="leading-4">
-              <p className="text-sm font-medium text-white">Dealer Staff</p>
+              <p className="text-sm font-medium text-white">Manager</p>
               <span className="text-xs text-gray-400">Online</span>
             </div>
           </div>
@@ -117,7 +127,7 @@ function SidebarItem({ icon, text, active, onClick, alert, subItems, dropdownId 
           text-sm font-medium rounded-md cursor-pointer transition-colors group
           ${
             active
-              ? "bg-blue-600 text-white shadow-sm"
+              ? "bg-indigo-600 text-white shadow-sm"
               : "hover:bg-gray-800 text-gray-300"
           }
         `}
@@ -176,7 +186,7 @@ function SidebarItem({ icon, text, active, onClick, alert, subItems, dropdownId 
                 text-sm font-medium rounded-md cursor-pointer transition-colors group
                 ${
                   location.pathname === subItem.path
-                    ? "bg-blue-500/20 text-blue-200"
+                    ? "bg-indigo-500/20 text-indigo-200"
                     : "hover:bg-gray-800 text-gray-400"
                 }
               `}
@@ -194,27 +204,33 @@ function SidebarItem({ icon, text, active, onClick, alert, subItems, dropdownId 
 const menuItems = [
   {
     id: "dashboard",
-    label: "Dashboard",
+    label: "Dealer Overview",
     icon: LayoutDashboard,
-    path: "/staff/dashboard",
+    path: "/manager/dashboard",
   },
   { 
     id: "inventory", 
     label: "Inventory", 
     icon: Package, 
-    path: "/staff/inventory",
+    path: "/manager/inventory",
     subItems: [
       {
         id: "vehicle-list",
         label: "Vehicle List",
         icon: Car,
-        path: "/staff/inventory"
+        path: "/manager/inventory/vehicles"
       },
       {
-        id: "compare-models",
-        label: "Compare Models",
-        icon: GitCompare,
-        path: "/staff/inventory/compare"
+        id: "stock-overview",
+        label: "Stock Overview",
+        icon: Boxes,
+        path: "/manager/inventory/stock"
+      },
+      {
+        id: "manufacturer-requests",
+        label: "Request from Manufacturer",
+        icon: TruckIcon,
+        path: "/manager/inventory/manufacturer-requests"
       }
     ]
   },
@@ -222,34 +238,125 @@ const menuItems = [
     id: "sales", 
     label: "Sales", 
     icon: DollarSign, 
-    path: "/staff/sales",
+    path: "/manager/sales",
     subItems: [
       {
         id: "order-form",
         label: "Order Forms",
         icon: FileText,
-        path: "/staff/sales/order-form"
+        path: "/manager/sales/order-form"
       },
       {
         id: "payment",
         label: "Payment",
         icon: CreditCard,
-        path: "/staff/sales/payment"
+        path: "/manager/sales/payment"
       },
-      {
-        id: "delivery",
-        label: "Delivery",
-        icon: Truck,
-        path: "/staff/sales/delivery"
-      }
-    ]
-  },
+        {
+          id: "delivery",
+          label: "Delivery",
+          icon: Truck,
+          path: "/manager/sales/delivery"
+        },
+        {
+          id: "promotions",
+          label: "Promotions",
+          icon: Tag,
+          path: "/manager/promotions"
+        }
+      ]
+    },
   { 
     id: "customers", 
     label: "Customers", 
     icon: Users, 
-    path: "/staff/customers",
+    path: "/manager/customers",
+    subItems: [
+      {
+        id: "customer-list",
+        label: "Customer List",
+        icon: Users,
+        path: "/manager/customers/list"
+      },
+              {
+          id: "test-drive-schedule",
+          label: "Test Drive Schedule",
+          icon: Calendar,
+          path: "/manager/test-drive"
+        },
+      {
+        id: "feedback-complaints",
+        label: "Feedback & Complaints",
+        icon: MessageSquare,
+        path: "/manager/customers/feedback"
+      }
+    ]
   },
-  { id: "reports", label: "Reports", icon: BarChart3, path: "/staff/reports" },
-  { id: "settings", label: "Settings", icon: Settings, path: "/staff/settings" },
+  { 
+    id: "reports", 
+    label: "Reports", 
+    icon: BarChart3, 
+    path: "/manager/reports",
+    subItems: [
+      {
+        id: "sales-performance",
+        label: "Sales Performance",
+        icon: TrendingUp,
+        path: "/manager/reports/sales-performance"
+      },
+      {
+        id: "inventory-report",
+        label: "Inventory Report",
+        icon: PieChart,
+        path: "/manager/reports/inventory"
+      },
+      {
+        id: "debt-report",
+        label: "Debt Report",
+        icon: DollarSign,
+        path: "/manager/reports/debt"
+      }
+    ]
+  },
+  { 
+    id: "staff-management", 
+    label: "Staff Management", 
+    icon: UserCog, 
+    path: "/manager/staff",
+    subItems: [
+      {
+        id: "staff-list",
+        label: "Staff List",
+        icon: Users,
+        path: "/manager/staff/list"
+      },
+      {
+        id: "performance-tracking",
+        label: "Performance Tracking",
+        icon: UserCheck,
+        path: "/manager/staff/performance"
+      }
+    ]
+  },
+  { 
+    id: "settings", 
+    label: "Settings", 
+    icon: Settings, 
+    path: "/manager/settings",
+    subItems: [
+      {
+        id: "dealer-profile",
+        label: "Dealer Profile",
+        icon: Building2,
+        path: "/manager/settings/dealer-profile"
+      },
+      {
+        id: "account-settings",
+        label: "Account Settings",
+        icon: UserCog,
+        path: "/manager/settings/account"
+      }
+    ]
+  },
 ];
+

@@ -18,11 +18,10 @@ export const DashBoard = () => {
   ];
 
   const pipelineData = [
-    { status: 'Pending Quotes', quantity: 15, color: '#F59E0B' },
-    { status: 'Approved Quotes', quantity: 12, color: '#3B82F6' },
-    { status: 'Orders In Progress', quantity: 8, color: '#8B5CF6' },
-    { status: 'Delivered Orders', quantity: 25, color: '#10B981' },
-    { status: 'Cancelled Orders', quantity: 3, color: '#EF4444' },
+    { status: 'Pending Order Forms', quantity: 15, color: '#F59E0B' },
+    { status: 'Active Installments', quantity: 8, color: '#3B82F6' },
+    { status: 'In Progress Deliveries', quantity: 12, color: '#8B5CF6' },
+    { status: 'Completed Orders', quantity: 25, color: '#10B981' },
   ];
 
 

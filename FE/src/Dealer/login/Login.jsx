@@ -1,124 +1,123 @@
 import React, { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router';
-import ReactImg from '../../assets/car2.jpg'
-import { FaGoogle } from "react-icons/fa";
-import { useAuth } from './AuthContext';
-
+import { useNavigate } from 'react-router';
+import ReactImg from '../../assets/car2.jpg';
+import { useAuth } from './useAuth';
 
 export default function LoginPage() {
-        const { login } = useAuth();
-        const [email, setEmail] = useState('');
-        const [password, setPassword] = useState('');
-        const navigate = useNavigate();
-        const [error, setError] = useState('');
-        const [loading, setLoading] = useState(false);
+    const { login, currentUser } = useAuth();
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const navigate = useNavigate();
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
 
-      const handleSubmit = async (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
+
         setLoading(true);
         setError('');
 
-        // gọi hàm login từ AuthContext
         try {
-          const res = await login(email, password);
-          if (res.success) {
-            // Lấy user từ response hoặc từ localStorage
-            const user = res.user || JSON.parse(localStorage.getItem('user') || '{}');
-            const userRoles = user.roles || [];
-            
-            // Kiểm tra role để redirect đúng dashboard
-            // Roles có thể là array of objects {roleId, roleName} hoặc array of strings
-            const roleNames = userRoles.map(role => {
-              if (typeof role === 'string') return role.toUpperCase();
-              return (role.roleName || role.role_name || '').toUpperCase();
-            }).filter(r => r); // Remove empty strings
-            
-            console.log('User roles:', roleNames);
-            console.log('User object:', user);
-            
-            // Nếu có role EVM hoặc ADMIN → redirect đến EVM dashboard
-            if (roleNames.includes('EVM') || roleNames.includes('ADMIN')) {
-              navigate('/evm');
+            const res = await login(email, password);
+            if (res.success) {
+                // Get user role and redirect to appropriate dashboard
+                const userRole = res.user?.roles?.[0]?.roleName || currentUser?.roles?.[0]?.roleName;
+
+                // Backend returns "Dealer Manager" and "Dealer Staff" (from database role_name column)
+                // Support both backend format and short format for flexibility
+                if (userRole === 'Dealer Manager' || userRole === 'MANAGER') {
+                    navigate('/manager/dashboard');
+                } else if (userRole === 'Dealer Staff' || userRole === 'STAFF') {
+                    navigate('/staff/dashboard');
+                } else {
+                    // Default fallback - could also show error for unknown roles
+                    console.warn('Unknown role:', userRole);
+                    navigate('/staff/dashboard');
+                }
             } else {
-              // Các role khác (STAFF, MANAGER, DEALER_STAFF) → redirect đến Dealer dashboard
-              navigate('/dashboard');
+                setError(res.message || 'Login failed. Please check your credentials.');
             }
-          } else {
-            setError(res.message || 'Login failed. Please check your credentials.');
-          }
         } catch (err) {
-          console.error('Login failed:', err);
-          setError('An error occurred. Please try again later.');
+            console.error('Login failed:', err);
+            setError('An error occurred. Please try again later.');
         }
         setLoading(false);
-      };
+    };
 
+    return (
+        <div className="flex justify-center items-center min-h-screen bg-gradient-to-r from-gray-100 to-gray-200">
+            <div className="flex w-[1400px] h-[700px] bg-white shadow-2xl rounded-2xl overflow-hidden">
+                {/* Left - Sign In */}
+                <div className="flex-1 flex flex-col justify-center items-center p-10 bg-gradient-to-r from-gray-400 to-gray-200">
+                    <h2 className="text-3xl font-bold mb-6">Sign In</h2>
+                    <p className="text-gray-500 mb-6">Enter your credentials to access your account</p>
 
+                    {/* Form */}
+                    <form onSubmit={handleSubmit} className="w-full max-w-md">
+                        <div className="mb-4">
+                            <input
+                                type="email"
+                                value={email}
+                                onChange={e => setEmail(e.target.value)}
+                                placeholder="Email"
+                                required
+                                disabled={loading}
+                                className="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <input
+                                type="password"
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                placeholder="Password"
+                                required
+                                disabled={loading}
+                                className="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <a href="#" className="text-sm font-medium text-black hover:underline">
+                                Forget Your Password?
+                            </a>
+                        </div>
+                        {error && (
+                            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm">
+                                {error}
+                            </div>
+                        )}
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className={`w-full px-4 py-2 text-white font-medium rounded-lg ${
+                                loading
+                                    ? 'bg-gray-300 cursor-not-allowed'
+                                    : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-xl transition duration-300'
+                            }`}
+                        >
+                            {loading ? 'Signing In...' : 'Sign In'}
+                        </button>
+                    </form>
+                </div>
 
-  return (
-    <div className="flex justify-center items-center min-h-screen bg-gradient-to-r from-gray-100 to-gray-200">
-      
-      <div className="flex w-[1400px] h-[700px] bg-white shadow-2xl rounded-2xl overflow-hidden">
-        
-        {/* Left - Sign In */}
-        <div className="flex-1 flex flex-col justify-center items-center p-10 bg-gradient-to-r from-gray-400 to-gray-200">
-          <h2 className="text-3xl font-bold mb-6">Sign In</h2>
-
-          <p className="text-gray-500 mb-4">or use your email password</p>
-          <button
-            className="flex items-center justify-center bg-white w-full border p-2 mb-4 rounded-md hover:bg-gray-100"
-            onClick={() => alert('Google Sign-In not implemented')}
-          >
-            <FaGoogle className="mr-2" /> Sign in with Google
-          </button>
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="w-full">
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="Email"
-              className="w-full p-3 mb-4 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="Password"
-              className="w-full p-3 mb-4 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
-            <a href="#" className="text-sm font-medium text-black mb-4">
-              Forget Your Password?
-            </a>
-            {error && (
-              <div className="text-red-500 mb-2 text-sm">
-                {error}
-              </div>
-            )}
-            <button
-              type="submit"
-              disabled={loading}
-              className={`w-full px-4 py-2 mt-4 my-2 text-white font-medium rounded-lg ${loading ? 'bg-gray-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-xl transition duration-300'}`}
-            >
-              {loading ? 'Signing In...' : 'Sign In'}
-            </button>
-          </form>
-        </div>
-
-        {/* Right - Sign Up Info */}
-        <div className="flex-2 text-white flex flex-col justify-center items-center p-10"
-          style={{ backgroundImage: `url(${ReactImg})`, backgroundSize: "cover", backgroundPosition: "45% 85%" }}>
-            <div className='flex-2 text-white flex flex-col justify-end items-end pl-100 pb-[-100px]   '>
-
-          <h2 className="text-3xl text-neutral-200 font-extrabold mb-4">Porches TayCan</h2>
-          <p className="mb-12 text-center">
-            Register with your personal details to use all site features
-          </p>
+                {/* Right - Sign Up Info */}
+                <div
+                    className="flex-2 text-white flex flex-col justify-center items-center p-10"
+                    style={{
+                        backgroundImage: `url(${ReactImg})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: '45% 85%'
+                    }}
+                >
+                    <div className="flex-2 text-white flex flex-col justify-end items-end pl-100 pb-[-100px]">
+                        <h2 className="text-3xl text-neutral-200 font-extrabold mb-4">Porsche TayCan</h2>
+                        <p className="mb-12 text-center">
+                            Register with your personal details to use all site features
+                        </p>
+                    </div>
+                </div>
             </div>
-          
         </div>
-      </div>
-    </div>
-  );
+    );
 }
 

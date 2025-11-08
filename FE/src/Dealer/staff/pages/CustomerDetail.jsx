@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import Layout from '../layout/Layout';
+import { viewOrdersByCustomerId } from '../services/orderService';
 import {
   ChevronRight,
   Phone,
@@ -28,6 +29,8 @@ const CustomerDetail = () => {
   const [activeTab, setActiveTab] = useState('info');
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [newNote, setNewNote] = useState('');
+  const [orders, setOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
 
   // Mock customer data - in real app, fetch from API using customerId from URL
   // Example: useEffect(() => { fetchCustomer(customerId); }, [customerId]);
@@ -57,30 +60,85 @@ const CustomerDetail = () => {
     }
   };
 
-  // Mock quotations data
-  const quotations = [
-    {
-      id: 'Q-2025-001',
-      vehicle: 'Model 3 AWD',
-      price: '1,020,000,000 VND',
-      status: 'Approved',
-      createdDate: '20/10/2025'
-    },
-    {
-      id: 'Q-2025-002',
-      vehicle: 'VF e34',
-      price: '940,000,000 VND',
-      status: 'Draft',
-      createdDate: '22/10/2025'
-    },
-    {
-      id: 'Q-2025-003',
-      vehicle: 'Model Y RWD',
-      price: '1,180,000,000 VND',
-      status: 'Pending',
-      createdDate: '25/10/2025'
-    }
-  ];
+  // Fetch orders when component mounts or customerId changes
+  useEffect(() => {
+    const fetchOrders = async () => {
+      if (!customerId) return;
+      
+      setLoadingOrders(true);
+      try {
+        const result = await viewOrdersByCustomerId(parseInt(customerId));
+        if (result.success && result.data) {
+          // Transform order data for display
+          const transformedOrders = result.data.map(order => {
+            // Get price from order detail or confirmation
+            let price = 0;
+            let vehicleName = 'Unknown Vehicle';
+            
+            // Try to get vehicle name from various sources
+            const modelId = order.modelId || order.model_id;
+            const serialId = order.detail?.serialId || order.detail?.serial_id;
+            
+            // Build vehicle name
+            if (modelId) {
+              vehicleName = `Model ID: ${modelId}`;
+            }
+            
+            if (order.detail) {
+              price = order.detail.unitPrice || order.detail.unit_price || 0;
+              // Add serial ID info if available
+              if (serialId) {
+                vehicleName = modelId ? `${vehicleName} (Serial: ${serialId})` : `Serial: ${serialId}`;
+              }
+            }
+            
+            if (order.confirmation) {
+              const confirmationPrice = order.confirmation.totalPrice || order.confirmation.total_price;
+              if (confirmationPrice) {
+                price = confirmationPrice;
+              }
+            }
+            
+            // Format date
+            const orderDate = order.orderDate || order.order_date || '';
+            const formattedDate = orderDate ? new Date(orderDate).toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric'
+            }) : '';
+            
+            // Format price
+            const formattedPrice = price ? new Intl.NumberFormat('vi-VN', {
+              style: 'currency',
+              currency: 'VND',
+              minimumFractionDigits: 0
+            }).format(price) : 'N/A';
+            
+            return {
+              id: `ORD-${order.orderId || order.order_id}`,
+              orderId: order.orderId || order.order_id,
+              vehicle: vehicleName,
+              price: formattedPrice,
+              status: order.status || 'Pending',
+              createdDate: formattedDate,
+              rawDate: orderDate
+            };
+          });
+          
+          setOrders(transformedOrders);
+        } else {
+          setOrders([]);
+        }
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        setOrders([]);
+      } finally {
+        setLoadingOrders(false);
+      }
+    };
+    
+    fetchOrders();
+  }, [customerId]);
 
   // Mock test drives data
   const testDrives = [
@@ -439,50 +497,60 @@ const CustomerDetail = () => {
                 {activeTab === 'quotations' && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-gray-900">Quotations</h3>
+                      <h3 className="text-lg font-semibold text-gray-900">Orders</h3>
                       <button className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
                         <Plus className="w-4 h-4" />
-                        <span className="text-sm font-medium">Create New Quotation</span>
+                        <span className="text-sm font-medium">Create New Order</span>
                       </button>
                     </div>
 
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Quote ID</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Vehicle</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Price</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Status</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Created</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {quotations.map((quote) => (
-                            <tr key={quote.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-4 text-sm font-medium text-gray-900">{quote.id}</td>
-                              <td className="px-4 py-4 text-sm text-gray-700">{quote.vehicle}</td>
-                              <td className="px-4 py-4 text-sm text-gray-700">{quote.price}</td>
-                              <td className="px-4 py-4">{getQuoteStatusBadge(quote.status)}</td>
-                              <td className="px-4 py-4 text-sm text-gray-700">{quote.createdDate}</td>
-                              <td className="px-4 py-4">
-                                <div className="flex items-center space-x-2">
-                                  <button className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors">
-                                    <Eye className="w-4 h-4 text-blue-600" />
-                                  </button>
-                                  {quote.status === 'Draft' && (
-                                    <button className="p-1.5 hover:bg-green-50 rounded-lg transition-colors">
-                                      <Edit className="w-4 h-4 text-green-600" />
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
+                    {loadingOrders ? (
+                      <div className="text-center py-8">
+                        <p className="text-gray-600">Loading orders...</p>
+                      </div>
+                    ) : orders.length === 0 ? (
+                      <div className="text-center py-8">
+                        <p className="text-gray-600">No orders found for this customer.</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Order ID</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Vehicle</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Price</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Status</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Created</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Action</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {orders.map((order) => (
+                              <tr key={order.id} className="hover:bg-gray-50">
+                                <td className="px-4 py-4 text-sm font-medium text-gray-900">{order.id}</td>
+                                <td className="px-4 py-4 text-sm text-gray-700">{order.vehicle}</td>
+                                <td className="px-4 py-4 text-sm text-gray-700">{order.price}</td>
+                                <td className="px-4 py-4">{getQuoteStatusBadge(order.status)}</td>
+                                <td className="px-4 py-4 text-sm text-gray-700">{order.createdDate}</td>
+                                <td className="px-4 py-4">
+                                  <div className="flex items-center space-x-2">
+                                    <button className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors">
+                                      <Eye className="w-4 h-4 text-blue-600" />
+                                    </button>
+                                    {(order.status === 'Pending' || order.status === 'pending') && (
+                                      <button className="p-1.5 hover:bg-green-50 rounded-lg transition-colors">
+                                        <Edit className="w-4 h-4 text-green-600" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 )}
 

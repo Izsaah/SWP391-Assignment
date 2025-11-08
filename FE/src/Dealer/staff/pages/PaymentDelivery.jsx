@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Layout from '../layout/Layout';
-import { CreditCard, Package, Eye, CheckCircle, Plus, FileText } from 'lucide-react';
+import { CreditCard, Package, CheckCircle, Plus, FileText } from 'lucide-react';
 
 const PaymentDelivery = () => {
   const [statusFilter, setStatusFilter] = useState('all');
@@ -10,94 +10,42 @@ const PaymentDelivery = () => {
   // Sample payment & delivery data
   const records = [
     {
-      contractId: 'C-2025-001',
-      customer: 'Le Minh Tuan',
-      vehicle: 'Model 3 Standard RWD',
-      amount: 920000000,
+      orderId: 'ORD-2025-003',
+      orderFormId: 'OF-2025-003',
+      customer: 'Nguyen Van An',
+      vehicle: 'Model 3 Performance AWD',
+      amount: 1250000000,
       // Payment Info
-      paymentMethod: 'Cash',
+      paymentMethod: 'Full Payment',
       amountPaid: 0,
       paymentStatus: 'Pending',
       paymentNotes: 'Awaiting customer payment',
       // Delivery Info
       warehouse: 'Warehouse A',
       driver: 'Tran Van Hung',
-      estimatedDelivery: '2025-10-25',
+      estimatedDelivery: '2025-10-28',
       deliveryStatus: 'Awaiting',
       deliveryNotes: 'Vehicle prepared for delivery',
       overallStatus: 'Pending',
     },
     {
-      contractId: 'C-2025-002',
-      customer: 'Nguyen Hoa',
-      vehicle: 'Model Y Long Range',
-      amount: 1200000000,
-      // Payment Info
-      paymentMethod: 'Finance',
-      amountPaid: 1200000000,
-      paymentStatus: 'Paid',
-      paymentNotes: 'Full payment received via installment plan',
-      // Delivery Info
-      warehouse: 'Warehouse B',
-      driver: 'Le Van Thanh',
-      estimatedDelivery: '2025-10-22',
-      deliveryStatus: 'Delivered',
-      deliveryNotes: 'Successfully delivered on October 22, 2025',
-      overallStatus: 'Completed',
-    },
-    {
-      contractId: 'C-2025-003',
-      customer: 'Nguyen Van An',
-      vehicle: 'Model 3 Performance AWD',
-      amount: 1250000000,
-      // Payment Info
-      paymentMethod: 'Cash',
-      amountPaid: 1250000000,
-      paymentStatus: 'Paid',
-      paymentNotes: 'VIP customer - immediate payment completed',
-      // Delivery Info
-      warehouse: 'Warehouse A',
-      driver: 'Pham Van Minh',
-      estimatedDelivery: '2025-10-26',
-      deliveryStatus: 'In Transit',
-      deliveryNotes: 'En route to customer location',
-      overallStatus: 'Paid',
-    },
-    {
-      contractId: 'C-2025-004',
-      customer: 'Tran Thi Mai',
+      orderId: 'ORD-2025-004',
+      orderFormId: 'OF-2025-004',
+      customer: 'Pham Thu Ha',
       vehicle: 'Model 3 Premium AWD',
       amount: 1020000000,
       // Payment Info
-      paymentMethod: 'Cash',
-      amountPaid: 500000000,
-      paymentStatus: 'Partial',
-      paymentNotes: 'Deposit received, awaiting remaining balance',
+      paymentMethod: 'Full Payment',
+      amountPaid: 1020000000,
+      paymentStatus: 'Paid',
+      paymentNotes: 'Full payment received',
       // Delivery Info
-      warehouse: 'Warehouse C',
-      driver: 'Not assigned',
-      estimatedDelivery: '2025-10-28',
-      deliveryStatus: 'Awaiting',
-      deliveryNotes: 'Awaiting full payment before delivery',
-      overallStatus: 'Pending',
-    },
-    {
-      contractId: 'C-2025-005',
-      customer: 'Pham Van Loc',
-      vehicle: 'Model Y Performance',
-      amount: 1450000000,
-      // Payment Info
-      paymentMethod: 'Lease',
-      amountPaid: 290000000,
-      paymentStatus: 'Partial',
-      paymentNotes: 'Lease agreement active - monthly installments in progress',
-      // Delivery Info
-      warehouse: 'Warehouse A',
-      driver: 'Nguyen Van Binh',
-      estimatedDelivery: '2025-10-24',
-      deliveryStatus: 'Awaiting',
-      deliveryNotes: 'Ready for delivery pending payment progress',
-      overallStatus: 'Pending',
+      warehouse: 'Warehouse B',
+      driver: 'Le Van Thanh',
+      estimatedDelivery: '2025-10-27',
+      deliveryStatus: 'Delivered',
+      deliveryNotes: 'Successfully delivered on October 27, 2025',
+      overallStatus: 'Completed',
     },
   ];
 
@@ -142,24 +90,24 @@ const PaymentDelivery = () => {
   const handleMarkAsPaid = (record) => {
     const totalAmount = formatCurrency(record.amount);
     if (window.confirm(`Confirm payment received in full (${totalAmount})?`)) {
-      console.log('Marking as paid:', record.contractId);
-      alert(`✅ Payment confirmed successfully.\n\nContract ${record.contractId} marked as Paid.`);
+      console.log('Marking as paid:', record.orderId);
+      alert(`✅ Payment confirmed successfully.\n\nOrder ${record.orderId} marked as Paid.`);
       setIsDetailsModalOpen(false);
     }
   };
 
   // Handle mark as delivered
-  const handleMarkAsDelivered = (contractId) => {
-    console.log('Marking as delivered:', contractId);
-    alert(`🚚 Delivery confirmed. Contract ${contractId} marked as Delivered.`);
+  const handleMarkAsDelivered = (orderId) => {
+    console.log('Marking as delivered:', orderId);
+    alert(`🚚 Delivery confirmed. Order ${orderId} marked as Delivered.`);
     setIsDetailsModalOpen(false);
   };
 
-  // Handle complete contract
-  const handleCompleteContract = (contractId) => {
-    if (window.confirm(`Complete contract ${contractId}? This will finalize the sale.`)) {
-      console.log('Completing contract:', contractId);
-      alert(`✅ Contract ${contractId} Completed successfully!`);
+  // Handle complete order
+  const handleCompleteOrder = (orderId) => {
+    if (window.confirm(`Complete order ${orderId}? This will finalize the sale.`)) {
+      console.log('Completing order:', orderId);
+      alert(`✅ Order ${orderId} Completed successfully!`);
       setIsDetailsModalOpen(false);
     }
   };
@@ -246,7 +194,7 @@ const PaymentDelivery = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Contract ID
+                    Order ID
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Customer
@@ -260,16 +208,13 @@ const PaymentDelivery = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Delivery
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredRecords.map((record) => (
-                  <tr key={record.contractId} className="hover:bg-gray-50">
+                  <tr key={record.orderId} onClick={() => handleViewDetails(record)} className="hover:bg-blue-50 cursor-pointer transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{record.contractId}</div>
+                      <div className="text-sm font-medium text-gray-900">{record.orderId}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{record.customer}</div>
@@ -291,35 +236,6 @@ const PaymentDelivery = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getStatusBadge(record.deliveryStatus)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-3">
-                        <button
-                          onClick={() => handleViewDetails(record)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="View Details"
-                        >
-                          <Eye className="w-5 h-5" />
-                        </button>
-                        {record.paymentStatus !== 'Paid' && record.paymentMethod === 'Cash' && (
-                          <button
-                            onClick={() => handleMarkAsPaid(record)}
-                            className="text-green-600 hover:text-green-900"
-                            title="Mark as Paid"
-                          >
-                            <CreditCard className="w-5 h-5" />
-                          </button>
-                        )}
-                        {record.deliveryStatus !== 'Delivered' && record.paymentStatus === 'Paid' && (
-                          <button
-                            onClick={() => handleMarkAsDelivered(record.contractId)}
-                            className="text-purple-600 hover:text-purple-900"
-                            title="Mark as Delivered"
-                          >
-                            <Package className="w-5 h-5" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -329,15 +245,15 @@ const PaymentDelivery = () => {
 
         {/* Details Modal */}
         {isDetailsModalOpen && selectedRecord && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-300">
               {/* Modal Header */}
-              <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-6 border-b border-green-800">
+              <div className="bg-gradient-to-r from-green-600 to-emerald-700 text-white p-6 border-b border-green-800">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-xl font-bold">Payment & Delivery Details</h2>
+                    <h2 className="text-2xl font-bold">Payment & Delivery Details</h2>
                     <p className="text-green-100 text-sm mt-1">
-                      {selectedRecord.contractId}
+                      Order {selectedRecord.orderId} • {selectedRecord.orderFormId}
                     </p>
                   </div>
                   <button
@@ -349,8 +265,10 @@ const PaymentDelivery = () => {
                 </div>
               </div>
 
-              {/* Modal Content */}
-              <div className="p-6 space-y-6 max-h-[calc(90vh-200px)] overflow-y-auto">
+              {/* Modal Content - Two Column Layout */}
+              <div className="flex flex-col lg:flex-row max-h-[calc(90vh-200px)] overflow-hidden">
+                {/* Left Section - Details (50%) */}
+                <div className="flex-1 p-6 overflow-y-auto space-y-6 border-r border-gray-200">
                 {/* Customer Info */}
                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <div className="grid grid-cols-2 gap-4">
@@ -401,37 +319,6 @@ const PaymentDelivery = () => {
                       <span>{getStatusBadge(selectedRecord.paymentStatus)}</span>
                     </div>
                   </div>
-                  <div className="mt-4 pt-4 border-t border-blue-300 flex space-x-2">
-                    {selectedRecord.paymentStatus !== 'Paid' && selectedRecord.paymentMethod === 'Cash' && (
-                      <button
-                        onClick={() => handleMarkAsPaid(selectedRecord)}
-                        className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition-colors"
-                      >
-                        <span className="text-lg">💵</span>
-                        <span>Mark as Paid</span>
-                      </button>
-                    )}
-                    {selectedRecord.paymentStatus !== 'Paid' && (selectedRecord.paymentMethod === 'Finance' || selectedRecord.paymentMethod === 'Lease') && (
-                      <button className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-semibold transition-colors">
-                        <Plus className="w-4 h-4" />
-                        <span>Add Installment</span>
-                      </button>
-                    )}
-                    <button className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-semibold transition-colors">
-                      <FileText className="w-4 h-4" />
-                      <span>📜 View Payment Log</span>
-                    </button>
-                  </div>
-                  {selectedRecord.paymentStatus !== 'Paid' && selectedRecord.paymentMethod === 'Cash' && (
-                    <div className="mt-3 text-xs text-blue-700 bg-blue-100 p-3 rounded border border-blue-200">
-                      🛈 Once marked as paid, the contract will move to "Completed" status.
-                    </div>
-                  )}
-                  {selectedRecord.paymentStatus !== 'Paid' && (selectedRecord.paymentMethod === 'Finance' || selectedRecord.paymentMethod === 'Lease') && (
-                    <div className="mt-3 text-xs text-orange-700 bg-orange-100 p-3 rounded border border-orange-200">
-                      💡 Add installment payments periodically. Status will automatically change to "Paid" when Amount Paid ≥ Total.
-                    </div>
-                  )}
                   <div className="mt-3 text-xs text-gray-600 bg-white/50 p-2 rounded">
                     💡 {selectedRecord.paymentNotes}
                   </div>
@@ -467,44 +354,122 @@ const PaymentDelivery = () => {
                       <span>{getStatusBadge(selectedRecord.deliveryStatus)}</span>
                     </div>
                   </div>
-                  <div className="mt-4 pt-4 border-t border-purple-300 flex space-x-2">
-                    {selectedRecord.deliveryStatus !== 'Delivered' && selectedRecord.paymentStatus === 'Paid' && (
-                      <button
-                        onClick={() => handleMarkAsDelivered(selectedRecord.contractId)}
-                        className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold transition-colors"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                        <span>Mark as Delivered</span>
-                      </button>
-                    )}
-                    <button className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-semibold transition-colors">
-                      <FileText className="w-4 h-4" />
-                      <span>Add Note</span>
-                    </button>
-                  </div>
                   <div className="mt-3 text-xs text-gray-600 bg-white/50 p-2 rounded">
                     📦 {selectedRecord.deliveryNotes}
                   </div>
                 </div>
+                </div>
+
+                {/* Right Section - Actions (50%) */}
+                <div className="flex-1 p-6 overflow-y-auto space-y-4 border-l border-gray-100">
+                  {/* Current Status Display */}
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4">
+                    <div className="text-xs text-gray-600 uppercase tracking-wide mb-2">Progress</div>
+                    <div className="text-2xl font-bold text-green-600 mb-1">
+                      {selectedRecord.overallStatus}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {selectedRecord.paymentMethod}
+                    </div>
+                  </div>
+
+                  {/* Payment Actions */}
+                  {selectedRecord.paymentStatus !== 'Paid' && (
+                    <div className="space-y-2">
+                      {selectedRecord.paymentMethod === 'Full Payment' && (
+                        <button
+                          onClick={() => handleMarkAsPaid(selectedRecord)}
+                          className="w-full flex items-center justify-between px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all duration-200 group"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <CheckCircle className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                            <div className="text-left">
+                              <div className="font-semibold">Confirm Payment</div>
+                              <div className="text-xs text-green-100">Mark as Paid</div>
+                            </div>
+                          </div>
+                          <span className="text-xl group-hover:translate-x-1 transition-transform">→</span>
+                        </button>
+                      )}
+                      {selectedRecord.paymentMethod === 'Installment' && (
+                        <button className="w-full flex items-center justify-between px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-all duration-200 group">
+                          <div className="flex items-center space-x-3">
+                            <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                            <div className="text-left">
+                              <div className="font-semibold">Add Installment</div>
+                              <div className="text-xs text-orange-100">Record Payment</div>
+                            </div>
+                          </div>
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Delivery Actions */}
+                  {selectedRecord.deliveryStatus !== 'Delivered' && selectedRecord.paymentStatus === 'Paid' && (
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => handleMarkAsDelivered(selectedRecord.orderId)}
+                        className="w-full flex items-center justify-between px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-all duration-200 group"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <CheckCircle className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                          <div className="text-left">
+                            <div className="font-semibold">Confirm Delivery</div>
+                            <div className="text-xs text-purple-100">Mark as Delivered</div>
+                          </div>
+                        </div>
+                        <span className="text-xl group-hover:translate-x-1 transition-transform">→</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Additional Actions */}
+                  <div className="space-y-2 pt-2 border-t border-gray-200">
+                    <button className="w-full flex items-center justify-between px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 hover:border-gray-400 rounded-lg transition-all duration-200 group">
+                      <div className="flex items-center space-x-3">
+                        <FileText className="w-4 h-4 text-gray-500 group-hover:text-blue-600 transition-colors" />
+                        <span className="text-sm font-medium">View Payment Log</span>
+                      </div>
+                    </button>
+                    
+                    <button className="w-full flex items-center justify-between px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 hover:border-gray-400 rounded-lg transition-all duration-200 group">
+                      <div className="flex items-center space-x-3">
+                        <FileText className="w-4 h-4 text-gray-500 group-hover:text-purple-600 transition-colors" />
+                        <span className="text-sm font-medium">Add Note</span>
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Complete Order Action */}
+                  {selectedRecord.paymentStatus === 'Paid' && selectedRecord.deliveryStatus === 'Delivered' && (
+                    <div className="pt-2 border-t border-gray-200">
+                      <button
+                        onClick={() => handleCompleteOrder(selectedRecord.orderId)}
+                        className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg transition-all duration-200 group"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <CheckCircle className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                          <div className="text-left">
+                            <div className="font-semibold">Complete Order</div>
+                            <div className="text-xs text-green-100">Finalize Sale</div>
+                          </div>
+                        </div>
+                        <span className="text-xl group-hover:translate-x-1 transition-transform">→</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Modal Footer */}
-              <div className="bg-gray-50 border-t border-gray-200 p-4 flex items-center justify-between">
+              <div className="bg-gray-50 border-t border-gray-200 p-4 flex items-center justify-end">
                 <button
                   onClick={() => setIsDetailsModalOpen(false)}
                   className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors"
                 >
                   Close
                 </button>
-                {selectedRecord.paymentStatus === 'Paid' && selectedRecord.deliveryStatus === 'Delivered' && (
-                  <button
-                    onClick={() => handleCompleteContract(selectedRecord.contractId)}
-                    className="flex items-center space-x-2 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors"
-                  >
-                    <CheckCircle className="w-5 h-5" />
-                    <span>Complete Contract</span>
-                  </button>
-                )}
               </div>
             </div>
           </div>

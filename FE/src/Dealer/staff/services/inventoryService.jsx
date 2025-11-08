@@ -73,7 +73,7 @@ export const fetchInventory = async () => {
     const token = localStorage.getItem('token');
     
     const response = await axios.post(
-      `${API_URL}/staff/viewInventory`,
+      `${API_URL}/staff/viewVehicle`,
       {}, // Empty body for POST request
       {
         headers: {
@@ -84,24 +84,29 @@ export const fetchInventory = async () => {
     );
 
     if (response.data && response.data.data) {
-      // ✅ THÊM: Fetch variants cho mỗi model
-      const inventories = response.data.data;
+      // Backend trả về List<VehicleModelDTO> - danh sách models trực tiếp
+      const models = response.data.data;
       
-      for (const inventory of inventories) {
-        if (inventory.list && Array.isArray(inventory.list)) {
-          for (const model of inventory.list) {
-            // Gọi API để lấy variants
-            const variants = await fetchVariantsForModel(model.modelId);
-            model.lists = variants; // Set variants vào model
-          }
+      console.log('📦 Raw models from API:', models);
+      console.log('📦 Number of models:', models?.length);
+      
+      // Fetch variants cho mỗi model (nếu chưa có)
+      for (const model of models) {
+        // Nếu model chưa có lists (variants), fetch thêm
+        if (!model.lists || !Array.isArray(model.lists) || model.lists.length === 0) {
+          console.log(`🔍 Fetching variants for model ${model.modelId}...`);
+          const variants = await fetchVariantsForModel(model.modelId);
+          model.lists = variants; // Set variants vào model
+          console.log(`✅ Found ${variants?.length || 0} variants for model ${model.modelId}`);
         }
       }
       
       return {
         success: true,
-        data: inventories
+        data: models // Trả về danh sách models, không phải inventory structure
       };
     } else {
+      console.warn('⚠️ Invalid response format:', response.data);
       return {
         success: false,
         message: 'Invalid response format'
@@ -123,109 +128,116 @@ export const fetchInventory = async () => {
  * @returns {Array} - Transformed data for frontend
  */
 export const transformInventoryData = (backendData) => {
+  console.log('🔄 Transforming inventory data:', backendData);
+  
   if (!backendData || !Array.isArray(backendData)) {
+    console.warn('⚠️ Invalid backend data format:', backendData);
     return [];
   }
 
   const transformedData = [];
 
-  backendData.forEach((inventory) => {
-    // Kiểm tra có hàng không (quantity > 0)
-    const hasStock = inventory.quantity && parseInt(inventory.quantity) > 0;
+  // Backend trả về List<VehicleModelDTO> trực tiếp, không có inventory wrapper
+  backendData.forEach((model) => {
+    console.log(`📦 Processing model: ${model.modelName} (ID: ${model.modelId})`);
     
-    if (!hasStock) {
-      return; // Skip inventory không có hàng
+    // Chỉ lấy model đang active
+    if (!model.isActive) {
+      console.log(`⏭️ Skipping inactive model: ${model.modelName}`);
+      return;
     }
 
-    // Iterate through each model in the inventory
-    if (inventory.list && Array.isArray(inventory.list)) {
-      inventory.list.forEach((model) => {
-        // Chỉ lấy model đang active
-        if (!model.isActive) {
+    // Check nếu có variants
+    if (model.lists && Array.isArray(model.lists) && model.lists.length > 0) {
+      console.log(`✅ Model ${model.modelName} has ${model.lists.length} variants`);
+      
+      // Có variants - iterate qua từng variant
+      model.lists.forEach((variant) => {
+        // Chỉ lấy variant đang active (có sẵn để bán)
+        if (!variant.isActive) {
+          console.log(`⏭️ Skipping inactive variant: ${variant.versionName}`);
           return;
         }
 
-        // Check nếu có variants
-        if (model.lists && Array.isArray(model.lists) && model.lists.length > 0) {
-          // Có variants - iterate qua từng variant
-          model.lists.forEach((variant) => {
-            // Chỉ lấy variant đang active (có sẵn để bán)
-            if (!variant.isActive) {
-              return;
-            }
-
-            transformedData.push({
-              // Basic IDs
-              id: `${model.modelName}-${variant.variantId}`,
-              inventoryId: inventory.inventoryId,
-              modelId: model.modelId,
-              variantId: variant.variantId,
-              
-              // Display information
-              title: `${model.modelName} ${variant.versionName}`,
-              model: model.modelName,
-              variant: variant.versionName,
-              color: variant.color,
-              description: model.description,
-              
-              // Pricing
-              price: variant.price,
-              priceUsd: variant.price,
-              
-              // Image - Fix URL nếu cần
-              imageUrl: variant.image ? fixImageUrl(variant.image) : null,
-              
-              // Status - luôn là "available" vì đã filter xe có hàng
-              status: 'available',
-              condition: 'New Vehicle',
-              
-              // Quantity
-              quantity: inventory.quantity,
-              
-              // Active flags
-              isActive: variant.isActive,
-              modelActive: model.isActive
-            });
-          });
-        } else {
-          // KHÔNG có variants - hiển thị ở model level
-          transformedData.push({
-            // Basic IDs
-            id: `model-${model.modelId}`,
-            inventoryId: inventory.inventoryId,
-            modelId: model.modelId,
-            variantId: null,
-            
-            // Display information
-            title: model.modelName,
-            model: model.modelName,
-            variant: 'Standard', // Default variant name
-            color: 'N/A',
-            description: model.description,
-            
-            // Pricing (default hoặc từ model nếu có)
-            price: 0, // BE không có price ở model level
-            priceUsd: 0,
-            
-            // Image - Fix URL nếu cần (model level không có image từ BE)
-            imageUrl: null,
-            
-            // Status
-            status: 'available',
-            condition: 'New Vehicle',
-            
-            // Quantity
-            quantity: inventory.quantity,
-            
-            // Active flags
-            isActive: true,
-            modelActive: model.isActive
-          });
-        }
+        transformedData.push({
+          // Basic IDs
+          id: `${model.modelName}-${variant.variantId}`,
+          inventoryId: null, // Không có inventoryId từ viewVehicle API
+          modelId: model.modelId,
+          variantId: variant.variantId,
+          
+          // Display information
+          title: `${model.modelName} ${variant.versionName}`,
+          model: model.modelName,
+          variant: variant.versionName,
+          color: variant.color || 'N/A',
+          description: model.description || '',
+          
+          // Pricing
+          price: variant.price || 0,
+          priceUsd: variant.price || 0,
+          
+          // Image - Fix URL nếu cần
+          imageUrl: variant.image ? fixImageUrl(variant.image) : null,
+          
+          // Status - luôn là "available" vì đã filter active
+          status: 'available',
+          condition: 'New Vehicle',
+          
+          // Quantity - không có từ viewVehicle API, set default
+          quantity: 1,
+          
+          // Location - không có từ API, set default
+          location: 'N/A',
+          
+          // Active flags
+          isActive: variant.isActive,
+          modelActive: model.isActive
+        });
+      });
+    } else {
+      console.log(`⚠️ Model ${model.modelName} has no variants, showing as model-level item`);
+      
+      // KHÔNG có variants - hiển thị ở model level
+      transformedData.push({
+        // Basic IDs
+        id: `model-${model.modelId}`,
+        inventoryId: null,
+        modelId: model.modelId,
+        variantId: null,
+        
+        // Display information
+        title: model.modelName,
+        model: model.modelName,
+        variant: 'Standard', // Default variant name
+        color: 'N/A',
+        description: model.description || '',
+        
+        // Pricing (default hoặc từ model nếu có)
+        price: 0, // BE không có price ở model level
+        priceUsd: 0,
+        
+        // Image - Fix URL nếu cần (model level không có image từ BE)
+        imageUrl: null,
+        
+        // Status
+        status: 'available',
+        condition: 'New Vehicle',
+        
+        // Quantity - không có từ viewVehicle API
+        quantity: 1,
+        
+        // Location
+        location: 'N/A',
+        
+        // Active flags
+        isActive: true,
+        modelActive: model.isActive
       });
     }
   });
 
+  console.log(`✅ Transformed ${transformedData.length} vehicles`);
   return transformedData;
 };
 

@@ -44,7 +44,7 @@ const Quotations = () => {
     discount: '0',
     vat: '10',
     totalPrice: '',
-    paymentMethod: 'Cash',
+    paymentMethod: 'Full Payment',
     bankName: '',
     loanTerm: '',
     interestRate: '',
@@ -65,7 +65,7 @@ const Quotations = () => {
       vin: '5YJ3E1EA0001',
       price: 970000000,
       discount: 50000000,
-      paymentMethod: 'Cash',
+      paymentMethod: 'Full Payment',
       status: 'Approved',
       date: '2025-10-22',
       sentDate: '2025-10-15',
@@ -95,7 +95,7 @@ const Quotations = () => {
       vin: 'Pending',
       price: 1350000000,
       discount: 100000000,
-      paymentMethod: 'Cash',
+      paymentMethod: 'Full Payment',
       status: 'Approved',
       date: '2025-10-21',
       sentDate: '2025-10-14',
@@ -110,7 +110,7 @@ const Quotations = () => {
       vin: 'Pending',
       price: 1080000000,
       discount: 60000000,
-      paymentMethod: 'Cash',
+      paymentMethod: 'Full Payment',
       status: 'Expired',
       date: '2025-10-10',
       sentDate: '2025-10-03',
@@ -125,7 +125,7 @@ const Quotations = () => {
       vin: 'Pending',
       price: 970000000,
       discount: 30000000,
-      paymentMethod: 'Cash',
+      paymentMethod: 'Full Payment',
       status: 'Pending',
       date: '2025-10-20',
       sentDate: '2025-10-20',
@@ -349,7 +349,7 @@ const Quotations = () => {
       discount: '0',
       vat: '10',
       totalPrice: '',
-      paymentMethod: 'Cash',
+      paymentMethod: 'Full Payment',
       bankName: '',
       loanTerm: '',
       interestRate: '',
@@ -900,7 +900,7 @@ const Quotations = () => {
                           Payment Method <span className="text-red-500">*</span>
                         </label>
                         <div className="grid grid-cols-2 gap-3">
-                          {['Cash', 'Finance'].map((method) => (
+                          {['Full Payment', 'Installment'].map((method) => (
                             <button
                               key={method}
                               type="button"
@@ -912,7 +912,7 @@ const Quotations = () => {
                               }`}
                             >
                               <div className="flex items-center justify-center space-x-2">
-                                <span className="text-2xl">{method === 'Cash' ? '💵' : '🏦'}</span>
+                                <span className="text-2xl">{method === 'Full Payment' ? '💵' : '🏦'}</span>
                                 <span>{method}</span>
                               </div>
                             </button>
@@ -941,25 +941,25 @@ const Quotations = () => {
                       📄 C. Additional Details
                     </h4>
                     
-                    {/* Cash Payment Message */}
-                    {formData.paymentMethod === 'Cash' && (
+                    {/* Full Payment Message */}
+                    {formData.paymentMethod === 'Full Payment' && (
                       <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4">
                         <div className="flex items-start space-x-3">
                           <span className="text-3xl">💵</span>
                           <div>
-                            <h5 className="font-semibold text-green-900 mb-1">Cash Payment</h5>
+                            <h5 className="font-semibold text-green-900 mb-1">Full Payment</h5>
                             <p className="text-sm text-green-800">Full payment due before delivery.</p>
                           </div>
                         </div>
                       </div>
                     )}
 
-                    {/* Finance Details */}
-                    {formData.paymentMethod === 'Finance' && (
+                    {/* Installment Details */}
+                    {formData.paymentMethod === 'Installment' && (
                       <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 space-y-4">
                         <div className="flex items-center space-x-2 mb-3">
                           <span className="text-2xl">🏦</span>
-                          <h5 className="font-semibold text-blue-900">Finance Details</h5>
+                          <h5 className="font-semibold text-blue-900">Installment Details</h5>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
