@@ -97,6 +97,13 @@ public class VehicleSerialDAO {
                 + "    INNER JOIN [Order] o ON od.order_id = o.order_id "
                 + "    WHERE od.serial_id IS NOT NULL "
                 + "    AND o.customer_id > 0"
+                + ") "
+                + "AND vs.serial_id NOT IN ("
+                + "    SELECT od2.serial_id "
+                + "    FROM OrderDetail od2 "
+                + "    INNER JOIN Confirmation c ON c.order_detail_id = od2.order_detail_id "
+                + "    WHERE od2.serial_id IS NOT NULL "
+                + "    AND c.agreement != 'Agree'" // Only include approved confirmations
                 + ")";
 
         List<VehicleSerialDTO> list = new ArrayList<>();

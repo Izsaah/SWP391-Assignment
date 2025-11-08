@@ -416,6 +416,70 @@ public class OrderService {
         return confirmationDAO.viewConfirmationsByOrderDetailId(orderDetailId);
     }
 
+    public Map<String, Object> getOrderDataForApproval(int orderId) {
+        Connection conn = null;
+        try {
+            conn = DbUtils.getConnection();
+
+            // Step 1: Get order_detail by order_id
+            OrderDetailDTO detail = orderDetailDAO.getOrderDetailByOrderId(orderId);
+            if (detail == null) {
+                System.err.println("No order detail found for order_id: " + orderId);
+                return null;
+            }
+
+            // Step 2: Get serial_id from order_detail
+            String serialId = detail.getSerialId();
+            if (serialId == null) {
+                System.err.println("No serial_id found in order_detail for order_id: " + orderId);
+                return null;
+            }
+
+            // Step 3: Get variant_id from vehicle_serial
+            VehicleSerialDTO serial = vehicleSerialDAO.getSerialBySerialId(serialId);
+            if (serial == null) {
+                System.err.println("No serial found for serial_id: " + serialId);
+                return null;
+            }
+
+            int variantId = serial.getVariantId();
+
+            // Step 4: Get variant details (version_name, color, price, image)
+            VehicleVariantDTO variant = variantDAO.getVariantById(variantId);
+            if (variant == null) {
+                System.err.println("No variant found for variant_id: " + variantId);
+                return null;
+            }
+
+            // Step 5: Build response map
+            Map<String, Object> data = new HashMap<>();
+            data.put("versionName", variant.getVersionName());
+            data.put("color", variant.getColor());
+            data.put("unitPrice", detail.getUnitPrice()); // From order_detail
+            data.put("image", variant.getImage());
+            data.put("variantId", variant.getVariantId());
+            data.put("price", variant.getPrice()); // Variant's base price
+
+            System.out.println("INFO: Retrieved order data for order_id " + orderId
+                    + " -> variant_id " + variantId
+                    + " (" + variant.getVersionName() + ", " + variant.getColor() + ")");
+
+            return data;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
     public Map<String, Object> getCompanyYearlySalesTarget(Integer year) {
         try {
             return orderDAO.calculateCompanyYearlySalesTarget(year);
