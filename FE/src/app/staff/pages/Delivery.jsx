@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import Layout from '../layout/Layout';
 import { Truck, CheckCircle, Clock, Package, AlertCircle, Loader2, XCircle } from 'lucide-react';
 import { viewOrdersByStaffId, updateOrderStatus } from '../services/orderService';
+import { getAllCustomers } from '../services/customerService';
+import { fetchInventory } from '../services/inventoryService';
 
 const Delivery = () => {
   const [statusFilter, setStatusFilter] = useState('all'); // all, pending, delivered, cancel
@@ -11,22 +13,70 @@ const Delivery = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  
+  // Maps for customer and vehicle names
+  const [customerMap, setCustomerMap] = useState(new Map()); // customerId -> customerName
+  const [vehicleMap, setVehicleMap] = useState(new Map()); // modelId -> modelName
 
-  // Fetch orders on component mount
+  // Fetch customer names and vehicle names, then fetch orders
   useEffect(() => {
-    fetchOrders();
-  }, []);
+    const loadAllData = async () => {
+      try {
+        // Fetch all customers
+        const customersResult = await getAllCustomers();
+        const customerNameMap = new Map();
+        if (customersResult.success && customersResult.data) {
+          for (const customer of customersResult.data) {
+            const customerId = customer.customerId || customer.customer_id || customer.id;
+            if (customerId) {
+              const id = parseInt(customerId);
+              if (!isNaN(id)) {
+                customerNameMap.set(id, customer.name || `Customer ${id}`);
+              }
+            }
+          }
+        }
+        setCustomerMap(customerNameMap);
+        console.log(`✅ Loaded ${customerNameMap.size} customers for name mapping`);
 
-  const fetchOrders = async () => {
+        // Fetch vehicle models
+        const inventoryResult = await fetchInventory();
+        const vehicleNameMap = new Map();
+        if (inventoryResult.success && inventoryResult.data) {
+          for (const model of inventoryResult.data) {
+            const modelId = model.modelId || model.model_id;
+            const modelName = model.modelName || model.name || `Model ${modelId}`;
+            if (modelId) {
+              const id = parseInt(modelId);
+              if (!isNaN(id)) {
+                vehicleNameMap.set(id, modelName);
+              }
+            }
+          }
+        }
+        setVehicleMap(vehicleNameMap);
+        console.log(`✅ Loaded ${vehicleNameMap.size} vehicle models for name mapping`);
+        
+        // Now fetch orders with the maps available
+        await fetchOrdersWithMaps(customerNameMap, vehicleNameMap);
+      } catch (err) {
+        console.error('Error fetching customer/vehicle data:', err);
+        // Still try to fetch orders (will show IDs if names not available)
+        await fetchOrdersWithMaps(new Map(), new Map());
+      }
+    };
+    
+    loadAllData();
+  }, []); // Only run once on mount
+
+  const fetchOrdersWithMaps = async (customerNameMap, vehicleNameMap) => {
     setLoading(true);
     setError(null);
     
-    // NOTE: Backend endpoint for viewing orders by staff ID is not available yet
     const result = await viewOrdersByStaffId();
     
     if (result.success && result.data && result.data.length > 0) {
-      // Filter orders by delivery status
-      // Backend Order status values: "Pending", "Cancel", "Delivered"
+      // Filter orders by delivery status and enrich with customer/vehicle names
       const filtered = result.data.map(order => {
         // Get status from various possible field names
         const orderStatus = order.status || order.order_status || order.Status || 'Pending';
@@ -39,18 +89,27 @@ const Delivery = () => {
           deliveryStatus = 'Cancelled';
         }
         
+        // Get customer and vehicle names from maps
+        const customerId = order.customerId || order.customer_id || order.CustomerId;
+        const modelId = order.modelId || order.model_id || order.ModelId;
+        const customerName = customerNameMap.get(customerId) || `Customer ${customerId || 'N/A'}`;
+        const vehicleName = vehicleNameMap.get(modelId) || `Model ${modelId || 'N/A'}`;
+        
         return {
           ...order,
           status: orderStatus, // Ensure status is always set
           deliveryStatus,
           orderId: order.orderId || order.order_id || order.OrderId,
-          customerId: order.customerId || order.customer_id || order.CustomerId,
-          modelId: order.modelId || order.model_id || order.ModelId,
+          customerId: customerId,
+          customerName: customerName, // ✅ Added customer name
+          modelId: modelId,
+          vehicleName: vehicleName, // ✅ Added vehicle name
           orderDate: order.orderDate || order.order_date || order.OrderDate
         };
       });
       setOrders(filtered);
       setError(null);
+      console.log(`✅ Loaded ${filtered.length} orders with customer and vehicle names`);
     } else {
       // Endpoint not available or no data
       setOrders([]);
@@ -62,6 +121,11 @@ const Delivery = () => {
     }
     
     setLoading(false);
+  };
+
+  // Also provide a function to refresh orders (uses current state maps)
+  const fetchOrders = async () => {
+    await fetchOrdersWithMaps(customerMap, vehicleMap);
   };
 
   // Filter deliveries based on status
@@ -305,10 +369,10 @@ const Delivery = () => {
                       Order ID
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Customer ID
+                      Customer Name
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Model ID
+                      Vehicle Name
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Order Date
@@ -324,8 +388,8 @@ const Delivery = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredDeliveries.map((delivery, index) => {
                     const orderId = delivery.orderId || delivery.order_id || delivery.OrderId || `ORDER-${index}`;
-                    const customerId = delivery.customerId || delivery.customer_id || delivery.CustomerId || 'N/A';
-                    const modelId = delivery.modelId || delivery.model_id || delivery.ModelId || 'N/A';
+                    const customerName = delivery.customerName || `Customer ${delivery.customerId || 'N/A'}`;
+                    const vehicleName = delivery.vehicleName || `Model ${delivery.modelId || 'N/A'}`;
                     const orderDate = delivery.orderDate || delivery.order_date || delivery.OrderDate || null;
                     
                     return (
@@ -334,10 +398,12 @@ const Delivery = () => {
                           <div className="text-sm font-medium text-gray-900">#{orderId}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">C-{customerId}</div>
+                          <div className="text-sm font-semibold text-gray-900">{customerName}</div>
+                          <div className="text-xs text-gray-500">ID: {delivery.customerId || 'N/A'}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">Model {modelId}</div>
+                          <div className="text-sm font-semibold text-blue-600">{vehicleName}</div>
+                          <div className="text-xs text-gray-500">Model ID: {delivery.modelId || 'N/A'}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">{formatDate(orderDate)}</div>
@@ -403,21 +469,27 @@ const Delivery = () => {
                       </div>
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-gray-500 uppercase">Customer ID</label>
-                      <div className="text-base font-semibold text-gray-900 mt-1">
-                        C-{selectedDelivery.customerId}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-gray-500 uppercase">Model ID</label>
-                      <div className="text-base font-semibold text-gray-900 mt-1">
-                        Model {selectedDelivery.modelId}
-                      </div>
-                    </div>
-                    <div>
                       <label className="text-xs font-semibold text-gray-500 uppercase">Order Date</label>
                       <div className="text-base font-semibold text-gray-900 mt-1">
                         {formatDate(selectedDelivery.orderDate)}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 uppercase">Customer Name</label>
+                      <div className="text-base font-semibold text-gray-900 mt-1">
+                        {selectedDelivery.customerName || `Customer ${selectedDelivery.customerId || 'N/A'}`}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        ID: {selectedDelivery.customerId || 'N/A'}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 uppercase">Vehicle Name</label>
+                      <div className="text-base font-semibold text-blue-600 mt-1">
+                        {selectedDelivery.vehicleName || `Model ${selectedDelivery.modelId || 'N/A'}`}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        Model ID: {selectedDelivery.modelId || 'N/A'}
                       </div>
                     </div>
                     <div className="col-span-2">
