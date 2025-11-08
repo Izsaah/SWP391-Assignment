@@ -385,37 +385,50 @@ const Payment = () => {
      // Don't set loading=true here because it will conflict with installment loading
      // Use separate loading state if needed
      try {
+       console.log('📥 Fetching completed payments (TT) from backend...');
        const result = await getCompletedPayments();
+       console.log('📥 Completed Payments API Response:', result);
+       
        if (result.success && result.data && result.data.length > 0) {
+         // ✅ Backend returns data in format: {customerId, name, address, email, phoneNumber, paymentId, orderId, amount, paymentDate, method}
          // Transform data to match frontend format
          const transformedData = result.data.map((payment) => {
            return {
              paymentId: payment.paymentId || payment.payment_id,
              orderId: payment.orderId || payment.order_id,
-             customerName: payment.customerName || payment.customer_name || 'N/A',
+             customerName: payment.name || payment.customerName || payment.customer_name || 'N/A',
              customerId: payment.customerId || payment.customer_id,
+             customerAddress: payment.address || payment.customerAddress || 'N/A',
              amount: payment.amount || 0,
              paymentDate: payment.paymentDate || payment.payment_date,
              method: payment.method || 'TT',
-             // Additional fields if available
-             vehicle: payment.vehicle || payment.vehicleName || 'N/A',
-             phone: payment.phone || payment.phoneNumber || payment.customerPhone || 'N/A',
-             email: payment.email || payment.customerEmail || 'N/A'
+             // Additional fields from backend response
+             phone: payment.phoneNumber || payment.phone || payment.customerPhone || 'N/A',
+             email: payment.email || payment.customerEmail || 'N/A',
+             vehicle: payment.vehicle || payment.vehicleName || 'N/A' // May not be in backend response
            };
          });
          setCompletedPayments(transformedData);
-         console.log('📦 Completed Payments:', transformedData);
-       } else if (result.message && result.message.includes('does not exist')) {
-         // Backend endpoint doesn't exist - try workaround by fetching from orders
-         console.warn('⚠️ Completed payments endpoint not available, trying workaround...');
+         console.log(`✅ Loaded ${transformedData.length} completed payments (TT) filtered by staff ID`);
+       } else {
+         // No data or empty response - this is OK, just means no TT payments for this staff
+         setCompletedPayments([]);
+         console.log('ℹ️ No completed payments (TT) found for this staff member');
+         
+         // Only use workaround if endpoint truly doesn't exist (404/405)
+         if (result.message && (result.message.includes('not found') || result.message.includes('404') || result.message.includes('405'))) {
+           console.warn('⚠️ Completed payments endpoint not available, trying workaround...');
+           await fetchCompletedPaymentsFromOrders();
+         }
+       }
+     } catch (err) {
+       console.error('❌ Error fetching completed payments:', err);
+       // Only try workaround if it's a network/endpoint error, not authentication
+       if (err.response?.status === 404 || err.response?.status === 405) {
          await fetchCompletedPaymentsFromOrders();
        } else {
          setCompletedPayments([]);
        }
-     } catch (err) {
-       console.error('❌ Error fetching completed payments:', err);
-       // Try workaround if backend endpoint fails
-       await fetchCompletedPaymentsFromOrders();
      }
    }, [fetchCompletedPaymentsFromOrders]);
 

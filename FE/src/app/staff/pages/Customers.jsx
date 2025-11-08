@@ -16,10 +16,10 @@ import {
   ChevronRight,
   Filter,
   X,
-  Loader2
+  Loader2,
+  ChevronLeft
 } from 'lucide-react';
 import { searchCustomersByName, createCustomer, getAllCustomers } from '../services/customerService';
-import { getCustomersWithActiveInstallments } from '../services/paymentService';
 
 const Customers = () => {
   const navigate = useNavigate();
@@ -30,6 +30,10 @@ const Customers = () => {
   const [error, setError] = useState(null);
   const [searchPerformed, setSearchPerformed] = useState(false);
   const [loadingInitial, setLoadingInitial] = useState(true);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const customersPerPage = 6;
   
   // Form state for new customer
   const [newCustomer, setNewCustomer] = useState({
@@ -158,12 +162,15 @@ const Customers = () => {
     setLoadingInitial(true);
     setError(null);
     try {
-      // First try getAllCustomers which uses getCustomersWithActiveInstallments
+      console.log('🔄 Fetching all customers from backend...');
       const result = await getAllCustomers();
       
-      if (result.success && result.data && result.data.length > 0) {
+      console.log('📦 Backend response:', result);
+      
+      if (result.success && result.data) {
         // Transform backend data to match frontend format
-        const transformedData = result.data.map(customer => ({
+        // Handle both empty array and array with data
+        const transformedData = (result.data || []).map(customer => ({
           customerId: customer.customerId || customer.customer_id || `C-${customer.customer_id || 'N/A'}`,
           name: customer.name || '',
           email: customer.email || '',
@@ -184,40 +191,23 @@ const Customers = () => {
         });
         
         setCustomersData(transformedData);
-        console.log(`✅ Loaded ${transformedData.length} customers`);
-      } else {
-        // Fallback: try getCustomersWithActiveInstallments directly
-        const fallbackResult = await getCustomersWithActiveInstallments();
-        if (fallbackResult.success && fallbackResult.data && fallbackResult.data.length > 0) {
-          const transformedData = fallbackResult.data.map(customer => ({
-            customerId: customer.customerId || customer.customer_id || `C-${customer.customer_id || 'N/A'}`,
-            name: customer.name || '',
-            email: customer.email || '',
-            phone: customer.phoneNumber || '',
-            phoneNumber: customer.phoneNumber || '',
-            address: customer.address || '',
-            type: 'Returning',
-            totalOrderForms: 0,
-            testDrive: '',
-            status: 'Active'
-          }));
-          
-          transformedData.sort((a, b) => {
-            const idA = parseInt(String(a.customerId).replace('C-', '').replace(/[^0-9]/g, '')) || 0;
-            const idB = parseInt(String(b.customerId).replace('C-', '').replace(/[^0-9]/g, '')) || 0;
-            return idA - idB;
-          });
-          
-          setCustomersData(transformedData);
-          console.log(`✅ Loaded ${transformedData.length} customers (direct method)`);
-        } else {
-          setCustomersData([]);
-          console.log('No customers found');
+        console.log(`✅ Loaded ${transformedData.length} customers from database`);
+        
+        if (transformedData.length === 0) {
+          console.log('ℹ️ No customers found in database');
+          setError(null); // Don't show error for empty list, it's valid
         }
+      } else {
+        // API call succeeded but returned error status
+        const errorMsg = result.message || 'Failed to load customers from server';
+        console.error('❌ Error from getAllCustomers:', errorMsg);
+        setError(errorMsg);
+        setCustomersData([]);
       }
     } catch (err) {
-      console.error('Error loading customers:', err);
-      setError('Failed to load customers. Please try searching by name.');
+      console.error('❌ Error loading customers:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to load customers. Please check your connection and try again.';
+      setError(errorMessage);
       setCustomersData([]);
     } finally {
       setLoadingInitial(false);
@@ -240,6 +230,26 @@ const Customers = () => {
       customer.address?.toLowerCase().includes(term)
     );
   });
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredCustomers.length / customersPerPage);
+  const startIndex = (currentPage - 1) * customersPerPage;
+  const endIndex = startIndex + customersPerPage;
+  const paginatedCustomers = filteredCustomers.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search term changes or when data changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, customersData.length]);
+
+  // Handle page change
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      // Scroll to top of table
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   return (
     <Layout>
@@ -388,7 +398,7 @@ const Customers = () => {
                   </tr>
                 )}
 
-                {!loading && !loadingInitial && filteredCustomers.map((customer, index) => (
+                {!loading && !loadingInitial && paginatedCustomers.map((customer, index) => (
                   <tr 
                     key={index} 
                     onClick={() => navigate(`/staff/customers/${customer.customerId}`)}
@@ -420,12 +430,85 @@ const Customers = () => {
             </table>
           </div>
 
-          {/* Pagination - Disabled since we don't have pagination from BE */}
-          {!loading && filteredCustomers.length > 0 && (
+          {/* Pagination */}
+          {!loading && !loadingInitial && filteredCustomers.length > 0 && (
             <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex items-center justify-between">
               <div className="text-sm text-gray-600">
-                Showing <span className="font-medium">{filteredCustomers.length}</span> customer(s)
+                Showing <span className="font-medium">{startIndex + 1}</span> to{' '}
+                <span className="font-medium">
+                  {Math.min(endIndex, filteredCustomers.length)}
+                </span>{' '}
+                of <span className="font-medium">{filteredCustomers.length}</span> customer(s)
               </div>
+              
+              {totalPages > 1 && (
+                <div className="flex items-center space-x-2">
+                  {/* Previous Button */}
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center space-x-1 ${
+                      currentPage === 1
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+                    }`}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span>Previous</span>
+                  </button>
+
+                  {/* Page Numbers */}
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
+                      // Show first page, last page, current page, and pages around current
+                      const showPage =
+                        pageNum === 1 ||
+                        pageNum === totalPages ||
+                        (pageNum >= currentPage - 1 && pageNum <= currentPage + 1);
+
+                      if (!showPage) {
+                        // Show ellipsis
+                        if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                          return (
+                            <span key={pageNum} className="px-2 text-gray-400">
+                              ...
+                            </span>
+                          );
+                        }
+                        return null;
+                      }
+
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => handlePageChange(pageNum)}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                            currentPage === pageNum
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Next Button */}
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center space-x-1 ${
+                      currentPage === totalPages
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+                    }`}
+                  >
+                    <span>Next</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

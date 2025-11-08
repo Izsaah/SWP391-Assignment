@@ -97,11 +97,13 @@ export const updateInstallmentPlan = async (planId, status, termMonth) => {
 
 /**
  * Get customers with active installments
- * @returns {Promise} - Promise containing customers with active installments   
+ * Backend automatically filters by staff ID from JWT token
+ * @returns {Promise} - Promise containing customers with active installments (filtered by staff ID)
  */
 export const getCustomersWithActiveInstallments = async () => {
   try {
     const token = localStorage.getItem('token');
+    // ✅ Backend endpoint filters payments by staff ID extracted from JWT token
     const url = `${API_URL}/staff/viewCustomerWithActiveInstallments`;
     
     // Kiểm tra xem có phải ngrok URL không và chuẩn bị headers
@@ -294,13 +296,15 @@ export const getCustomersWithActiveInstallments = async () => {
 
 /**
  * Get completed payments (payments with method = "TT")
- * Backend endpoint needed: POST /api/staff/viewCompletedPayments
+ * Backend endpoint: POST /api/staff/viewCustomerWithTTStatus
+ * Backend automatically filters by staff ID from JWT token
  * @returns {Promise} - Promise containing completed payments data
  */
 export const getCompletedPayments = async () => {
   try {
     const token = localStorage.getItem('token');
-    const url = `${API_URL}/staff/viewCompletedPayments`;
+    // ✅ Use the correct endpoint that exists in backend
+    const url = `${API_URL}/staff/viewCustomerWithTTStatus`;
     
     const isNgrokUrl = API_URL?.includes('ngrok');
     const headers = {
@@ -318,7 +322,7 @@ export const getCompletedPayments = async () => {
       console.log('🔍 API Call: POST', url);
       response = await axios.post(
         url,
-        {}, // Empty body
+        {}, // Empty body - backend extracts staff ID from JWT token
         { headers }
       );
     } catch (postError) {
@@ -337,6 +341,8 @@ export const getCompletedPayments = async () => {
       }
     }
     
+    console.log('📦 TT Payments API Response:', response.data);
+    
     if (response.data && response.data.status === 'success') {
       return {
         success: true,
@@ -353,15 +359,21 @@ export const getCompletedPayments = async () => {
   } catch (error) {
     console.error('❌ Error getting completed payments:', error);
     
+    // Handle authentication errors
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      return {
+        success: false,
+        message: 'Authentication failed. Please log in again.',
+        data: []
+      };
+    }
+    
     // If endpoint doesn't exist (404), return empty data with helpful message
     if (error.response?.status === 404 || error.response?.status === 405) {
       return {
         success: false,
-        message: 'Backend endpoint /api/staff/viewCompletedPayments does not exist yet.\n\n' +
-                 'Backend needs to create:\n' +
-                 '1. PaymentService.getCompletedPayments() - filter payments where method = "TT"\n' +
-                 '2. ViewCompletedPaymentsController - POST endpoint\n' +
-                 '3. Return data format: [{customerName, orderId, amount, paymentDate, ...}]',
+        message: 'Backend endpoint /api/staff/viewCustomerWithTTStatus not found.\n\n' +
+                 'Please ensure the backend is running and the endpoint is properly configured.',
         data: []
       };
     }

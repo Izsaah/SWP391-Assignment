@@ -181,20 +181,36 @@ export const viewOrdersByStaffId = async () => {
  * Update order status
  * Backend endpoint: POST /api/staff/updateOrderStatuss (note: double 's' in the URL)
  * @param {number} orderId - Order ID
- * @param {string} status - New status: "Pending", "Delivered", or "Cancel"
+ * @param {string} status - New status: "Pending", "Delivered", or "Cancel" (will be normalized to backend format)
  * @returns {Promise} - Promise containing the result
  */
 export const updateOrderStatus = async (orderId, status) => {
   try {
     const token = localStorage.getItem('token');
     
-    // Validate status values
+    if (!token) {
+      return {
+        success: false,
+        message: 'Authentication token not found. Please log in again.'
+      };
+    }
+    
+    // Validate status values (accept frontend format)
     const validStatuses = ['Pending', 'Delivered', 'Cancel'];
     if (!validStatuses.includes(status)) {
       return {
         success: false,
         message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
       };
+    }
+    
+    // Normalize status to backend format: "Cancel" -> "cancelled" (backend expects lowercase)
+    // Backend uses equalsIgnoreCase, but sending exact format for consistency
+    let backendStatus = status;
+    if (status === 'Cancel') {
+      backendStatus = 'cancelled'; // Backend expects "cancelled" (see OrderService.java line 292)
+    } else {
+      backendStatus = status.toLowerCase(); // "Pending" -> "pending", "Delivered" -> "delivered"
     }
     
     const isNgrokUrl = API_URL?.includes('ngrok');
@@ -207,14 +223,18 @@ export const updateOrderStatus = async (orderId, status) => {
       headers['ngrok-skip-browser-warning'] = 'true';
     }
     
+    console.log(`🔄 Updating order ${orderId} status: ${status} -> ${backendStatus}`);
+    
     const response = await axios.post(
       `${API_URL}/staff/updateOrderStatuss`, // Note: double 's' in the endpoint URL
       {
         order_id: orderId,
-        status: status
+        status: backendStatus
       },
       { headers }
     );
+    
+    console.log('📦 Update status response:', response.data);
     
     if (response.data && response.data.status === 'success') {
       return {
@@ -229,9 +249,28 @@ export const updateOrderStatus = async (orderId, status) => {
     }
   } catch (error) {
     console.error('❌ Error updating order status:', error);
+    console.error('❌ Error response:', error.response?.data);
+    console.error('❌ Error status:', error.response?.status);
+    
+    // Handle authentication errors
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      return {
+        success: false,
+        message: 'Authentication failed. Your session may have expired. Please log in again.'
+      };
+    }
+    
+    // Handle validation errors
+    if (error.response?.status === 400) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Invalid request. Please check the order ID and status.'
+      };
+    }
+    
     return {
       success: false,
-      message: error.response?.data?.message || 'Failed to update order status'
+      message: error.response?.data?.message || 'Failed to update order status. Please try again.'
     };
   }
 };
