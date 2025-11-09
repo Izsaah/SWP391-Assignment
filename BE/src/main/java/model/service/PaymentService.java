@@ -21,11 +21,7 @@ public class PaymentService {
 
     public PaymentDTO processPayment(int orderId, String method, InstallmentPlanDTO plan) throws ClassNotFoundException, SQLException {
         System.out.println("DEBUG: Starting payment processing for order_id = " + orderId);
-<<<<<<< HEAD
         
-=======
-
->>>>>>> blablabla
         OrderDTO order = orderDAO.getById(orderId);
         if (order == null) {
             System.err.println("ERROR: Order not found for order_id = " + orderId);
@@ -175,6 +171,7 @@ public class PaymentService {
         try {
             List<InstallmentPlanDTO> plans = installDAO.getActiveOrOverduePlans();
             if (plans != null && !plans.isEmpty()) {
+                Set<Integer> addedCustomerIds = new HashSet<>();
                 for (InstallmentPlanDTO plan : plans) {
                     PaymentDTO payment = paymentDAO.findPaymentById(plan.getPaymentId());
                     if (payment == null) {
@@ -187,7 +184,7 @@ public class PaymentService {
                     }
 
                     int customerId = order.getCustomerId();
-                    if (customerId <= 0) {
+                    if (customerId <= 0 || addedCustomerIds.contains(customerId)) {
                         continue;
                     }
 
@@ -197,63 +194,53 @@ public class PaymentService {
                     }
 
                     CustomerDTO customer = customerList.get(0);
-
                     double monthlyPay = 0.0;
                     int termMonth = 0;
                     try {
                         monthlyPay = Double.parseDouble(plan.getMonthlyPay());
                     } catch (NumberFormatException e) {
-                        // Use default 0.0
                     }
-
                     try {
                         termMonth = Integer.parseInt(plan.getTermMonth());
                     } catch (NumberFormatException e) {
-                        // Use default 0
                     }
 
-<<<<<<< HEAD
                     // **FIX: Calculate total amount from monthly payment * term**
-=======
-                    // Calculate total amount from monthly payment * term
->>>>>>> blablabla
                     double totalAmountWithInterest = monthlyPay * termMonth;
 
                     // Get the original payment amount (principal)
                     double originalAmount = payment.getAmount();
 
                     // Calculate paid and outstanding
-<<<<<<< HEAD
                     // Assuming at least the first payment has been made
-=======
->>>>>>> blablabla
                     double paidAmount = originalAmount;
                     double outstanding = Math.max(0, totalAmountWithInterest - paidAmount);
 
                     Map<String, Object> map = new LinkedHashMap<>();
+
                     map.put("customerId", customer.getCustomerId());
                     map.put("name", customer.getName());
                     map.put("address", customer.getAddress());
                     map.put("email", customer.getEmail());
                     map.put("phoneNumber", customer.getPhoneNumber());
+
                     map.put("planId", plan.getPlanId());
                     map.put("interestRate", plan.getInterestRate());
                     map.put("termMonth", plan.getTermMonth());
                     map.put("monthlyPay", plan.getMonthlyPay());
                     map.put("status", plan.getStatus());
+
                     map.put("paymentId", payment.getPaymentId());
                     map.put("orderId", payment.getOrderId());
-<<<<<<< HEAD
                     map.put("totalAmount", totalAmountWithInterest); // **FIX: Use calculated total**
-=======
-                    map.put("totalAmount", totalAmountWithInterest);
->>>>>>> blablabla
                     map.put("paymentDate", payment.getPaymentDate());
                     map.put("method", payment.getMethod());
+
                     map.put("outstandingAmount", outstanding);
                     map.put("paidAmount", paidAmount);
 
                     responseList.add(map);
+                    addedCustomerIds.add(customerId);
                 }
             }
         } catch (Exception e) {
@@ -267,7 +254,10 @@ public class PaymentService {
         try {
             // Get all payments with TT (direct payment) method
             List<PaymentDTO> allPayments = paymentDAO.getAllPayment();
+
             if (allPayments != null && !allPayments.isEmpty()) {
+                Set<Integer> addedCustomerIds = new HashSet<>();
+
                 for (PaymentDTO payment : allPayments) {
                     // Only process TT (direct payment) methods
                     if (!"TT".equalsIgnoreCase(payment.getMethod())) {
@@ -281,7 +271,9 @@ public class PaymentService {
                     }
 
                     int customerId = order.getCustomerId();
-                    if (customerId <= 0) {
+
+                    // Skip if customer already added or invalid ID
+                    if (customerId <= 0 || addedCustomerIds.contains(customerId)) {
                         continue;
                     }
 
@@ -296,10 +288,7 @@ public class PaymentService {
                     // Get order details to calculate total amount
                     List<OrderDetailDTO> orderDetails = orderDetailDAO.getOrderDetailListByOrderId(payment.getOrderId());
                     double calculatedTotal = 0.0;
-<<<<<<< HEAD
 
-=======
->>>>>>> blablabla
                     if (orderDetails != null && !orderDetails.isEmpty()) {
                         for (OrderDetailDTO detail : orderDetails) {
                             try {
@@ -317,25 +306,25 @@ public class PaymentService {
 
                     // Build response map
                     Map<String, Object> map = new LinkedHashMap<>();
+
                     map.put("customerId", customer.getCustomerId());
                     map.put("name", customer.getName());
                     map.put("address", customer.getAddress());
                     map.put("email", customer.getEmail());
                     map.put("phoneNumber", customer.getPhoneNumber());
+
                     map.put("paymentId", payment.getPaymentId());
                     map.put("orderId", payment.getOrderId());
                     map.put("totalAmount", totalAmount); // Use payment.getAmount() for consistency
                     map.put("paymentDate", payment.getPaymentDate());
                     map.put("method", payment.getMethod());
-                    // For TT payments, everything is paid upfront
-                    map.put("outstandingAmount", 0.0);
-                    map.put("paidAmount", totalAmount);
 
                     // For TT payments, everything is paid upfront
                     map.put("outstandingAmount", 0.0);
                     map.put("paidAmount", totalAmount);
 
                     responseList.add(map);
+                    addedCustomerIds.add(customerId);
                 }
             }
         } catch (Exception e) {
