@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import model.dto.OrderDTO;
 import model.dto.UserAccountDTO;
 import model.service.OrderService;
@@ -46,7 +47,7 @@ public class ViewOrderByDealerStaffIdController extends HttpServlet {
             }
             
             // Call the service to retrieve the list of orders based on role
-            List<OrderDTO> orderList = orderService.GetListOrderByDealerStaffId(
+            List<Map<String, Object>> orderList = orderService.GetListOrderByDealerStaffId(
                 userId, 
                 user.getRoleId(), 
                 user.getDealerId()
