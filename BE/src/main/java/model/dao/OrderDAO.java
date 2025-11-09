@@ -6,7 +6,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import model.dto.ConfirmationDTO;
 import model.dto.OrderDTO;
 import utils.DbUtils;
 
@@ -74,11 +78,73 @@ public class OrderDAO {
     }
 
     public List<OrderDTO> getByStaffId(int dealerStaffId) throws SQLException, ClassNotFoundException {
-        return retrieve("dealer_staff_id=?", dealerStaffId);
+        return retrieve("dealer_staff_id=? AND customer_id != 0", dealerStaffId);
     }
 
     public List<OrderDTO> getByCustomerId(int customerId) throws SQLException, ClassNotFoundException {
         return retrieve("customer_id=?", customerId);
+    }
+
+    public List<OrderDTO> getAllByDealerId(int dealerId) throws SQLException, ClassNotFoundException {
+        String sql = "SELECT o.* FROM [Order] o "
+                + "INNER JOIN UserAccount u ON o.dealer_staff_id = u.user_id "
+                + "WHERE u.dealer_id = ? AND o.customer_id != 0";
+
+        List<OrderDTO> orders = new ArrayList<>();
+
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, dealerId);
+
+            try ( ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    orders.add(mapToOrder(rs));
+                }
+            }
+        }
+
+        return orders;
+    }
+
+    public List<OrderDTO> getAllOrderFromDealer(int dealerId) throws SQLException, ClassNotFoundException {
+        String sql = "SELECT o.*, od.order_detail_id, c.confirmation_id, c.staff_admin_id, "
+                + "c.agreement, c.date_time "
+                + "FROM [Order] o "
+                + "INNER JOIN UserAccount u ON o.dealer_staff_id = u.user_id "
+                + "LEFT JOIN OrderDetail od ON o.order_id = od.order_id "
+                + "LEFT JOIN Confirmation c ON od.order_detail_id = c.order_detail_id "
+                + "WHERE u.dealer_id = ? AND o.customer_id = 0"
+                + "ORDER BY o.order_date DESC, o.order_id DESC";
+
+        List<OrderDTO> orders = new ArrayList<>();
+
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, dealerId);
+
+            try ( ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    OrderDTO order = mapToOrder(rs);
+
+                    // Add confirmation data if exists
+                    if (rs.getObject("confirmation_id") != null) {
+                        ConfirmationDTO confirmation = new ConfirmationDTO(
+                                rs.getInt("confirmation_id"),
+                                rs.getInt("staff_admin_id"),
+                                rs.getInt("order_detail_id"),
+                                rs.getString("agreement"),
+                                rs.getString("date_time")
+                        );
+                        // You'll need to add a method to set confirmation in OrderDTO
+                        order.setConfirmation(confirmation);
+                    }
+
+                    orders.add(order);
+                }
+            }
+        }
+
+        return orders;
     }
 
     public List<OrderDTO> getOrdersByDealerStaffIds(List<Integer> staffIds) throws ClassNotFoundException, SQLException {
@@ -132,25 +198,23 @@ public class OrderDAO {
             return ps.executeUpdate() > 0;
         }
     }
-    
-    public List<java.util.Map<String, Object>> retrieveOrdersWithConfirmedDetails(int orderDetailId)
+
+    public List<Map<String, Object>> retrieveOrdersWithConfirmedDetails()
             throws SQLException, ClassNotFoundException {
         String sql = "SELECT o.order_id, o.customer_id, o.dealer_staff_id, o.model_id, o.order_date, o.status, "
                 + "d.order_detail_id, d.serial_id, d.quantity, d.unit_price "
                 + "FROM [Order] o "
                 + "JOIN OrderDetail d ON o.order_id = d.order_id "
                 + "WHERE EXISTS (SELECT 1 FROM Confirmation c WHERE c.order_detail_id = d.order_detail_id) "
-                + "AND d.order_detail_id = ?";
+                + "ORDER BY o.order_date DESC";
 
         try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
-            ps.setInt(1, orderDetailId);
             ResultSet rs = ps.executeQuery();
-
-            List<java.util.Map<String, Object>> list = new ArrayList<>();
+            List<Map<String, Object>> list = new ArrayList<>();
 
             while (rs.next()) {
-                java.util.Map<String, Object> row = new java.util.HashMap<>();
+                Map<String, Object> row = new LinkedHashMap<>();
 
                 // Order info
                 row.put("order_id", rs.getInt("order_id"));
@@ -172,5 +236,130 @@ public class OrderDAO {
             return list;
         }
     }
-    
+
+    public List<OrderDTO> getAllApprovedOrdersFromAllDealers() throws SQLException, ClassNotFoundException {
+        String sql = "SELECT o.*, od.order_detail_id, c.confirmation_id, c.staff_admin_id, "
+                + "c.agreement, c.date_time, u.dealer_id, u.user_id as dealer_staff_id "
+                + "FROM [Order] o "
+                + "INNER JOIN UserAccount u ON o.dealer_staff_id = u.user_id "
+                + "INNER JOIN OrderDetail od ON o.order_id = od.order_id "
+                + "INNER JOIN Confirmation c ON od.order_detail_id = c.order_detail_id "
+                + "WHERE o.customer_id = 0 AND c.agreement = 'Agree' "
+                + "ORDER BY o.order_date DESC, o.order_id DESC";
+
+        List<OrderDTO> orders = new ArrayList<>();
+
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            try ( ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    OrderDTO order = mapToOrder(rs);
+
+                    // Add confirmation data
+                    ConfirmationDTO confirmation = new ConfirmationDTO(
+                            rs.getInt("confirmation_id"),
+                            rs.getInt("staff_admin_id"),
+                            rs.getInt("order_detail_id"),
+                            rs.getString("agreement"),
+                            rs.getString("date_time")
+                    );
+                    order.setConfirmation(confirmation);
+
+                    orders.add(order);
+                }
+            }
+        }
+
+        return orders;
+    }
+
+    public Map<String, Object> calculateCompanyYearlySalesTarget(Integer year)
+            throws SQLException, ClassNotFoundException {
+
+        if (year == null) {
+            year = java.time.Year.now().getValue(); // Current year
+        }
+
+        String sql = "SELECT "
+                + "COUNT(DISTINCT o.order_id) as total_orders, "
+                + "COUNT(DISTINCT od.order_detail_id) as total_cars, "
+                + "SUM(od.quantity) as total_quantity, "
+                + "SUM(od.unit_price * od.quantity) as total_revenue "
+                + "FROM [Order] o "
+                + "INNER JOIN OrderDetail od ON o.order_id = od.order_id "
+                + "INNER JOIN Confirmation c ON od.order_detail_id = c.order_detail_id "
+                + "WHERE c.agreement = 'Agree' "
+                + "AND o.customer_id = 0 "
+                + "AND YEAR(c.date_time) = ?";
+
+        Map<String, Object> result = new HashMap<>();
+
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, year);
+
+            try ( ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    result.put("year", year);
+                    result.put("totalOrders", rs.getInt("total_orders"));
+                    result.put("totalCars", rs.getInt("total_cars"));
+                    result.put("totalQuantity", rs.getInt("total_quantity"));
+                    result.put("totalRevenue", rs.getDouble("total_revenue"));
+                } else {
+                    result.put("year", year);
+                    result.put("totalOrders", 0);
+                    result.put("totalCars", 0);
+                    result.put("totalQuantity", 0);
+                    result.put("totalRevenue", 0.0);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    public List<Map<String, Object>> calculateCompanyMonthlyBreakdown(Integer year)
+            throws SQLException, ClassNotFoundException {
+
+        if (year == null) {
+            year = java.time.Year.now().getValue();
+        }
+
+        String sql = "SELECT "
+                + "MONTH(c.date_time) as month, "
+                + "COUNT(DISTINCT o.order_id) as total_orders, "
+                + "COUNT(DISTINCT od.order_detail_id) as total_cars, "
+                + "SUM(od.quantity) as total_quantity, "
+                + "SUM(od.unit_price * od.quantity) as total_revenue "
+                + "FROM [Order] o "
+                + "INNER JOIN OrderDetail od ON o.order_id = od.order_id "
+                + "INNER JOIN Confirmation c ON od.order_detail_id = c.order_detail_id "
+                + "WHERE c.agreement = 'Agree' "
+                + "AND o.customer_id = 0 "
+                + "AND YEAR(c.date_time) = ? "
+                + "GROUP BY MONTH(c.date_time) "
+                + "ORDER BY MONTH(c.date_time)";
+
+        List<Map<String, Object>> monthlyData = new ArrayList<>();
+
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, year);
+
+            try ( ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> monthData = new HashMap<>();
+                    monthData.put("month", rs.getInt("month"));
+                    monthData.put("totalOrders", rs.getInt("total_orders"));
+                    monthData.put("totalCars", rs.getInt("total_cars"));
+                    monthData.put("totalQuantity", rs.getInt("total_quantity"));
+                    monthData.put("totalRevenue", rs.getDouble("total_revenue"));
+                    monthlyData.add(monthData);
+                }
+            }
+        }
+
+        return monthlyData;
+    }
+
 }

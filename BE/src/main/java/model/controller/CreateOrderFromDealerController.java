@@ -22,8 +22,8 @@ import utils.ResponseUtils;
  *
  * @author Admin
  */
-@WebServlet("/api/staff/createOrder")
-public class CreateOrderController extends HttpServlet {
+@WebServlet("/api/staff/createOrderFromDealer")
+public class CreateOrderFromDealerController extends HttpServlet {
 
     private final OrderService service = new OrderService();
     private final VehicleVariantDAO variantDAO = new VehicleVariantDAO();
@@ -32,21 +32,18 @@ public class CreateOrderController extends HttpServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
         try {
-            // Extract dealerstaffId from JWT token
             String token = JwtUtil.extractToken(req);
             int dealerstaffId = JwtUtil.extractUserId(token);
-
             Map<String, Object> params = RequestUtils.extractParams(req);
 
-            // Validate required fields (removed dealerstaffId from required params)
-            if (!params.containsKey("customerId")
-                    || !params.containsKey("modelId") || !params.containsKey("quantity")) {
-                ResponseUtils.error(resp, "Missing required parameters: customerId, modelId, quantity");
+            // Validate required fields
+            if (!params.containsKey("modelId") 
+                    || !params.containsKey("quantity")) {
+                ResponseUtils.error(resp, "Missing required parameters: dealerstaffId, modelId, quantity");
                 return;
             }
 
             // Parse required parameters
-            int customerId = Integer.parseInt(params.get("customerId").toString()) ;
             int modelId = Integer.parseInt(params.get("modelId").toString());
             int quantity = Integer.parseInt(params.get("quantity").toString());
 
@@ -81,21 +78,22 @@ public class CreateOrderController extends HttpServlet {
                 status = params.get("status").toString();
             }
 
-            // Handle isCustom - optional, defaults to false
-            boolean isCustom = params.containsKey("isCustom") && params.get("isCustom") != null
-                    ? Boolean.parseBoolean(params.get("isCustom").toString())
-                    : false;
-
-            // Create order via service (using dealerstaffId from token)
-            int orderId = service.HandlingCreateOrder(customerId, dealerstaffId, modelId,
+            // Handle isCustom - optional, defaults to true
+            boolean isCustom = true;
+            if (params.containsKey("isCustom") && params.get("isCustom") != null
+                    && !params.get("isCustom").toString().trim().isEmpty()) {
+                isCustom = Boolean.parseBoolean(params.get("isCustom").toString());
+            }
+            
+            // Create order via service
+            int orderId = service.HandlingCreateOrder(0, dealerstaffId, modelId,
                     status, variantId, quantity, unitPrice, isCustom);
 
             // Return response
             if (orderId > 0) {
                 String message = String.format(
-                        "Order ID: %d | Dealer Staff ID: %d | Variant: %s | Unit Price: %.2f%s",
+                        "Order ID: %d | Variant: %s | Unit Price: %.2f%s",
                         orderId,
-                        dealerstaffId,
                         variantId != null && variantId > 0 ? variantId : "Auto-Generated",
                         unitPrice,
                         isCustom ? " | Status: Custom (Pending Confirmation)" : ""
@@ -105,8 +103,6 @@ public class CreateOrderController extends HttpServlet {
                 ResponseUtils.error(resp, "Failed to create order");
             }
 
-        } catch (utils.AuthException e) {
-            ResponseUtils.error(resp, "Authentication failed: " + e.getMessage());
         } catch (NumberFormatException e) {
             ResponseUtils.error(resp, "Invalid number format: " + e.getMessage());
         } catch (Exception e) {

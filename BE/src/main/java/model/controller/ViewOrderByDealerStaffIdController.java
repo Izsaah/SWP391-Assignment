@@ -12,7 +12,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 import model.dto.OrderDTO;
+import model.dto.UserAccountDTO;
 import model.service.OrderService;
+import model.service.UserAccountService;
 import utils.JwtUtil;
 import utils.ResponseUtils;
 
@@ -25,34 +27,48 @@ import utils.ResponseUtils;
 public class ViewOrderByDealerStaffIdController extends HttpServlet {
     
     private final OrderService orderService = new OrderService();
+    private final UserAccountService userService = new UserAccountService();
     
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
         try {
-            // Extract token and get dealerStaffId from JWT
+            // Extract token and get userId from JWT
             String token = JwtUtil.extractToken(req);
-            int dealerStaffId = JwtUtil.extractUserId(token);
+            int userId = JwtUtil.extractUserId(token);
             
-            // Call the service to retrieve the list of orders
-            List<OrderDTO> orderList = orderService.GetListOrderByDealerStaffId(dealerStaffId);
+            // Get user details to check role and dealer
+            UserAccountDTO user = userService.getDealerStaffById(userId);
+            
+            if (user == null) {
+                ResponseUtils.error(resp, "User not found");
+                return;
+            }
+            
+            // Call the service to retrieve the list of orders based on role
+            List<OrderDTO> orderList = orderService.GetListOrderByDealerStaffId(
+                userId, 
+                user.getRoleId(), 
+                user.getDealerId()
+            );
             
             if (orderList != null && !orderList.isEmpty()) {
-                ResponseUtils.success(resp, "Orders found successfully", orderList);
-            } else if (orderList != null) {
-                // If the list is empty but retrieval succeeded (Collections.emptyList())
-                ResponseUtils.success(resp, "No orders found for dealer staff ID: " + dealerStaffId, orderList);
+                String message = user.getRoleId() == 2 
+                    ? "All dealer orders retrieved successfully" 
+                    : "Your orders retrieved successfully";
+                ResponseUtils.success(resp, message, orderList);
             } else {
-                // Should ideally not happen if service returns Collections.emptyList() on failure
-                ResponseUtils.error(resp, "Failed to retrieve orders");
+                String message = user.getRoleId() == 2 
+                    ? "No orders found for this dealer" 
+                    : "No orders found for your account";
+                ResponseUtils.success(resp, message, orderList);
             }
             
         } catch (utils.AuthException e) {
-            // Handle authentication errors (missing/invalid token)
             ResponseUtils.error(resp, "Authentication failed: " + e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
-            ResponseUtils.error(resp, "An unexpected error occurred while viewing orders: " + e.getMessage());
+            ResponseUtils.error(resp, "An unexpected error occurred: " + e.getMessage());
         }
     }
 }

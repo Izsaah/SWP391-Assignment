@@ -93,7 +93,7 @@ public class InstallmentPlanDAO {
         return retrieve("1 = 1");
     }
 
-    public InstallmentPlanDTO findPaymentById(int paymentId) {
+    public InstallmentPlanDTO findByPaymentId(int paymentId) {
         List<InstallmentPlanDTO> list = retrieve("payment_id = ?", paymentId);
         return list.get(0);
     }

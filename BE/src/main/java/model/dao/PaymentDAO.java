@@ -72,10 +72,23 @@ public class PaymentDAO {
 
     public PaymentDTO findPaymentById(int paymentId) {
         List<PaymentDTO> list = retrieve("payment_id = ?", paymentId);
-        return list.get(0);
+        if (list != null && !list.isEmpty()) {
+            return list.get(0);
+        }
+        
+        return null;
+    }
+    
+    public PaymentDTO findPaymentByOrderId(int orderId) {
+        List<PaymentDTO> list = retrieve("order_id = ?", orderId);
+        if (list != null && !list.isEmpty()) {
+            return list.get(0);
+        }
+        
+        return null;
     }
 
-    public List<PaymentDTO> findPaymentByOrderId(int orderId) {
+    public List<PaymentDTO> findPaymentListByOrderId(int orderId) {
         return retrieve("order_id = ?", orderId);
     }
 }
