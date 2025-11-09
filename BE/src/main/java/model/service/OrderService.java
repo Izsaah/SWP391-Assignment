@@ -7,16 +7,19 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import model.dao.ConfirmationDAO;
 import model.dao.OrderDAO;
 import model.dao.OrderDetailDAO;
+import model.dao.UserAccountDAO;
 import model.dao.VehicleSerialDAO;
 import model.dao.VehicleVariantDAO;
 import model.dto.ConfirmationDTO;
 import model.dto.OrderDTO;
 import model.dto.OrderDetailDTO;
+import model.dto.UserAccountDTO;
 import model.dto.VehicleSerialDTO;
 import model.dto.VehicleVariantDTO;
 import utils.DbUtils;
@@ -28,7 +31,8 @@ public class OrderService {
     private final VehicleVariantDAO variantDAO = new VehicleVariantDAO();
     private final VehicleSerialDAO vehicleSerialDAO = new VehicleSerialDAO();
     private final OrderDetailDAO orderDetailDAO = new OrderDetailDAO();
-
+    private final UserAccountDAO userDAO = new UserAccountDAO();
+    
     public int HandlingCreateOrder(
             int customerId,
             int dealerstaffId,
@@ -292,10 +296,10 @@ public class OrderService {
         }
     }
 
-    public List<OrderDTO> GetListOrderByDealerStaffId(int userId, int roleId, int dealerId) {
+    public List<Map<String, Object>> GetListOrderByDealerStaffId(int userId, int roleId, int dealerId) {
+        List<Map<String, Object>> enrichedOrderList = new ArrayList<>();
         try {
             List<OrderDTO> orderList;
-
             if (roleId == 2) {
                 orderList = orderDAO.getAllByDealerId(dealerId);
             } else {
@@ -308,11 +312,29 @@ public class OrderService {
             }
 
             for (OrderDTO order : orderList) {
+                // Get order detail
                 OrderDetailDTO detail = orderDetailDAO.getOrderDetailByOrderId(order.getOrderId());
                 order.setDetail(detail);
+
+                // Get dealer staff name
+                UserAccountDTO dealerStaff = userDAO.getUserById(order.getDealerStaffId());
+                String staffName = (dealerStaff != null) ? dealerStaff.getUsername(): "Unknown";
+
+                // Build enriched map
+                Map<String, Object> orderMap = new LinkedHashMap<>();
+                orderMap.put("orderId", order.getOrderId());
+                orderMap.put("customerId", order.getCustomerId());
+                orderMap.put("dealerStaffId", order.getDealerStaffId());
+                orderMap.put("dealerStaffName", staffName);
+                orderMap.put("modelId", order.getModelId());
+                orderMap.put("orderDate", order.getOrderDate());
+                orderMap.put("status", order.getStatus());
+                orderMap.put("detail", detail);
+
+                enrichedOrderList.add(orderMap);
             }
 
-            return orderList;
+            return enrichedOrderList;
         } catch (Exception e) {
             e.printStackTrace();
             return Collections.emptyList();
