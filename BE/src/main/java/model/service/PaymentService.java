@@ -63,7 +63,7 @@ public class PaymentService {
                                 discountStr = discountStr.replace("%", "").trim();
                                 double discount = Double.parseDouble(discountStr);
                                 if (discount > 0 && discount < 1) {
-                                    discount = discount * 100;
+discount = discount * 100;
                                 }
                                 totalAmount = totalAmount * (1 - discount / 100.0);
                             }
@@ -113,6 +113,19 @@ public class PaymentService {
             plan.setPaymentId(payment.getPaymentId());
             InstallmentPlanDTO createdPlan = installDAO.create(plan);
             payment.setInstallmentPlan(createdPlan);
+        } else {
+            // For Full Payment (TT), update order status to "delivered" since payment is complete
+            try {
+                boolean statusUpdated = orderDAO.updateStatus(orderId, "delivered");
+                if (statusUpdated) {
+                    System.out.println("INFO: Order " + orderId + " status updated to 'delivered' after Full Payment");
+                } else {
+                    System.err.println("WARNING: Failed to update order " + orderId + " status to 'delivered'");
+                }
+            } catch (Exception e) {
+                System.err.println("ERROR: Failed to update order status after Full Payment: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
 
         return payment;
@@ -122,7 +135,7 @@ public class PaymentService {
         try {
             boolean updated = installDAO.updateStatus(plan); // updates status and term_month
             if (updated) {
-                // Reload the full updated record from DB
+// Reload the full updated record from DB
                 return installDAO.findById(plan.getPlanId());
             }
             return null;
@@ -134,10 +147,8 @@ public class PaymentService {
 
     public PaymentDTO getPaymentByOrderId(int orderId) {
         try {
-            return paymentDAO.findPaymentById(orderId);
-        } catch (IndexOutOfBoundsException e) {
-            System.out.println("No payment found for Order ID " + orderId);
-            return null;
+            List<PaymentDTO> payments = paymentDAO.findPaymentByOrderId(orderId);
+            return (payments != null && !payments.isEmpty()) ? payments.get(0) : null;
         } catch (Exception e) {
             e.printStackTrace();
             return null;
@@ -196,7 +207,7 @@ public class PaymentService {
                     map.put("planId", plan.getPlanId());
                     map.put("interestRate", plan.getInterestRate());
                     map.put("termMonth", plan.getTermMonth());
-                    map.put("monthlyPay", plan.getMonthlyPay());
+map.put("monthlyPay", plan.getMonthlyPay());
                     map.put("status", plan.getStatus());
 
                     map.put("paymentId", payment.getPaymentId());
@@ -266,7 +277,7 @@ public class PaymentService {
                     map.put("paymentId", payment.getPaymentId());
                     map.put("orderId", payment.getOrderId());
                     map.put("amount", payment.getAmount());
-                    map.put("paymentDate", payment.getPaymentDate());
+map.put("paymentDate", payment.getPaymentDate());
                     map.put("method", payment.getMethod());
 
                     responseList.add(map);

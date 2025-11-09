@@ -25,97 +25,11 @@ const FeedbackComplaints = () => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [assignStaffId, setAssignStaffId] = useState('');
 
-  // Sample feedback/complaints data
-  const feedbacks = [
-    {
-      id: 'FB-2025-001',
-      customerName: 'Nguyen Van A',
-      customerId: 'C-001',
-      customerPhone: '0987654321',
-      assignedStaff: 'Duy',
-      assignedStaffId: 'S-005',
-      type: 'Feedback',
-      rating: 5,
-      date: '2025-11-15',
-      status: 'New',
-      content: 'Car runs smoothly, enthusiastic staff. Very satisfied with the service quality and delivery process.',
-      category: 'Service Quality',
-      vehicle: 'VF e34',
-      orderId: 'OF-2025-001'
-    },
-    {
-      id: 'FB-2025-002',
-      customerName: 'Tran Thi B',
-      customerId: 'C-002',
-      customerPhone: '0912345678',
-      assignedStaff: null,
-      assignedStaffId: null,
-      type: 'Complaint',
-      rating: 2,
-      date: '2025-11-14',
-      status: 'New',
-      content: 'Car delivery was 3 days late. The staff promised delivery on 11/11 but it arrived on 11/14. Very disappointed with the delay.',
-      category: 'Delivery',
-      vehicle: 'VF 8',
-      orderId: 'OF-2025-002'
-    },
-    {
-      id: 'FB-2025-003',
-      customerName: 'Le Van C',
-      customerId: 'C-003',
-      customerPhone: '0909876543',
-      assignedStaff: 'An',
-      assignedStaffId: 'S-006',
-      type: 'Feedback',
-      rating: 4,
-      date: '2025-11-13',
-      status: 'Assigned',
-      content: 'Overall good experience. The test drive was excellent, staff was professional. Minor issue with documentation but resolved quickly.',
-      category: 'Service Quality',
-      vehicle: 'VF e34',
-      orderId: 'OF-2025-003'
-    },
-    {
-      id: 'FB-2025-004',
-      customerName: 'Pham Thi D',
-      customerId: 'C-004',
-      customerPhone: '0976543210',
-      assignedStaff: 'Duy',
-      assignedStaffId: 'S-005',
-      type: 'Complaint',
-      rating: 1,
-      date: '2025-11-12',
-      status: 'Resolved',
-      content: 'Vehicle had minor scratches on delivery. After contacting staff, they arranged for repair and compensation. Issue resolved.',
-      category: 'Product Quality',
-      vehicle: 'VF 8',
-      orderId: 'OF-2025-004'
-    },
-    {
-      id: 'FB-2025-005',
-      customerName: 'Hoang Van E',
-      customerId: 'C-005',
-      customerPhone: '0938765432',
-      assignedStaff: null,
-      assignedStaffId: null,
-      type: 'Feedback',
-      rating: 5,
-      date: '2025-11-11',
-      status: 'New',
-      content: 'Excellent service from start to finish. Staff was knowledgeable and helped find the perfect vehicle for my needs.',
-      category: 'Service Quality',
-      vehicle: 'VF e34',
-      orderId: 'OF-2025-005'
-    }
-  ];
+  // Feedback/complaints data - to be fetched from API
+  const [feedbacks, setFeedbacks] = useState([]);
 
-  // Get all available staff
-  const allStaff = [
-    { id: 'S-005', name: 'Duy' },
-    { id: 'S-006', name: 'An' },
-    { id: 'S-007', name: 'Minh' },
-    { id: 'S-008', name: 'Lan' }
-  ];
+  // Get all available staff - to be fetched from API
+  const [allStaff, setAllStaff] = useState([]);
 
   // Get unique lists for filters
   const staffList = [...new Set(feedbacks.map(f => f.assignedStaff).filter(Boolean))];

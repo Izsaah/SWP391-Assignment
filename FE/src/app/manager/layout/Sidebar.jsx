@@ -22,7 +22,6 @@ import {
   TrendingUp,
   Building2,
   PieChart,
-  Boxes,
   TruckIcon,
   UserCheck,
   Truck,
@@ -219,12 +218,6 @@ const menuItems = [
         label: "Vehicle List",
         icon: Car,
         path: "/manager/inventory/vehicles"
-      },
-      {
-        id: "stock-overview",
-        label: "Stock Overview",
-        icon: Boxes,
-        path: "/manager/inventory/stock"
       },
       {
         id: "manufacturer-requests",

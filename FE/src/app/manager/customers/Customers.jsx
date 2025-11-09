@@ -18,87 +18,8 @@ const Customers = () => {
   const [typeFilter, setTypeFilter] = useState('all');
   const [staffFilter, setStaffFilter] = useState('all');
 
-  // Sample customers data with business-level KPIs
-  const customersData = [
-    {
-      customerId: 'C-2025-001',
-      name: 'Le Minh Tuan',
-      email: 'leminhtuan@email.com',
-      phone: '0987654323',
-      assignedStaff: 'Nguyen Van Hung',
-      assignedStaffId: 'S-001',
-      lifetimeValue: 920000000,
-      totalOrders: 3,
-      outstandingBalance: 0,
-      type: 'VIP',
-      status: 'Active'
-    },
-    {
-      customerId: 'C-2025-002',
-      name: 'Tran Hoa',
-      email: 'tranhoa@email.com',
-      phone: '0912345648',
-      assignedStaff: 'Le Thi Mai',
-      assignedStaffId: 'S-002',
-      lifetimeValue: 1040000000,
-      totalOrders: 1,
-      outstandingBalance: 775000000,
-      type: 'Returning',
-      status: 'Active'
-    },
-    {
-      customerId: 'C-2025-003',
-      name: 'Nguyen Van An',
-      email: 'nguyenvanan@email.com',
-      phone: '0909876543',
-      assignedStaff: 'Pham Thi Lan',
-      assignedStaffId: 'S-003',
-      lifetimeValue: 2500000000,
-      totalOrders: 5,
-      outstandingBalance: 0,
-      type: 'VIP',
-      status: 'Active'
-    },
-    {
-      customerId: 'C-2025-004',
-      name: 'Pham Thu Ha',
-      email: 'phamthuha@email.com',
-      phone: '0938765432',
-      assignedStaff: 'Tran Van Minh',
-      assignedStaffId: 'S-004',
-      lifetimeValue: 1020000000,
-      totalOrders: 2,
-      outstandingBalance: 0,
-      type: 'Returning',
-      status: 'Active'
-    },
-    {
-      customerId: 'C-2025-005',
-      name: 'Hoang Thi Lan',
-      email: 'hoangthilan@email.com',
-      phone: '0976543210',
-      assignedStaff: 'Nguyen Van Hung',
-      assignedStaffId: 'S-001',
-      lifetimeValue: 1080000000,
-      totalOrders: 1,
-      outstandingBalance: 792000000,
-      type: 'Returning',
-      status: 'Active'
-    },
-    {
-      customerId: 'C-2025-006',
-      name: 'Vo Minh Duc',
-      email: 'vominhduc@email.com',
-      phone: '0987123456',
-      assignedStaff: 'Le Thi Mai',
-      assignedStaffId: 'S-002',
-      lifetimeValue: 0,
-      totalOrders: 0,
-      outstandingBalance: 0,
-      type: 'Lost',
-      status: 'Inactive'
-    }
-  ];
+  // Customers data - to be fetched from API
+  const [customersData, setCustomersData] = useState([]);
 
   // Get unique staff list
   const staffList = [...new Set(customersData.map(c => c.assignedStaff))];

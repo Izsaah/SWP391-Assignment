@@ -4,12 +4,14 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import model.dao.ConfirmationDAO;
 import model.dao.OrderDAO;
 import model.dao.OrderDetailDAO;
+import model.dao.UserAccountDAO;
 import model.dao.VehicleSerialDAO;
 import model.dao.VehicleVariantDAO;
 import model.dto.ConfirmationDTO;
@@ -26,6 +28,7 @@ public class OrderService {
     private final VehicleVariantDAO variantDAO = new VehicleVariantDAO();
     private final VehicleSerialDAO vehicleSerialDAO = new VehicleSerialDAO();
     private final OrderDetailDAO orderDetailDAO = new OrderDetailDAO();
+    private final UserAccountDAO userDAO = new UserAccountDAO();
     
     public int HandlingCreateOrder(
             int customerId,
@@ -60,21 +63,24 @@ public class OrderService {
                 newVariant.setModelId(modelId);
                 newVariant.setVersionName("Auto-Generated Version");
                 newVariant.setColor("Default Color");
-                newVariant.setPrice(0.0);
+                // Use the unitPrice passed from frontend, or default to 0.0
+                newVariant.setPrice(unitPrice > 0 ? unitPrice : 0.0);
                 newVariant.setIsActive(true);
 
                 finalVariantId = variantDAO.create(conn, newVariant);
                 if (finalVariantId <= 0) {
                     throw new SQLException("Failed to create variant");
                 }
-                finalUnitPrice = 0.0;
+                // Use the unitPrice from frontend if provided, otherwise 0.0
+                finalUnitPrice = unitPrice > 0 ? unitPrice : 0.0;
             } else {
                 VehicleVariantDTO variant = variantDAO.findUnitPriceByVariantId(variantId);
                 if (variant == null) {
                     throw new SQLException("Variant not found with ID: " + variantId);
                 }
-                finalVariantId = variantId;
-                finalUnitPrice = variant.getPrice();
+finalVariantId = variantId;
+                // Use variant price if no price was provided from frontend, otherwise use frontend price
+                finalUnitPrice = (unitPrice > 0) ? unitPrice : variant.getPrice();
             }
 
             // Order details
@@ -140,8 +146,7 @@ public class OrderService {
             }
         }
     }
-
-    public boolean approveCustomOrderByOrderId(int orderId, String decision, String versionName,
+public boolean approveCustomOrderByOrderId(int orderId, String decision, String versionName,
             String color, double unitPrice, int staffAdminId) {
         Connection conn = null;
         try {
@@ -205,7 +210,7 @@ public class OrderService {
                 if (!orderDeleted) {
                     throw new SQLException("Failed to delete order_id = " + orderId);
                 }
-                System.out.println("INFO: Custom order rejected. Deleted order_id = " + orderId);
+System.out.println("INFO: Custom order rejected. Deleted order_id = " + orderId);
             } else {
                 System.out.println("INFO: Custom order decision is pending. No action taken.");
             }
@@ -251,38 +256,50 @@ public class OrderService {
         }
     }
 
-    public List<OrderDTO> HandlingGetOrdersByCustomerId(int customerId) {
-        try {
-            List<OrderDTO> orderList = orderDAO.getByCustomerId(customerId);
+public List<OrderDTO> HandlingGetOrdersByCustomerId(int customerId) {
+    try {
+        List<OrderDTO> orderList = orderDAO.getByCustomerId(customerId);
 
-            if (orderList == null || orderList.isEmpty()) {
-                return Collections.emptyList();
-            }
+        if (orderList == null || orderList.isEmpty()) {
+            return Collections.emptyList();
+        }
 
-            for (OrderDTO order : orderList) {
-
+        // Xử lý từng đơn hàng riêng biệt
+        for (OrderDTO order : orderList) {
+            try {
                 OrderDetailDTO detail = orderDetailDAO.getOrderDetailByOrderId(order.getOrderId());
                 order.setDetail(detail);
 
                 if (detail != null) {
-
-                    ConfirmationDTO confirmation = confirmationDAO.getConfirmationByOrderDetailId(detail.getOrderDetailId());
-
-                    if (confirmation != null) {
-                        order.setConfirmation(confirmation);
-                        order.setIsCustom(true);
-                    } else {
+                    try {
+                        ConfirmationDTO confirmation = confirmationDAO.getConfirmationByOrderDetailId(detail.getOrderDetailId());
+                        if (confirmation != null) {
+                            order.setConfirmation(confirmation);
+                            order.setIsCustom(true);
+                        } else {
+                            order.setIsCustom(false);
+                        }
+                    } catch (Exception e) {
+                        System.out.println("Warning: Không thể lấy confirmation cho order " + order.getOrderId() + ": " + e.getMessage());
                         order.setIsCustom(false);
                     }
+                } else {
+                    order.setIsCustom(false);
                 }
+            } catch (Exception e) {
+                System.out.println("Warning: Không thể lấy detail cho order " + order.getOrderId() + ": " + e.getMessage());
+                e.printStackTrace();
+                order.setDetail(null);
+                order.setIsCustom(false);
             }
-
-            return orderList;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return Collections.emptyList();
         }
+
+        return orderList;
+    } catch (Exception e) {
+        e.printStackTrace();
+        return Collections.emptyList();
     }
+}
     public boolean updateOrderStatus(int orderId, String newStatus)
             throws SQLException, ClassNotFoundException {
 
@@ -292,8 +309,7 @@ public class OrderService {
                 && !newStatus.equalsIgnoreCase("cancelled")) {
             throw new IllegalArgumentException("Invalid status: " + newStatus);
         }
-
-        try (Connection conn = DbUtils.getConnection()) {
+try (Connection conn = DbUtils.getConnection()) {
             conn.setAutoCommit(false);
 
             boolean success = orderDAO.updateStatus(orderId, newStatus);
@@ -314,6 +330,71 @@ public class OrderService {
     public List<ConfirmationDTO> getConfirmationByOrderDetailId(int orderDetailId) 
             throws SQLException, ClassNotFoundException{
         return confirmationDAO.viewConfirmationsByOrderDetailId(orderDetailId);
+    }
+    
+    /**
+     * Get all orders from all staff in a dealer
+     * Uses optimized query with IN clause instead of multiple queries
+     */
+    public List<OrderDTO> getAllOrdersByDealer(int dealerId) {
+        try {
+            // Get all user IDs in this dealer (both MANAGER role_id=2 and STAFF role_id=3)
+            List<Integer> userIds = userDAO.getStaffIdsByDealer(dealerId);
+            
+            System.out.println("DEBUG: getAllOrdersByDealer - dealerId: " + dealerId);
+            System.out.println("DEBUG: getAllOrdersByDealer - staffIds found: " + (userIds != null ? userIds.size() : 0));
+            if (userIds != null && !userIds.isEmpty()) {
+                System.out.println("DEBUG: getAllOrdersByDealer - staffIds: " + userIds);
+            }
+            
+            if (userIds == null || userIds.isEmpty()) {
+                System.out.println("WARN: No staff IDs found for dealer: " + dealerId);
+                return Collections.emptyList();
+            }
+            
+            // Use optimized method to get all orders in one query instead of looping
+            List<OrderDTO> allOrders = orderDAO.getOrdersByDealerStaffIds(userIds);
+            
+            System.out.println("DEBUG: getAllOrdersByDealer - Total orders found: " + (allOrders != null ? allOrders.size() : 0));
+            
+            if (allOrders == null || allOrders.isEmpty()) {
+                System.out.println("INFO: No orders found for dealer: " + dealerId);
+                return Collections.emptyList();
+            }
+
+            // Enrich each order with details and confirmation info
+            for (OrderDTO order : allOrders) {
+                try {
+                    OrderDetailDTO detail = orderDetailDAO.getOrderDetailByOrderId(order.getOrderId());
+                    order.setDetail(detail);
+
+                    if (detail != null) {
+                        ConfirmationDTO confirmation = confirmationDAO.getConfirmationByOrderDetailId(detail.getOrderDetailId());
+                        if (confirmation != null) {
+                            order.setConfirmation(confirmation);
+                            order.setIsCustom(true);
+                        } else {
+                            order.setIsCustom(false);
+                        }
+                    } else {
+                        // Even if detail is null, still set isCustom to false
+                        order.setIsCustom(false);
+                    }
+                } catch (Exception e) {
+                    System.err.println("ERROR: Failed to enrich order " + order.getOrderId() + ": " + e.getMessage());
+                    e.printStackTrace();
+                    // Continue processing other orders even if one fails
+                    order.setIsCustom(false);
+                }
+            }
+
+            System.out.println("DEBUG: getAllOrdersByDealer - Final orders count after enrichment: " + allOrders.size());
+            return allOrders;
+        } catch (Exception e) {
+            System.err.println("ERROR: getAllOrdersByDealer failed for dealerId: " + dealerId);
+            e.printStackTrace();
+            return Collections.emptyList();
+        }
     }
             
 }

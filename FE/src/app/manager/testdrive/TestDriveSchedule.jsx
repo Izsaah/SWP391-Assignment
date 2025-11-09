@@ -37,96 +37,15 @@ const TestDriveSchedule = () => {
     notes: ''
   });
 
-  // Sample test drive appointments data
-  const appointments = [
-    {
-      id: 'TD-2025-001',
-      date: '2025-11-15',
-      time: '09:00',
-      customerName: 'Nguyen Van A',
-      customerPhone: '0987654321',
-      vehicleModel: 'VF e34',
-      vehicleVariant: 'Standard',
-      serial: 'S/N 121312ADS',
-      assignedStaff: 'Duy',
-      assignedStaffId: 'S-005',
-      status: 'Pending',
-      location: 'Showroom A - District 1',
-      notes: 'Customer prefers morning appointment'
-    },
-    {
-      id: 'TD-2025-002',
-      date: '2025-11-15',
-      time: '14:30',
-      customerName: 'Tran Thi B',
-      customerPhone: '0912345678',
-      vehicleModel: 'VF 8',
-      vehicleVariant: 'Premium',
-      serial: 'S/N 87XC234FDS',
-      assignedStaff: 'An',
-      assignedStaffId: 'S-006',
-      status: 'Confirmed',
-      location: 'Showroom B - District 7',
-      notes: 'Follow-up after inquiry'
-    },
-    {
-      id: 'TD-2025-003',
-      date: '2025-11-16',
-      time: '10:15',
-      customerName: 'Le Van C',
-      customerPhone: '0909876543',
-      vehicleModel: 'VF e34',
-      vehicleVariant: 'Luxury',
-      serial: 'S/N 456XYZ789',
-      assignedStaff: null,
-      assignedStaffId: null,
-      status: 'Pending',
-      location: 'Showroom A - District 1',
-      notes: ''
-    },
-    {
-      id: 'TD-2025-004',
-      date: '2025-11-14',
-      time: '15:00',
-      customerName: 'Pham Thi D',
-      customerPhone: '0976543210',
-      vehicleModel: 'VF 8',
-      vehicleVariant: 'Standard',
-      serial: 'S/N 789ABC123',
-      assignedStaff: 'Duy',
-      assignedStaffId: 'S-005',
-      status: 'Completed',
-      location: 'Showroom A - District 1',
-      notes: 'Customer satisfied, considering purchase'
-    },
-    {
-      id: 'TD-2025-005',
-      date: '2025-11-13',
-      time: '11:30',
-      customerName: 'Hoang Van E',
-      customerPhone: '0938765432',
-      vehicleModel: 'VF e34',
-      vehicleVariant: 'Premium',
-      serial: 'S/N 321DEF456',
-      assignedStaff: 'An',
-      assignedStaffId: 'S-006',
-      status: 'Cancelled',
-      location: 'Showroom B - District 7',
-      notes: 'Customer cancelled due to schedule conflict'
-    }
-  ];
+  // Test drive appointments data - to be fetched from API
+  const [appointments, setAppointments] = useState([]);
 
   // Get unique lists for filters
   const staffList = [...new Set(appointments.map(a => a.assignedStaff).filter(Boolean))];
   const vehicleModels = [...new Set(appointments.map(a => a.vehicleModel))];
 
-  // Get all available staff for assignment
-  const allStaff = [
-    { id: 'S-005', name: 'Duy' },
-    { id: 'S-006', name: 'An' },
-    { id: 'S-007', name: 'Minh' },
-    { id: 'S-008', name: 'Lan' }
-  ];
+  // Get all available staff for assignment - to be fetched from API
+  const [allStaff, setAllStaff] = useState([]);
 
   // Helper functions
   const formatDateTime = (date, time) => {

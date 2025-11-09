@@ -7,31 +7,8 @@ const ManufacturerRequestsList = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showToast, setShowToast] = useState(false);
 
-  // Mock data for requests list
-  const requests = [
-    {
-      id: 'REQ-1734567890123',
-      brand: 'Tesla',
-      model: 'Model 3',
-      color: 'White',
-      quantity: 10,
-      price: 39990,
-      status: 'Pending',
-      createdAt: '2025-01-15',
-      notes: 'Requesting additional stock for high demand'
-    },
-    {
-      id: 'REQ-1734567890124',
-      brand: 'VinFast',
-      model: 'VF e34',
-      color: 'Green',
-      quantity: 5,
-      price: 28990,
-      status: 'Approved',
-      createdAt: '2025-01-10',
-      notes: ''
-    },
-  ];
+  // Requests data - to be fetched from API
+  const [requests, setRequests] = useState([]);
 
   const getStatusBadge = (status) => {
     switch(status) {

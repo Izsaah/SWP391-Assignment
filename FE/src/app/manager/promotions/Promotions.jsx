@@ -24,69 +24,8 @@ const Promotions = () => {
   const [dateTo, setDateTo] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Sample promotions data from manufacturer
-  const promotions = [
-    {
-      id: 'PROMO-2025-001',
-      code: 'SPRING2025',
-      fromManufacturer: 'VinFast',
-      vehicleModel: 'VF e34',
-      vehicleVariant: 'Standard, Premium, Luxury',
-      discountType: 'Percentage',
-      value: 10,
-      validFrom: '2025-11-01',
-      validTo: '2025-12-31',
-      dealerStatus: 'Active',
-      appliedCount: 45,
-      applicableVariants: ['VF e34 Standard', 'VF e34 Premium'],
-      manufacturerRules: 'Valid for VF e34 models only. Cannot be combined with other promotions. Minimum purchase of 1 vehicle.'
-    },
-    {
-      id: 'PROMO-2025-002',
-      code: 'VF8YEAREND',
-      fromManufacturer: 'VinFast',
-      vehicleModel: 'VF 8',
-      vehicleVariant: 'All Variants',
-      discountType: 'Fixed Amount',
-      value: 50000000,
-      validFrom: '2025-11-15',
-      validTo: '2025-12-31',
-      dealerStatus: 'Active',
-      appliedCount: 23,
-      applicableVariants: ['VF 8 Standard', 'VF 8 Premium'],
-      manufacturerRules: 'Valid for all VF 8 variants. Limited time offer. Cannot be combined with other promotions.'
-    },
-    {
-      id: 'PROMO-2025-003',
-      code: 'SUMMER2025',
-      fromManufacturer: 'VinFast',
-      vehicleModel: 'VF e34',
-      vehicleVariant: 'Premium, Luxury',
-      discountType: 'Percentage',
-      value: 15,
-      validFrom: '2025-12-01',
-      validTo: '2025-12-31',
-      dealerStatus: 'Inactive',
-      appliedCount: 0,
-      applicableVariants: [],
-      manufacturerRules: 'Valid for VF e34 Premium and Luxury only. Special summer promotion.'
-    },
-    {
-      id: 'PROMO-2025-004',
-      code: 'NEWCUST2025',
-      fromManufacturer: 'VinFast',
-      vehicleModel: 'All Models',
-      vehicleVariant: 'All Variants',
-      discountType: 'Percentage',
-      value: 5,
-      validFrom: '2025-11-01',
-      validTo: '2026-01-31',
-      dealerStatus: 'Active',
-      appliedCount: 67,
-      applicableVariants: ['VF e34 Standard', 'VF e34 Premium', 'VF 8 Standard', 'VF 8 Premium'],
-      manufacturerRules: 'Valid for new customers only. First-time purchase. Can be combined with other promotions.'
-    }
-  ];
+  // Promotions data - to be fetched from API
+  const [promotions, setPromotions] = useState([]);
 
   // Get all available vehicle models
   const vehicleModels = [...new Set(promotions.map(p => p.vehicleModel))];

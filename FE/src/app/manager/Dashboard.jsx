@@ -16,12 +16,12 @@ import FloatingBell from './components/dashboard/FloatingBell';
 export const Dashboard = () => {
   // Header state removed
 
-  // Mock data - replace with API calls
+  // KPI data - to be fetched from API
   const kpiData = {
-    totalRevenue: { value: '42.5B', unit: '₫', change: '+12.5%', trend: 'up' },
-    activeQuotes: { value: 128, change: '+8', trend: 'up' },
-    vehiclesInStock: { value: 56, change: '-3', trend: 'down' },
-    vehiclesSold: { value: 37, change: '+15%', trend: 'up' },
+    totalRevenue: { value: '0', unit: '₫', change: '0%', trend: 'neutral' },
+    activeQuotes: { value: 0, change: '0', trend: 'neutral' },
+    vehiclesInStock: { value: 0, change: '0', trend: 'neutral' },
+    vehiclesSold: { value: 0, change: '0%', trend: 'neutral' },
   };
 
   // Header handlers removed

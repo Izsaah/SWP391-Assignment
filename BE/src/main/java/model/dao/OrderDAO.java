@@ -29,20 +29,42 @@ public class OrderDAO {
 
     public List<OrderDTO> retrieve(String condition, Object... params) throws SQLException, ClassNotFoundException {
         String sql = "SELECT * FROM " + TABLE_NAME + " WHERE " + condition;
+        System.out.println("DEBUG OrderDAO.retrieve: SQL = " + sql);
+        System.out.println("DEBUG OrderDAO.retrieve: Parameters count = " + params.length);
+        for (int i = 0; i < params.length; i++) {
+            System.out.println("DEBUG OrderDAO.retrieve: Parameter[" + i + "] = " + params[i] + " (type: " + (params[i] != null ? params[i].getClass().getName() : "null") + ")");
+        }
         try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
             for (int i = 0; i < params.length; i++) {
                 ps.setObject(i + 1, params[i]);
             }
             ResultSet rs = ps.executeQuery();
             List<OrderDTO> list = new ArrayList<>();
+            int rowCount = 0;
             while (rs.next()) {
-                list.add(mapToOrder(rs));
+                rowCount++;
+                try {
+                    OrderDTO order = mapToOrder(rs);
+                    list.add(order);
+                    System.out.println("DEBUG OrderDAO.retrieve: Mapped order ID = " + order.getOrderId() + ", customerId = " + order.getCustomerId());
+                } catch (SQLException e) {
+                    System.err.println("DEBUG OrderDAO.retrieve: Error mapping row " + rowCount + ": " + e.getMessage());
+                    e.printStackTrace();
+                }
             }
+            System.out.println("DEBUG OrderDAO.retrieve: Total rows processed = " + rowCount + ", list size = " + list.size());
             return list;
+        } catch (SQLException e) {
+            System.err.println("DEBUG OrderDAO.retrieve: SQLException occurred: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        } catch (Exception e) {
+            System.err.println("DEBUG OrderDAO.retrieve: Unexpected exception: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
         }
     }
-
-    public int create(Connection conn, OrderDTO order) throws SQLException {
+public int create(Connection conn, OrderDTO order) throws SQLException {
         try ( PreparedStatement ps = conn.prepareStatement(INSERT_ORDER, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, order.getCustomerId());
             ps.setInt(2, order.getDealerStaffId());
@@ -78,7 +100,15 @@ public class OrderDAO {
     }
 
     public List<OrderDTO> getByCustomerId(int customerId) throws SQLException, ClassNotFoundException {
-        return retrieve("customer_id=?", customerId);
+        System.out.println("DEBUG OrderDAO.getByCustomerId: Querying for customerId = " + customerId);
+        List<OrderDTO> result = retrieve("customer_id=?", customerId);
+        System.out.println("DEBUG OrderDAO.getByCustomerId: Found " + (result != null ? result.size() : "null") + " orders for customerId = " + customerId);
+        if (result != null && !result.isEmpty()) {
+            for (OrderDTO order : result) {
+                System.out.println("DEBUG OrderDAO.getByCustomerId: Order ID = " + order.getOrderId() + ", status = " + order.getStatus());
+            }
+        }
+        return result;
     }
 
     public List<OrderDTO> getOrdersByDealerStaffIds(List<Integer> staffIds) throws ClassNotFoundException, SQLException {
@@ -103,7 +133,7 @@ public class OrderDAO {
             }
 
             ResultSet rs = ps.executeQuery();
-            while (rs.next()) {
+while (rs.next()) {
                 orders.add(mapToOrder(rs));
             }
         }

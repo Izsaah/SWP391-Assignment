@@ -19,10 +19,10 @@ const PipelineSummary = () => {
             <h3 className="text-base font-semibold text-gray-900">Quotations</h3>
           </div>
           <div className="space-y-2">
-            <StatRow label="Total" value={128} />
-            <StatRow label="Pending" value={50} color="text-yellow-600" />
-            <StatRow label="Approved" value={40} color="text-green-600" />
-            <StatRow label="Expired" value={38} color="text-red-600" />
+            <StatRow label="Total" value={0} />
+            <StatRow label="Pending" value={0} color="text-yellow-600" />
+            <StatRow label="Approved" value={0} color="text-green-600" />
+            <StatRow label="Expired" value={0} color="text-red-600" />
           </div>
         </div>
 
@@ -33,10 +33,10 @@ const PipelineSummary = () => {
             <h3 className="text-base font-semibold text-gray-900">Orders</h3>
           </div>
           <div className="space-y-2">
-            <StatRow label="Total" value={37} />
-            <StatRow label="Completed" value={30} color="text-green-600" />
-            <StatRow label="Delivery in progress" value={5} color="text-blue-600" />
-            <StatRow label="Cancelled" value={2} color="text-red-600" />
+            <StatRow label="Total" value={0} />
+            <StatRow label="Completed" value={0} color="text-green-600" />
+            <StatRow label="Delivery in progress" value={0} color="text-blue-600" />
+            <StatRow label="Cancelled" value={0} color="text-red-600" />
           </div>
         </div>
       </div>

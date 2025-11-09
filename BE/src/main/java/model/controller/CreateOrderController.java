@@ -56,6 +56,29 @@ public class CreateOrderController extends HttpServlet {
             Integer variantId = null;
             double unitPrice = 0.0;
 
+            // First, try to get unitPrice from request (frontend sends basePrice/totalPrice)
+            if (params.containsKey("unitPrice") && params.get("unitPrice") != null) {
+                try {
+                    unitPrice = Double.parseDouble(params.get("unitPrice").toString());
+                } catch (NumberFormatException e) {
+                    // Ignore, will try other methods
+                }
+            } else if (params.containsKey("basePrice") && params.get("basePrice") != null) {
+                try {
+                    unitPrice = Double.parseDouble(params.get("basePrice").toString());
+                } catch (NumberFormatException e) {
+                    // Ignore, will try other methods
+                }
+} else if (params.containsKey("totalPrice") && params.get("totalPrice") != null) {
+                try {
+                    // If totalPrice is provided, divide by quantity to get unit price
+                    double totalPrice = Double.parseDouble(params.get("totalPrice").toString());
+                    unitPrice = totalPrice / quantity;
+                } catch (NumberFormatException e) {
+                    // Ignore, will try other methods
+                }
+            }
+
             if (params.containsKey("variantId") && params.get("variantId") != null
                     && !params.get("variantId").toString().trim().isEmpty()) {
                 variantId = Integer.parseInt(params.get("variantId").toString());
@@ -66,7 +89,10 @@ public class CreateOrderController extends HttpServlet {
                         ResponseUtils.error(resp, "Variant not found with ID: " + variantId);
                         return;
                     }
-                    unitPrice = variant.getPrice();
+                    // Use variant price if no price was provided from frontend, or if variant price is higher
+                    if (unitPrice <= 0 || variant.getPrice() > 0) {
+                        unitPrice = variant.getPrice();
+                    }
                 }
             }
 
@@ -104,7 +130,7 @@ public class CreateOrderController extends HttpServlet {
             ResponseUtils.error(resp, "Invalid number format: " + e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
-            ResponseUtils.error(resp, "Error creating order: " + e.getMessage());
+ResponseUtils.error(resp, "Error creating order: " + e.getMessage());
         }
     }
 }

@@ -16,9 +16,9 @@ const Item = ({ icon: Icon, label, value, color }) => (
 const FinancialSnapshot = () => {
   return (
     <div className="space-y-3">
-      <Item icon={DollarSign} label="Payments Collected (Month)" value="₫ 12.3B" />
-      <Item icon={CreditCard} label="Outstanding Installments" value="₫ 3.8B" />
-      <Item icon={Clock} label="Avg Delivery Time" value="4.2 days" />
+      <Item icon={DollarSign} label="Payments Collected (Month)" value="₫ 0" />
+      <Item icon={CreditCard} label="Outstanding Installments" value="₫ 0" />
+      <Item icon={Clock} label="Avg Delivery Time" value="0 days" />
     </div>
   );
 };

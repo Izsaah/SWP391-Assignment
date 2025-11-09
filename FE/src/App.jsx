@@ -57,6 +57,7 @@ const RoleRedirect = () => {
       const normalized = role === 'Dealer Manager' ? 'MANAGER' : role === 'Dealer Staff' ? 'STAFF' : role;
       if (normalized === 'MANAGER') return <Navigate to="/manager/dashboard" />;
       if (normalized === 'STAFF') return <Navigate to="/staff/dashboard" />;
+      if (role === 'EVM' || role === 'ADMIN') return <Navigate to="/evm" />;
     }
   } catch {
     // ignore and fall through to login
@@ -292,8 +293,15 @@ function App() {
           }
         />
 
-        {/* EVM routes */}
-        <Route path="/evm" element={<EVMLayout />}>
+        {/* EVM routes - Only accessible by EVM or ADMIN role */}
+        <Route 
+          path="/evm" 
+          element={
+            <ProtectedRoute allowRoles={['EVM', 'ADMIN']}>
+              <EVMLayout />
+            </ProtectedRoute>
+          }
+        >
           <Route index element={<EVMStaffDashboard />} />
           <Route path="vehicle-catalog" element={<VehicleCatalog />} />
           <Route path="vehicle-models" element={<Navigate to="/evm/vehicle-catalog?tab=models" replace />} />

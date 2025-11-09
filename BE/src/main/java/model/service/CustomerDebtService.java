@@ -25,6 +25,12 @@ public class CustomerDebtService {
             }
 
             for (OrderDTO order : orders) {
+                // Skip cancelled orders - they should not contribute to debt
+                String orderStatus = order.getStatus();
+                if (orderStatus != null && orderStatus.equalsIgnoreCase("cancelled")) {
+                    continue;
+                }
+                
                 // Get order detail(s)
                 List<OrderDetailDTO> details = orderDetailDAO.getOrderDetailListByOrderId(order.getOrderId());
                 if (details == null || details.isEmpty()) {
@@ -38,14 +44,31 @@ public class CustomerDebtService {
                         String quantityStr = detail.getQuantity();
                         if (quantityStr != null && !quantityStr.trim().isEmpty()) {
                             quantity = Double.parseDouble(quantityStr.trim());
+                            // Validate quantity is positive
+                            if (quantity <= 0) {
+                                System.err.println("Invalid quantity (<= 0) for order detail ID: " + detail.getOrderDetailId());
+                                continue; // Skip this detail
+                            }
                         } else {
                             quantity = 1; // default
                         }
                     } catch (NumberFormatException e) {
-                        System.err.println("Invalid quantity for order detail ID: " + detail.getOrderDetailId());
-                        quantity = 1; // default
+                        System.err.println("Invalid quantity format for order detail ID: " + detail.getOrderDetailId());
+                        continue; // Skip this detail instead of using default
                     }
-                    orderTotal += quantity * detail.getUnitPrice();
+                    
+                    double unitPrice = detail.getUnitPrice();
+                    // Validate unit price is positive
+                    if (unitPrice <= 0) {
+                        System.err.println("Invalid unit price (<= 0) for order detail ID: " + detail.getOrderDetailId());
+                        continue; // Skip this detail
+                    }
+                    
+                    orderTotal += quantity * unitPrice;
+                }
+// Skip if order total is invalid
+                if (orderTotal <= 0) {
+                    continue;
                 }
 
                 // Get payments made for this order
@@ -54,14 +77,22 @@ public class CustomerDebtService {
                 if (payments != null && !payments.isEmpty()) {
                     totalPaid = payments.stream()
                             .mapToDouble(PaymentDTO::getAmount)
+                            .filter(amount -> amount > 0) // Only count positive payments
                             .sum();
                 }
 
-                // Remaining debt = total order value - amount paid
-                totalDebt += (orderTotal - totalPaid);
+                // Calculate remaining debt = total order value - amount paid
+                // Only add to total debt if there's actually outstanding balance
+                double remainingDebt = orderTotal - totalPaid;
+                if (remainingDebt > 0) {
+                    totalDebt += remainingDebt;
+                }
+                // If totalPaid > orderTotal, it means overpayment - don't subtract from total debt
+                // (we don't want negative debt values)
             }
 
-            return totalDebt;
+            // Ensure debt is never negative
+            return Math.max(0, totalDebt);
         } catch (Exception e) {
             e.printStackTrace();
             return 0.0;

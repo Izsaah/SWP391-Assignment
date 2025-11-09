@@ -25,108 +25,11 @@ const CustomerDetail = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [showReassignModal, setShowReassignModal] = useState(false);
 
-  // Mock customer data with business KPIs
-  const customer = {
-    customerId: 'C-2025-001',
-    name: 'Le Minh Tuan',
-    email: 'leminhtuan@email.com',
-    phone: '0987654323',
-    gender: 'Male',
-    dateOfBirth: '1990-05-15',
-    type: 'VIP',
-    status: 'Active',
-    assignedStaff: 'Nguyen Van Hung',
-    assignedStaffId: 'S-001',
-    joinedDate: 'September 10, 2025',
-    lifetimeValue: 920000000,
-    totalOrders: 3,
-    outstandingBalance: 0,
-    address: {
-      city: 'Ho Chi Minh City',
-      district: 'District 1',
-      fullAddress: '123 Nguyen Hue Street, District 1, Ho Chi Minh City'
-    }
-  };
-
-  // Mock order history
-  const orderHistory = [
-    {
-      orderId: 'ORD-2025-001',
-      orderFormId: 'OF-2025-001',
-      vehicle: 'Model 3 Standard RWD',
-      amount: 920000000,
-      status: 'Completed',
-      orderDate: '2025-10-22',
-      deliveryDate: '2025-10-28',
-      salesperson: 'Nguyen Van Hung'
-    },
-    {
-      orderId: 'ORD-2025-002',
-      orderFormId: 'OF-2025-005',
-      vehicle: 'Model Y Long Range',
-      amount: 1200000000,
-      status: 'Completed',
-      orderDate: '2025-09-15',
-      deliveryDate: '2025-09-25',
-      salesperson: 'Nguyen Van Hung'
-    },
-    {
-      orderId: 'ORD-2025-003',
-      orderFormId: 'OF-2025-010',
-      vehicle: 'Model 3 Performance AWD',
-      amount: 1350000000,
-      status: 'Pending',
-      orderDate: '2025-10-25',
-      deliveryDate: null,
-      salesperson: 'Nguyen Van Hung'
-    }
-  ];
-
-  // Mock payment history
-  const paymentHistory = [
-    {
-      paymentId: 'PAY-2025-001',
-      orderId: 'ORD-2025-001',
-      amount: 920000000,
-      paymentMethod: 'Full Payment',
-      paymentDate: '2025-10-22',
-      status: 'Completed',
-      receiptNumber: 'REC-2025-001'
-    },
-    {
-      paymentId: 'PAY-2025-002',
-      orderId: 'ORD-2025-002',
-      amount: 1200000000,
-      paymentMethod: 'Full Payment',
-      paymentDate: '2025-09-15',
-      status: 'Completed',
-      receiptNumber: 'REC-2025-002'
-    },
-    {
-      paymentId: 'PAY-2025-003',
-      orderId: 'ORD-2025-003',
-      amount: 450000000,
-      paymentMethod: 'Installment',
-      paymentDate: '2025-10-25',
-      status: 'Partial',
-      receiptNumber: 'REC-2025-003',
-      remainingBalance: 900000000
-    }
-  ];
-
-  // Staff performance data
-  const staffPerformance = {
-    name: 'Nguyen Van Hung',
-    staffId: 'S-001',
-    totalCustomers: 45,
-    totalRevenue: 12500000000,
-    totalOrders: 78,
-    avgOrderValue: 160256410,
-    customerSatisfaction: 4.8,
-    joinDate: 'January 2024',
-    recentOrders: 12,
-    recentRevenue: 3200000000
-  };
+  // Customer data - to be fetched from API
+  const [customer, setCustomer] = useState(null);
+  const [orderHistory, setOrderHistory] = useState([]);
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [staffPerformance, setStaffPerformance] = useState(null);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', {

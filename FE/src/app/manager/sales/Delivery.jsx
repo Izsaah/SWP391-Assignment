@@ -9,54 +9,8 @@ const Delivery = () => {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const deliveries = [
-    {
-      orderId: 'ORD-2025-003',
-      orderFormId: 'OF-2025-003',
-      customer: 'Nguyen Van An',
-      vehicle: 'Model 3 Performance AWD',
-      amount: 1250000000,
-      vin: '5YJ3E3EA0003',
-      status: 'Not Delivered',
-      warehouse: 'Warehouse A',
-      driver: 'Tran Van Hung',
-      estimatedDelivery: '2025-10-28',
-      deliveryNotes: 'Vehicle prepared for delivery',
-      salesperson: 'Pham Thi Lan',
-      salespersonId: 'S-003'
-    },
-    {
-      orderId: 'ORD-2025-004',
-      orderFormId: 'OF-2025-004',
-      customer: 'Pham Thu Ha',
-      vehicle: 'Model 3 Premium AWD',
-      amount: 1020000000,
-      vin: '5YJ3E4EA0004',
-      status: 'Delivered',
-      warehouse: 'Warehouse B',
-      driver: 'Le Van Thanh',
-      estimatedDelivery: '2025-10-27',
-      actualDeliveryDate: '2025-10-25',
-      deliveryNotes: 'Successfully delivered on October 25, 2025',
-      salesperson: 'Tran Van Minh',
-      salespersonId: 'S-004'
-    },
-    {
-      orderId: 'ORD-2025-005',
-      orderFormId: 'OF-2025-005',
-      customer: 'Hoang Thi Mai',
-      vehicle: 'Model Y Long Range',
-      amount: 1350000000,
-      vin: '5YJ3E5EA0005',
-      status: 'Not Delivered',
-      warehouse: 'Warehouse C',
-      driver: 'Pham Van Minh',
-      estimatedDelivery: '2025-10-30',
-      deliveryNotes: 'Waiting for customer availability',
-      salesperson: 'Nguyen Van Hung',
-      salespersonId: 'S-001'
-    },
-  ];
+  // Delivery data - to be fetched from API
+  const [deliveries, setDeliveries] = useState([]);
 
   const staffList = [...new Set(deliveries.map(d => d.salesperson))];
 
