@@ -76,7 +76,7 @@ public class UserAccountDAO {
     }
 
     public UserAccountDTO login(String email, String password) {
-        List<UserAccountDTO> users = retrieve("email = ? AND password = ?", email, password);
+        List<UserAccountDTO> users = retrieve("email = ? AND password = ? AND is_active = 1", email, password);
         return (users != null && !users.isEmpty()) ? users.get(0) : null;
     }
 
