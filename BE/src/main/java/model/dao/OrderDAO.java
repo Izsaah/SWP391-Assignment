@@ -81,8 +81,26 @@ public class OrderDAO {
         return retrieve("dealer_staff_id=? AND customer_id != 0", dealerStaffId);
     }
 
-    public List<OrderDTO> getByCustomerId(int customerId) throws SQLException, ClassNotFoundException {
-        return retrieve("customer_id=?", customerId);
+    public List<OrderDTO> getByCustomerIdAndDealerId(int customerId, int dealerId) throws SQLException, ClassNotFoundException {
+        String sql = "SELECT o.* FROM [Order] o "
+                + "INNER JOIN UserAccount u ON o.dealer_staff_id = u.user_id "
+                + "WHERE u.dealer_id = ? AND o.customer_id = ?";
+
+        List<OrderDTO> orders = new ArrayList<>();
+
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, dealerId);
+            ps.setInt(2, customerId);
+
+            try ( ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    orders.add(mapToOrder(rs));
+                }
+            }
+        }
+
+        return orders;
     }
 
     public List<OrderDTO> getAllByDealerId(int dealerId) throws SQLException, ClassNotFoundException {

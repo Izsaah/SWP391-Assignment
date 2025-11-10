@@ -371,36 +371,12 @@ public class OrderService {
         }
     }
 
-    public List<OrderDTO> HandlingGetOrdersByCustomerId(int customerId) {
+    public List<OrderDTO> HandlingGetOrdersByCustomerId(int customerId, int dealerId) throws SQLException, ClassNotFoundException {
         try {
-            List<OrderDTO> orderList = orderDAO.getByCustomerId(customerId);
-
-            if (orderList == null || orderList.isEmpty()) {
-                return Collections.emptyList();
-            }
-
-            for (OrderDTO order : orderList) {
-
-                OrderDetailDTO detail = orderDetailDAO.getOrderDetailByOrderId(order.getOrderId());
-                order.setDetail(detail);
-
-                if (detail != null) {
-
-                    ConfirmationDTO confirmation = confirmationDAO.getConfirmationByOrderDetailId(detail.getOrderDetailId());
-
-                    if (confirmation != null) {
-                        order.setConfirmation(confirmation);
-                        order.setIsCustom(true);
-                    } else {
-                        order.setIsCustom(false);
-                    }
-                }
-            }
-
-            return orderList;
-        } catch (Exception e) {
+            return orderDAO.getByCustomerIdAndDealerId(customerId, dealerId);
+        } catch (SQLException | ClassNotFoundException e) {
             e.printStackTrace();
-            return Collections.emptyList();
+            return null;
         }
     }
 
