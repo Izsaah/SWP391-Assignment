@@ -40,7 +40,7 @@ public class UpdateScheduleController extends HttpServlet {
             
             int appointmentId = Integer.parseInt(appointmentIdParam);
 
-            TestDriveScheduleDTO updatedSchedule = scheduleService.UpdateTestDriveSchedule(appointmentId, newStatus);
+            TestDriveScheduleDTO updatedSchedule = scheduleService.updateTestDriveSchedule(appointmentId, newStatus);
             
             if (updatedSchedule == null) {
                 ResponseUtils.error(resp, "Failed to update status. ID may be invalid or new_status is invalid.");

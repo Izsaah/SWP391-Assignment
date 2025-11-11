@@ -107,16 +107,74 @@ public class TestDriveScheduleDAO {
         return (results != null && !results.isEmpty()) ? results.get(0) : null;
     }
 
-    public TestDriveScheduleDTO getTestDriveScheduleByCustomerIdAndDealer(int customerId, int dealerId) {
-        String query = "SELECT DISTINCT tds.appointment_id, tds.customer_id, tds.serial_id, tds.date, tds.status "
-                + "FROM test_drive_schedule tds "
-                + "INNER JOIN orders o ON tds.customer_id = o.customer_id "
-                + "INNER JOIN user_account ua ON o.dealer_staff_id = ua.user_id "
-                + "WHERE tds.customer_id = ? AND ua.dealer_id = ?";
+// Get a single test drive schedule for a customer filtered by dealer
+public TestDriveScheduleDTO getTestDriveScheduleByCustomerIdAndDealer(int customerId, int dealerId) throws ClassNotFoundException {
+    String query = "SELECT DISTINCT tds.appointment_id, tds.customer_id, tds.serial_id, tds.date, tds.status "
+            + "FROM TestDriveSchedule tds "
+            + "INNER JOIN [Order] o ON tds.customer_id = o.customer_id "
+            + "INNER JOIN [UserAccount] ua ON o.dealer_staff_id = ua.user_id "
+            + "WHERE tds.customer_id = ? AND ua.dealer_id = ?";
 
-        List<TestDriveScheduleDTO> results = retrieve(query, customerId, dealerId);
-        return (results != null && !results.isEmpty()) ? results.get(0) : null;
+    try (Connection conn = DbUtils.getConnection();
+         PreparedStatement ps = conn.prepareStatement(query)) {
+
+        ps.setInt(1, customerId);
+        ps.setInt(2, dealerId);
+
+        try (ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return new TestDriveScheduleDTO(
+                        rs.getInt("appointment_id"),
+                        rs.getInt("customer_id"),
+                        rs.getString("serial_id"),
+                        rs.getString("date"),
+                        rs.getString("status")
+                );
+            }
+        }
+
+    } catch (SQLException e) {
+        e.printStackTrace();
     }
+
+    return null;
+}
+
+// Get all test drive schedules for a dealer
+public List<TestDriveScheduleDTO> getTestDriveSchedulesByDealer(int dealerId) throws ClassNotFoundException {
+    String query = "SELECT DISTINCT tds.appointment_id, tds.customer_id, tds.serial_id, tds.date, tds.status "
+            + "FROM TestDriveSchedule tds "
+            + "INNER JOIN [Order] o ON tds.customer_id = o.customer_id "
+            + "INNER JOIN [UserAccount] ua ON o.dealer_staff_id = ua.user_id "
+            + "WHERE ua.dealer_id = ?";
+
+    List<TestDriveScheduleDTO> list = new ArrayList<>();
+
+    try (Connection conn = DbUtils.getConnection();
+         PreparedStatement ps = conn.prepareStatement(query)) {
+
+        ps.setInt(1, dealerId);
+
+        try (ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                list.add(new TestDriveScheduleDTO(
+                        rs.getInt("appointment_id"),
+                        rs.getInt("customer_id"),
+                        rs.getString("serial_id"),
+                        rs.getString("date"),
+                        rs.getString("status")
+                ));
+            }
+        }
+
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
+
+    return list;
+}
+
+
 
     public TestDriveScheduleDTO updateStatus(int appointment_id, String status) {
         String updateSql = "UPDATE " + TABLE_NAME + " SET status=? WHERE appointment_id=?";

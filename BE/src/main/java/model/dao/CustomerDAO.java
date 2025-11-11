@@ -65,6 +65,13 @@ public class CustomerDAO {
             }
         }
     }
+public CustomerDTO getCustomerById(int customerId) {
+    List<CustomerDTO> customers = findById(customerId);
+    if (customers != null && !customers.isEmpty()) {
+        return customers.get(0); // return the first (and should be only) match
+    }
+    return null;
+}
 
     public List<CustomerDTO> findByName(String name) {
         return retrieve("name = ?", name);
