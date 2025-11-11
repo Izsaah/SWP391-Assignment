@@ -31,10 +31,8 @@ public class CreateScheduleController extends HttpServlet {
             Map<String, Object> params = RequestUtils.extractParams(req);
 
             String customerIdStr = params.get("customer_id").toString();
-            String serialId = params.get("serial_id").toString();
-            String scheduleId = params.get("schedule_id").toString();
+            String serialId = params.get("serial_id").toString(); 
             String date = params.get("date").toString();
-            String status = params.get("status").toString();
 
             if (customerIdStr == null || customerIdStr.trim().isEmpty() ||
                 serialId == null || serialId.trim().isEmpty() ||
