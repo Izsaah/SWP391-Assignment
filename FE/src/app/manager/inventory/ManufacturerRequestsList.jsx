@@ -1,14 +1,104 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Layout from '../layout/Layout';
-import { Plus, Search, Filter, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Search, Clock, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import CreateManufacturerRequestModal from './components/CreateManufacturerRequestModal';
+import { fetchManufacturerRequests } from '../services/inventoryService';
 
 const ManufacturerRequestsList = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showToast, setShowToast] = useState(false);
 
-  // Requests data - to be fetched from API
+  // Requests data - fetched from API
   const [requests, setRequests] = useState([]);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const loadRequests = async () => {
+    setLoading(true);
+    const res = await fetchManufacturerRequests();
+    if (res.success) {
+      const list = Array.isArray(res.data) ? res.data : [];
+      setRequests(groupRequests(list));
+    } else {
+      setRequests([]);
+      console.warn('Failed to load requests:', res.message);
+    }
+    setLoading(false);
+  };
+
+  // Group rows to ensure "1 lần tạo = 1 dòng"
+  // Primary rule: collapse items created in the same day with same model/color/status
+  // This preserves truly separate creations on different days or with different specs
+  const groupRequests = (rows) => {
+    const grouped = new Map();
+    for (const r of rows) {
+      const dateObj = r.createdAt ? new Date(r.createdAt) : null;
+      const dayKey = dateObj ? `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}` : 'unknown';
+      const model = (r.modelName || r.model || 'N/A').toString().trim().toLowerCase();
+      const color = (r.color || 'N/A').toString().trim().toLowerCase();
+      const status = (r.status || r.agreement || 'Pending').toString().trim().toLowerCase();
+      const key = `${dayKey}|${status}|${model}|${color}`;
+
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          requestId: r.requestId ?? r.orderId ?? r.id ?? key,
+          modelName: r.modelName || r.model || 'N/A',
+          color: r.color || 'N/A',
+          quantity: Number(r.quantity || 0),
+          price: r.price ?? r.unitPrice ?? null,
+          status: r.status || r.agreement || 'Pending',
+          createdAt: r.createdAt || r.date || r.orderDate || null,
+          _models: new Set(r.modelName || r.model ? [r.modelName || r.model] : []),
+          _colors: new Set(r.color ? [r.color] : []),
+          _prices: new Set(r.price != null ? [r.price] : []),
+          _statuses: new Set(r.status ? [r.status] : []),
+        });
+      } else {
+        const g = grouped.get(key);
+        g.quantity += Number(r.quantity || 0);
+        if (r.modelName || r.model) g._models.add(r.modelName || r.model);
+        if (r.color) g._colors.add(r.color);
+        if (r.price != null) g._prices.add(r.price);
+        if (r.status) g._statuses.add(r.status);
+        // keep earliest date
+        const date = r.createdAt || r.date || r.orderDate;
+        if (date && (!g.createdAt || date < g.createdAt)) g.createdAt = date;
+      }
+    }
+
+    return Array.from(grouped.values()).map((g) => {
+      const modelCount = g._models.size;
+      const colorCount = g._colors.size;
+      const priceCount = g._prices.size;
+      // resolve status: if any Rejected -> Rejected; else if all Approved -> Approved; else Pending
+      const statuses = Array.from(g._statuses);
+      let status = 'Pending';
+      if (statuses.some((s) => (s || '').toLowerCase() === 'rejected')) status = 'Rejected';
+      else if (statuses.length > 0 && statuses.every((s) => (s || '').toLowerCase() === 'approved')) status = 'Approved';
+
+      return {
+        requestId: g.requestId,
+        modelName: modelCount <= 1 ? (Array.from(g._models)[0] || 'N/A') : 'Multiple Models',
+        color: colorCount <= 1 ? (Array.from(g._colors)[0] || 'N/A') : 'Mixed',
+        quantity: g.quantity,
+        price: priceCount === 1 ? Array.from(g._prices)[0] : null,
+        status,
+        createdAt: g.createdAt || null,
+      };
+    });
+  };
+
+  useEffect(() => {
+    loadRequests();
+    
+    // Auto-refresh every 30 seconds to update status when EVM approves
+    const interval = setInterval(() => {
+      loadRequests();
+    }, 30000); // 30 seconds
+    
+    return () => clearInterval(interval);
+  }, []);
 
   const getStatusBadge = (status) => {
     switch(status) {
@@ -48,6 +138,17 @@ const ManufacturerRequestsList = () => {
     }).format(price);
   };
 
+  const filteredRequests = requests.filter((r) => {
+    if (statusFilter !== 'all' && (r.status || '').toLowerCase() !== statusFilter) return false;
+    if (query) {
+      const q = query.toLowerCase();
+      if (!(`${r.requestId || ''}`.toLowerCase().includes(q) || (r.modelName || '').toLowerCase().includes(q) || (r.color || '').toLowerCase().includes(q))) {
+        return false;
+      }
+    }
+    return true;
+  });
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -57,36 +158,44 @@ const ManufacturerRequestsList = () => {
             <h1 className="text-3xl font-bold text-gray-900">Manufacturer Requests</h1>
             <p className="text-sm text-gray-600 mt-1">Manage and track requests to manufacturer</p>
           </div>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center space-x-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Create Request</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={loadRequests}
+              disabled={loading}
+              className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center space-x-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Create Request</span>
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search requests..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               />
             </div>
-            <select className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
               <option value="all">All Status</option>
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
               <option value="rejected">Rejected</option>
             </select>
-            <button className="flex items-center justify-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              <Filter className="w-4 h-4" />
-              <span>More Filters</span>
-            </button>
           </div>
         </div>
 
@@ -117,36 +226,33 @@ const ManufacturerRequestsList = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+                  {/* Actions column removed - top bar Refresh already exists */}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {requests.map((request) => {
+                {filteredRequests.map((request, index) => {
                   const statusInfo = getStatusBadge(request.status);
                   const StatusIcon = statusInfo.icon;
                   return (
-                    <tr key={request.id} className="hover:bg-gray-50">
+                    <tr key={index} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-mono text-gray-900">{request.id}</span>
+                        <span className="text-sm font-mono text-gray-900">#{request.requestId}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-sm font-medium text-gray-900">{request.brand}</div>
-                          <div className="text-sm text-gray-500">{request.model}</div>
+                          <div className="text-sm font-medium text-gray-900">{request.modelName || 'Model'}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                          {request.color}
+                          {request.color || 'N/A'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <span className="text-sm font-medium text-gray-900">{request.quantity}</span>
+                        <span className="text-sm font-medium text-gray-900">{request.quantity ?? 'N/A'}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <span className="text-sm text-gray-900">{formatPrice(request.price)}</span>
+                        <span className="text-sm text-gray-900">{formatPrice(request.price ?? 0)}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusInfo.color}`}>
@@ -155,11 +261,9 @@ const ManufacturerRequestsList = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {request.createdAt}
+                        {request.createdAt ? new Date(request.createdAt).toLocaleDateString('vi-VN') : 'N/A'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button className="text-indigo-600 hover:text-indigo-900">View</button>
-                      </td>
+                      {/* Per-row action removed */}
                     </tr>
                   );
                 })}
@@ -168,7 +272,7 @@ const ManufacturerRequestsList = () => {
           </div>
         </div>
 
-        {requests.length === 0 && (
+        {!loading && filteredRequests.length === 0 && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
             <p className="text-gray-500 mb-4">No requests found</p>
             <button
@@ -188,7 +292,7 @@ const ManufacturerRequestsList = () => {
           onSuccess={(requestData) => {
             setShowToast(true);
             setTimeout(() => setShowToast(false), 3000);
-            // Refresh requests list would go here in real implementation
+            loadRequests();
           }}
         />
 

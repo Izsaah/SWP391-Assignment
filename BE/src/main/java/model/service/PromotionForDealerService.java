@@ -4,7 +4,10 @@
  */
 package model.service;
 
+import static jakarta.json.bind.JsonbConfig.DATE_FORMAT;
 import java.sql.SQLException;
+import java.text.ParseException;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import model.dao.DealerDAO;

@@ -2,6 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '../layout/Layout';
 import { CreditCard, DollarSign, Edit2, TrendingDown, Users, TrendingUp, BarChart3, Search, AlertCircle, Loader2, Info, Minus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getCustomersWithActiveInstallments, getCompletedPayments, updateInstallmentPlan } from '../services/paymentService';
+import { viewAllOrders } from '../services/orderService';
+import axios from 'axios';
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 const Payment = () => {
   const [activeTab, setActiveTab] = useState('installments');
@@ -23,6 +27,9 @@ const Payment = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [updating, setUpdating] = useState(false);
+  
+  // Map for orderId -> staff info (dealerStaffId, staffName)
+  const [orderStaffMap, setOrderStaffMap] = useState(new Map());
 
   // Format currency helper function
   const formatCurrency = (amount) => {
@@ -34,12 +41,118 @@ const Payment = () => {
     }).format(amount || 0);
   };
 
-  // Fetch active installments on mount
+  const normalizeInterestRate = (value) => {
+    if (value === null || value === undefined) return null;
+
+    const stringValue = value.toString().trim();
+    if (!stringValue) return null;
+
+    const cleanedValue = stringValue.replace('%', '');
+    if (!cleanedValue) return null;
+
+    const numeric = Number(cleanedValue);
+    if (Number.isNaN(numeric)) return null;
+
+    // If the rate is <= 1, assume it's provided as a decimal (e.g., 0.12 -> 12%)
+    const percentage = Math.abs(numeric) <= 1 && !stringValue.includes('%')
+      ? numeric * 100
+      : numeric;
+
+    return Number(percentage.toFixed(2));
+  };
+
+  const formatInterestRateDisplay = (rate) => {
+    if (rate === null || rate === undefined) return 'N/A';
+
+    const numeric = Number(rate);
+    if (Number.isNaN(numeric)) return 'N/A';
+
+    const displayValue = Number.isInteger(numeric) ? numeric : numeric.toFixed(2);
+    return `${displayValue}%`;
+  };
+
+  const hasInterestRate = (rate) => {
+    if (rate === null || rate === undefined) return false;
+    if (typeof rate === 'string' && rate.trim() === '') return false;
+
+    const numeric = Number(rate);
+    return !Number.isNaN(numeric);
+  };
+
+  const normalizeId = (value) => {
+    if (value === null || value === undefined) return null;
+    const n = Number(value);
+    return Number.isNaN(n) ? value : n;
+  };
+
+  // Load order-staff mapping and then fetch payments
   useEffect(() => {
-    fetchActiveInstallments();
+    const loadData = async () => {
+      // First load order-staff map
+      const map = await loadOrderStaffMap();
+      // Update state
+      setOrderStaffMap(map);
+      // Then fetch payments with the map
+      await fetchActiveInstallmentsWithMap(map);
+      await fetchCompletedPaymentsWithMap(map);
+    };
+    loadData();
   }, []);
 
-  const fetchActiveInstallments = async () => {
+  // Load order-staff mapping from orders and staff accounts
+  const loadOrderStaffMap = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const isNgrokUrl = API_URL?.includes('ngrok');
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+      
+      if (isNgrokUrl) {
+        headers['ngrok-skip-browser-warning'] = 'true';
+      }
+
+      // Fetch all orders to get orderId -> dealerStaffId mapping
+      // Note: We don't fetch from EVM API as manager doesn't have access (CORS error)
+      // Backend should return dealerStaffName in orders response
+      const ordersResult = await viewAllOrders();
+      
+      const map = new Map();
+      if (ordersResult.success && ordersResult.data) {
+        for (const order of ordersResult.data) {
+          const orderId = normalizeId(order.orderId || order.order_id);
+          const staffId = normalizeId(order.dealerStaffId || order.dealer_staff_id || order.salespersonId);
+          // ✅ FIX: Prioritize dealerStaffName from backend response, only show username
+          // Backend GetListOrderByDealerStaffId() returns dealerStaffName field
+          const staffName = order.dealerStaffName || order.username || order.salespersonName || 
+                          order.staffName || order.staffUsername || null;
+          
+          // Only add to map if we have a valid username (not "Staff {id}")
+          if (orderId && staffId && staffName && !staffName.startsWith('Staff ')) {
+            map.set(orderId, {
+              staffId: staffId,
+              staffName: staffName
+            });
+          } else if (orderId && staffId && staffName) {
+            // If we have staffName but it's "Staff {id}", still add it but log warning
+            map.set(orderId, {
+              staffId: staffId,
+              staffName: staffName
+            });
+          }
+        }
+        console.log(`✅ Loaded ${map.size} order-staff mappings`);
+      }
+      return map;
+    } catch (err) {
+      console.warn('⚠️ Could not load order-staff map:', err);
+      // Return empty map
+      return new Map();
+    }
+  };
+
+  const fetchActiveInstallmentsWithMap = async (staffMap) => {
     setLoading(true);
     setError(null);
     
@@ -54,23 +167,39 @@ const Payment = () => {
         // Transform backend data to frontend format (same as staff)
         const transformed = result.data.map((customer) => {
           const planId = customer.planId || null;
-          const interestRate = parseFloat(customer.interestRate || 0);
+          const rawInterestRate = customer.interestRate ?? customer.interest_rate ?? customer.rate ??
+                                  customer.installmentInterestRate ?? customer.planInterestRate ??
+                                  customer.plan_rate ?? customer.InterestRate;
+          const interestRate = normalizeInterestRate(rawInterestRate);
           const termMonth = customer.termMonth ? parseInt(customer.termMonth) : null;
           const monthlyPay = parseFloat(customer.monthlyPay || 0);
           const status = customer.status || 'ACTIVE';
           const outstandingAmount = parseFloat(customer.outstandingAmount || 0);
           
           const paymentId = customer.paymentId || null;
-          const orderId = customer.orderId || null;
+          const orderId = normalizeId(customer.orderId || customer.order_id);
           const totalAmount = parseFloat(customer.totalAmount || 0);
           const paymentDate = customer.paymentDate || null;
           const method = customer.method || 'TG';
           
           const paidAmount = totalAmount > 0 ? Math.max(0, totalAmount - outstandingAmount) : 0;
           
-          // Get staff name if available
-          const salesperson = customer.salespersonName || customer.staffName || 'N/A';
-          const salespersonId = customer.salespersonId || customer.staffId || null;
+          // Get staff info from order-staff map based on orderId
+          let salespersonId = null;
+          let salesperson = 'N/A';
+          
+            const mapToUse = staffMap || orderStaffMap;
+            if (orderId && mapToUse.has(orderId)) {
+              const staffInfo = mapToUse.get(orderId);
+              salespersonId = staffInfo.staffId;
+              salesperson = staffInfo.staffName;
+            } else {
+              // Fallback: try to get from customer data directly
+              salespersonId = customer.salespersonId || customer.staffId || customer.dealerStaffId || customer.dealer_staff_id || null;
+              // ✅ FIX: Only show username, not "Staff {id}"
+              salesperson = customer.dealerStaffName || customer.salespersonName || customer.staffName || 
+                           customer.username || customer.staffUsername || 'N/A';
+            }
           
           return {
             customerId: customer.customerId,
@@ -116,12 +245,16 @@ const Payment = () => {
     }
   };
 
-  // Fetch completed payments on mount
-  useEffect(() => {
-    fetchCompletedPayments();
-  }, []);
+  // Wrapper functions for backward compatibility
+  const fetchActiveInstallments = async () => {
+    await fetchActiveInstallmentsWithMap(orderStaffMap);
+  };
 
-  const fetchCompletedPayments = useCallback(async () => {
+  const fetchCompletedPayments = async () => {
+    await fetchCompletedPaymentsWithMap(orderStaffMap);
+  };
+
+  const fetchCompletedPaymentsWithMap = async (staffMap) => {
     try {
       console.log('📥 Fetching completed payments (TT) from backend...');
       const result = await getCompletedPayments();
@@ -129,9 +262,43 @@ const Payment = () => {
       
       if (result.success && result.data && result.data.length > 0) {
         const transformedData = result.data.map((payment) => {
-          // Get staff name if available
-          const salesperson = payment.salespersonName || payment.staffName || 'N/A';
-          const salespersonId = payment.salespersonId || payment.staffId || null;
+          // Get staff info from order-staff map based on orderId
+          const orderId = normalizeId(payment.orderId || payment.order_id || null);
+          let salespersonId = null;
+          let salesperson = 'N/A';
+
+          const rawInterestRate = payment.interestRate ?? payment.interest_rate ?? payment.rate ??
+                                  payment.installmentInterestRate ?? payment.planInterestRate ??
+                                  payment.ttInterestRate ?? payment.InterestRate;
+          const interestRate = normalizeInterestRate(rawInterestRate);
+
+          const mapToUse = staffMap || orderStaffMap;
+          if (orderId && mapToUse.has(orderId)) {
+            const staffInfo = mapToUse.get(orderId);
+            salespersonId = staffInfo.staffId;
+            salesperson = staffInfo.staffName;
+          } else {
+            // Fallback: try to get from payment data directly
+            salespersonId = payment.salespersonId || payment.staffId || payment.dealerStaffId || payment.dealer_staff_id || null;
+            // ✅ FIX: Only show username, not "Staff {id}"
+            salesperson = payment.dealerStaffName || payment.salespersonName || payment.staffName || 
+                         payment.username || payment.staffUsername || 'N/A';
+          }
+
+          // Robust amount mapping
+          const rawAmount = payment.amount ?? payment.totalAmount ?? payment.total_amount ??
+                            payment.price ?? payment.paymentAmount ?? payment.paidAmount ?? 0;
+          const amount = Number(rawAmount) || 0;
+
+          // Vehicle mapping across possible keys
+          const vehicle = payment.vehicle || payment.vehicleName || payment.vehicle_name ||
+                          payment.modelName || payment.model_name || payment.model || 'N/A';
+
+          // Dates can come in multiple fields
+          const paymentDate = payment.paymentDate || payment.payment_date || payment.date || payment.createdAt || payment.created_at || null;
+
+          // Method normalization (TT/TG)
+          const method = (payment.method || payment.paymentMethod || payment.payment_method || 'TT').toString().toUpperCase();
           
           return {
             paymentId: payment.paymentId || payment.payment_id,
@@ -139,14 +306,15 @@ const Payment = () => {
             customerName: payment.name || payment.customerName || payment.customer_name || 'N/A',
             customerId: payment.customerId || payment.customer_id,
             customerAddress: payment.address || payment.customerAddress || 'N/A',
-            amount: payment.amount || 0,
-            paymentDate: payment.paymentDate || payment.payment_date,
-            method: payment.method || 'TT',
+            amount: amount,
+            paymentDate: paymentDate,
+            method: method,
             phone: payment.phoneNumber || payment.phone || payment.customerPhone || 'N/A',
             email: payment.email || payment.customerEmail || 'N/A',
-            vehicle: payment.vehicle || payment.vehicleName || 'N/A',
+            vehicle: vehicle,
             salesperson: salesperson,
-            salespersonId: salespersonId
+            salespersonId: salespersonId,
+            interestRate: interestRate
           };
         });
         setCompletedPayments(transformedData);
@@ -159,7 +327,7 @@ const Payment = () => {
       console.error('❌ Error fetching completed payments:', err);
       setCompletedPayments([]);
     }
-  }, []);
+  };
 
   // Get unique staff list from payments
   const staffList = [...new Set([
@@ -783,7 +951,7 @@ const Payment = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-600">
-                              {payment.interestRate ? `${payment.interestRate}%` : 'N/A'}
+                              {formatInterestRateDisplay(payment.interestRate)}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -887,6 +1055,9 @@ const Payment = () => {
                           Payment Date
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Interest Rate
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Method
                         </th>
                       </tr>
@@ -926,6 +1097,11 @@ const Payment = () => {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
                               {payment.paymentDate ? new Date(payment.paymentDate).toLocaleDateString('vi-VN') : 'N/A'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-600">
+                              {formatInterestRateDisplay(payment.interestRate)}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -1093,12 +1269,12 @@ const Payment = () => {
                               : 'N/A'}
                           </span>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Interest Rate</span>
-                          <span className="text-base font-semibold text-gray-900">
-                            {selectedPayment.interestRate ? `${selectedPayment.interestRate}%` : 'N/A'}
-                          </span>
-                        </div>
+                        {hasInterestRate(selectedPayment.interestRate) && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">Interest Rate:</span>
+                            <span className="text-sm text-gray-900">{formatInterestRateDisplay(selectedPayment.interestRate)}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between items-center">
                           <span className="text-sm text-gray-600">Status</span>
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${

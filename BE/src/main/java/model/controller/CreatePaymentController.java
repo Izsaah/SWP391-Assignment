@@ -48,15 +48,6 @@ public class CreatePaymentController extends HttpServlet {
                 plan.setStatus(status);
             }
 
-            // Check if a payment already exists for this order
-            PaymentDTO existingPayment = paymentService.getPaymentByOrderId(orderId);
-            if (existingPayment != null) {
-                // Payment already exists, return error
-                ResponseUtils.error(response, "Payment already exists for this order_id");
-                return;
-            }
-
-            // If no existing payment, proceed to create
             PaymentDTO result = paymentService.processPayment(orderId, method, plan);
 
             if (result != null) {

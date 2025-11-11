@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router'
-import { LayoutDashboard, Package, Tags, Users, BarChart3, ChevronLast, ChevronFirst, ChevronDown, ChevronRight, Car, Palette, Boxes, ScrollText, BadgePercent } from 'lucide-react'
+import { LayoutDashboard, Package, Tags, Users, BarChart3, ChevronLast, ChevronFirst, ChevronDown, ChevronRight, Car, Palette, Boxes, ScrollText, BadgePercent, BadgeCheck } from 'lucide-react'
 
 const SidebarContext = createContext()
 const useSidebar = () => useContext(SidebarContext)
@@ -173,7 +173,8 @@ const menuItems = [
   ]},
   { id: 'evm-dealers', label: 'Dealer Management', icon: Users, path: '/evm/contracts', subItems: [
     { id: 'evm-contracts', label: 'Contracts', icon: ScrollText, path: '/evm/contracts' },
-    { id: 'evm-users', label: 'Users', icon: Users, path: '/evm/users' }
+    { id: 'evm-users', label: 'Users', icon: Users, path: '/evm/users' },
+    { id: 'evm-approvals', label: 'Approvals', icon: BadgeCheck, path: '/evm/approvals' }
   ]},
   { id: 'evm-reports', label: 'Reports', icon: BarChart3, path: '/evm/sales-report', subItems: [
     { id: 'evm-sales-report', label: 'Sales Report', icon: BarChart3, path: '/evm/sales-report' },

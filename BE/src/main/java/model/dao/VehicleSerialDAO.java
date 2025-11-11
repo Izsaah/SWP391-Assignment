@@ -65,10 +65,111 @@ public class VehicleSerialDAO {
             return ps.executeUpdate();
         }
     }
-    
-    public VehicleSerialDTO getSerialBySerialId(String serialId){
+
+    public VehicleSerialDTO getSerialBySerialId(String serialId) {
         List<VehicleSerialDTO> lists = retrieve("serial_id = ?", serialId);
         return lists.get(0);
     }
 
+    public int batchCreate(Connection conn, List<VehicleSerialDTO> serials) throws SQLException {
+        if (serials == null || serials.isEmpty()) {
+            return 0;
+        }
+        String sql = "INSERT INTO VehicleSerial (serial_id, variant_id) VALUES (?, ?)";
+        try ( PreparedStatement ps = conn.prepareStatement(sql)) {
+            for (VehicleSerialDTO s : serials) {
+                ps.setString(1, s.getSerialId());
+                ps.setInt(2, s.getVariantId());
+                ps.addBatch();
+            }
+            int[] results = ps.executeBatch();
+            return results.length;
+        }
+    }
+
+    public List<VehicleSerialDTO> getAvailableSerialsByVariantId(Connection conn, int variantId) {
+        String sql = "SELECT vs.serial_id, vs.variant_id "
+                + "FROM VehicleSerial vs "
+                + "WHERE vs.variant_id = ? "
+                + "AND vs.serial_id NOT IN ("
+                + "    SELECT od.serial_id "
+                + "    FROM OrderDetail od "
+                + "    INNER JOIN [Order] o ON od.order_id = o.order_id "
+                + "    WHERE od.serial_id IS NOT NULL "
+                + "    AND o.customer_id > 0"
+                + ") "
+                + "AND vs.serial_id NOT IN ("
+                + "    SELECT od2.serial_id "
+                + "    FROM OrderDetail od2 "
+                + "    INNER JOIN Confirmation c ON c.order_detail_id = od2.order_detail_id "
+                + "    WHERE od2.serial_id IS NOT NULL "
+                + "    AND c.agreement != 'Agree'" // Only include approved confirmations
+                + ")";
+
+        List<VehicleSerialDTO> list = new ArrayList<>();
+        try ( PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, variantId);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                VehicleSerialDTO serial = new VehicleSerialDTO();
+                serial.setSerialId(rs.getString("serial_id"));
+                serial.setVariantId(rs.getInt("variant_id"));
+                list.add(serial);
+            }
+            return list;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    public List<VehicleSerialDTO> getUnorderedOrDealerOrderedSerialsByVariantIdAndDealer(int variantId, int dealerId) {
+        String sql = "SELECT DISTINCT vs.serial_id, vs.variant_id "
+                + "FROM VehicleSerial vs "
+                + "WHERE vs.variant_id = ? "
+                // Exclude serials ordered by actual customers
+                + "AND vs.serial_id NOT IN ("
+                + "    SELECT od.serial_id "
+                + "    FROM OrderDetail od "
+                + "    INNER JOIN [Order] o ON od.order_id = o.order_id "
+                + "    WHERE od.serial_id IS NOT NULL "
+                + "    AND o.customer_id > 0"
+                + ") "
+                // AND (unordered OR ordered by this specific dealer)
+                + "AND ("
+                + "    vs.serial_id NOT IN ("
+                + "        SELECT od2.serial_id "
+                + "        FROM OrderDetail od2 "
+                + "        WHERE od2.serial_id IS NOT NULL"
+                + "    ) "
+                + "    OR vs.serial_id IN ("
+                + "        SELECT od3.serial_id "
+                + "        FROM OrderDetail od3 "
+                + "        INNER JOIN [Order] o3 ON od3.order_id = o3.order_id "
+                + "        INNER JOIN UserAccount ua ON o3.dealer_staff_id = ua.user_id "
+                + "        WHERE od3.serial_id IS NOT NULL "
+                + "        AND o3.customer_id = 0 "
+                + "        AND ua.dealer_id = ?"
+                + "    )"
+                + ")";
+
+        List<VehicleSerialDTO> list = new ArrayList<>();
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, variantId);
+            ps.setInt(2, dealerId);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                VehicleSerialDTO serial = new VehicleSerialDTO();
+                serial.setSerialId(rs.getString("serial_id"));
+                serial.setVariantId(rs.getInt("variant_id"));
+                list.add(serial);
+            }
+            return list;
+        } catch (Exception e) {
+            System.err.println("Error in getUnorderedOrDealerOrderedSerialsByVariantIdAndDealer(): " + e.getMessage());
+            e.printStackTrace();
+        }
+        return list;
+    }
 }

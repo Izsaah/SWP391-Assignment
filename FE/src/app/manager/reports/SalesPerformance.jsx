@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Layout from '../layout/Layout';
 import {
   TrendingUp,
@@ -17,8 +17,34 @@ const SalesPerformance = () => {
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(false);
 
-  // Sales performance data - to be fetched from API
+  // Sales performance data from BE
   const [salesData, setSalesData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    // Default: load current month
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+    setDateFrom(first);
+    setDateTo(last);
+  }, []);
+
+  const loadData = async () => {
+    if (!dateFrom || !dateTo) return;
+    setLoading(true);
+    setError('');
+    const { fetchDealerSalesRecords } = await import('../services/reportsService');
+    const res = await fetchDealerSalesRecords({ startDate: dateFrom, endDate: dateTo });
+    if (res.success) {
+      setSalesData(res.data || []);
+    } else {
+      setSalesData([]);
+      setError(res.message || 'Failed to load sales data');
+    }
+    setLoading(false);
+  };
 
   // Helper functions
   const formatCurrency = (amount) => {
@@ -48,8 +74,7 @@ const SalesPerformance = () => {
 
   // Handle search
   const handleSearch = () => {
-    // In real app, would make API call with filters
-    console.log('Searching with filters:', { dateFrom, dateTo, topFilter });
+    loadData();
   };
 
   // Handle view details
@@ -138,6 +163,7 @@ const SalesPerformance = () => {
 
         {/* Main Table */}
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          {error && <div className="p-3 text-sm text-red-700 bg-red-50 border-b border-red-200">{error}</div>}
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
@@ -164,7 +190,7 @@ const SalesPerformance = () => {
                         <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
                           <Users className="w-4 h-4 text-blue-600" />
                         </div>
-                        <span className="text-sm font-medium text-gray-900">{staff.staffName}</span>
+                        <span className="text-sm font-medium text-gray-900">{staff.username || staff.staffName}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

@@ -153,4 +153,8 @@ public class UserAccountService {
     public List<UserAccountDTO> getDealerStaffByName(String name) {
         return UDao.searchDealerStaffAndManagerByName(name);
     }
+    
+    public UserAccountDTO getDealerStaffById(int id) {
+        return UDao.getUserById(id);
+    }
 }

@@ -23,16 +23,21 @@ export default function LoginPage() {
                 // Get user role and redirect to appropriate dashboard
                 const userRole = res.user?.roles?.[0]?.roleName || currentUser?.roles?.[0]?.roleName;
 
+                // Normalize for matching
+                const upper = userRole ? userRole.toUpperCase() : userRole;
+
                 // Backend returns "Dealer Manager" and "Dealer Staff" (from database role_name column)
                 // Support both backend format and short format for flexibility
-                if (userRole === 'Dealer Manager' || userRole === 'MANAGER') {
+                if (userRole === 'Dealer Manager' || upper === 'MANAGER') {
                     navigate('/manager/dashboard');
-                } else if (userRole === 'Dealer Staff' || userRole === 'STAFF') {
+                } else if (userRole === 'Dealer Staff' || upper === 'STAFF') {
                     navigate('/staff/dashboard');
+                } else if (upper === 'EVM' || upper === 'ADMIN') {
+                    navigate('/evm');
                 } else {
-                    // Default fallback - could also show error for unknown roles
+                    // Default fallback - go to login and show message in console
                     console.warn('Unknown role:', userRole);
-                    navigate('/staff/dashboard');
+                    navigate('/login');
                 }
             } else {
                 setError(res.message || 'Login failed. Please check your credentials.');

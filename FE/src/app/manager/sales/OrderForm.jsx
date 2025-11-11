@@ -17,13 +17,22 @@ const OrderForm = () => {
 
   // Order forms data - fetched from API
   const [orderForms, setOrderForms] = useState([]);
+  
+  // Maps for customer, vehicle, and staff names
+  const [customerMap, setCustomerMap] = useState(new Map());
+  const [vehicleMap, setVehicleMap] = useState(new Map());
+  const [staffMap, setStaffMap] = useState(new Map());
 
-  // Fetch orders from API
+  // Fetch orders from API with name mapping
   useEffect(() => {
-    const fetchOrders = async () => {
-      setLoading(true);
-      setError(null);
+    const loadAllData = async () => {
+      // ✅ FIX: Khai báo maps bên ngoài try block để tránh undefined
+      let customerNameMap = new Map();
+      let vehicleNameMap = new Map();
+      let staffNameMap = new Map();
+      
       try {
+        // Fetch all customers for name mapping
         const token = localStorage.getItem('token');
         const isNgrokUrl = API_URL?.includes('ngrok');
         const headers = {
@@ -34,113 +43,270 @@ const OrderForm = () => {
         if (isNgrokUrl) {
           headers['ngrok-skip-browser-warning'] = 'true';
         }
-        
-        const response = await axios.post(
-          `${API_URL}/manager/viewAllOrders`,
-          {},
-          { headers }
-        );
-        
-        if (response.data && response.data.status === 'success' && response.data.data) {
-          console.log(`📥 Raw orders from API: ${response.data.data.length} orders`);
+
+        // Fetch customers
+        try {
+          const customersResponse = await axios.post(
+            `${API_URL}/staff/viewAllCustomer`,
+            {},
+            { headers }
+          );
           
-          // Transform backend data to frontend format
-          // IMPORTANT: Transform ALL orders, regardless of status, detail, or any condition
-          const transformedOrders = response.data.data.map((order, index) => {
-            try {
-              // Parse order date
-              let orderDate = order.orderDate || new Date().toISOString().split('T')[0];
-              if (order.orderDate && order.orderDate.includes(' ')) {
-                orderDate = order.orderDate.split(' ')[0];
+          if (customersResponse.data && customersResponse.data.status === 'success' && customersResponse.data.data) {
+            for (const customer of customersResponse.data.data) {
+              const customerId = customer.customerId || customer.customer_id || customer.id;
+              if (customerId) {
+                const id = parseInt(customerId);
+                if (!isNaN(id)) {
+                  customerNameMap.set(id, customer.name || `Customer ${id}`);
+                }
               }
-              
-              // Calculate amount (default to 0 if no detail)
-              const quantity = parseInt(order.quantity || '1');
-              const unitPrice = order.unitPrice || 0;
-              const amount = unitPrice * quantity;
-              
-              // Transform order - include ALL orders regardless of status or detail
-              const transformed = {
-                id: `OF-${order.orderId}`,
-                orderId: order.orderId,
-                customer: order.customerName || `Customer ${order.customerId}`,
-                customerId: order.customerId,
-                salesperson: order.salespersonName || 'Unknown Staff',
-                dealerStaffId: order.dealerStaffId,
-                vehicle: order.vehicleName || `Model ${order.modelId}`,
-                modelId: order.modelId,
-                serialId: order.serialId || null,
-                amount: amount,
-                quantity: quantity,
-                unitPrice: unitPrice,
-                status: order.status || 'Pending', // Default to 'Pending' if null
-                orderDate: orderDate,
-                createdDate: orderDate,
-                isSpecialOrder: order.isCustom || false,
-                flaggedForCompany: order.flaggedForCompany || false,
-                orderDetailId: order.orderDetailId || null,
-                confirmationId: order.confirmationId || null,
-                agreement: order.agreement || null,
-                confirmationDateTime: order.confirmationDateTime || null
-              };
-              
-              return transformed;
-            } catch (err) {
-              console.error(`❌ Error transforming order ${order.orderId}:`, err);
-              // Even if transform fails, still return a basic order object
-              return {
-                id: `OF-${order.orderId}`,
-                orderId: order.orderId,
-                customer: `Customer ${order.customerId}`,
-                customerId: order.customerId,
-                salesperson: 'Unknown Staff',
-                dealerStaffId: order.dealerStaffId,
-                vehicle: `Model ${order.modelId}`,
-                modelId: order.modelId,
-                serialId: null,
-                amount: 0,
-                quantity: 1,
-                unitPrice: 0,
-                status: order.status || 'Pending',
-                orderDate: new Date().toISOString().split('T')[0],
-                createdDate: new Date().toISOString().split('T')[0],
-                isSpecialOrder: false,
-                flaggedForCompany: false,
-                orderDetailId: null,
-                confirmationId: null,
-                agreement: null,
-                confirmationDateTime: null
-              };
             }
-          }).filter(Boolean); // Remove any null/undefined entries (shouldn't happen, but safety check)
-          
-          console.log(`✅ Transformed ${transformedOrders.length} orders (should match raw count: ${response.data.data.length})`);
-          console.log(`📋 Orders by status:`, transformedOrders.reduce((acc, o) => {
-            acc[o.status] = (acc[o.status] || 0) + 1;
-            return acc;
-          }, {}));
-          
-          setOrderForms(transformedOrders);
-        } else {
-          console.warn('⚠️ API response not successful or no data:', response.data);
-          setOrderForms([]);
-          setError(response.data?.message || 'Failed to load orders');
+          }
+          setCustomerMap(customerNameMap);
+          console.log(`✅ Loaded ${customerNameMap.size} customers for name mapping`);
+        } catch (err) {
+          console.warn('⚠️ Could not load customers:', err);
         }
+
+        // Fetch vehicle models for name mapping
+        try {
+          // ✅ FIX: Đổi endpoint từ viewInventory sang viewVehicle
+          const inventoryResponse = await axios.post(
+            `${API_URL}/staff/viewVehicle`,
+            {},
+            { headers }
+          );
+          
+          if (inventoryResponse.data && inventoryResponse.data.status === 'success' && inventoryResponse.data.data) {
+            for (const model of inventoryResponse.data.data) {
+              const modelId = model.modelId || model.model_id;
+              const modelName = model.modelName || model.name || `Model ${modelId}`;
+              if (modelId) {
+                const id = parseInt(modelId);
+                if (!isNaN(id)) {
+                  vehicleNameMap.set(id, modelName);
+                }
+              }
+            }
+          }
+          setVehicleMap(vehicleNameMap);
+          console.log(`✅ Loaded ${vehicleNameMap.size} vehicle models for name mapping`);
+        } catch (err) {
+          console.warn('⚠️ Could not load vehicles:', err);
+        }
+
+        // Now fetch orders first, then we'll fetch staff accounts based on unique staffIds
+        await fetchOrdersWithMaps(customerNameMap, vehicleNameMap, staffNameMap);
       } catch (err) {
-        console.error('❌ Error fetching orders:', err);
-        setOrderForms([]);
-        if (err.response?.status === 401 || err.response?.status === 403) {
-          setError('Authentication failed. Please log in again.');
-        } else {
-          setError(err.response?.data?.message || 'Failed to load orders');
-        }
-      } finally {
-        setLoading(false);
+        console.error('Error loading data:', err);
+        // Still try to fetch orders (will show IDs if names not available)
+        await fetchOrdersWithMaps(customerNameMap, vehicleNameMap, staffNameMap);
       }
     };
     
-    fetchOrders();
+    loadAllData();
   }, []);
+
+  const fetchOrdersWithMaps = async (customerNameMap, vehicleNameMap, staffNameMap) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem('token');
+      const isNgrokUrl = API_URL?.includes('ngrok');
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+      
+      if (isNgrokUrl) {
+        headers['ngrok-skip-browser-warning'] = 'true';
+      }
+      
+      const response = await axios.post(
+        `${API_URL}/staff/viewOrdersByStaffId`,
+        {},
+        { headers }
+      );
+      
+      if (response.data && response.data.status === 'success' && response.data.data) {
+        console.log(`📥 Raw orders from API: ${response.data.data.length} orders`);
+        
+        // Debug: Check if backend returns dealerStaffName
+        if (response.data.data.length > 0) {
+          const firstOrder = response.data.data[0];
+          console.log('📥 Sample order from API:', {
+            orderId: firstOrder.orderId,
+            dealerStaffId: firstOrder.dealerStaffId,
+            dealerStaffName: firstOrder.dealerStaffName,
+            hasDealerStaffName: !!firstOrder.dealerStaffName
+          });
+        }
+        
+        // Build staff name map from orders response if username is available
+        // Note: We don't fetch from EVM API as manager doesn't have access
+        // Backend OrderService.GetListOrderByDealerStaffId() returns dealerStaffName field
+        
+        // Transform backend data to frontend format with name mapping
+        const transformedOrders = response.data.data.map((order, index) => {
+          try {
+            // Parse order date
+            let orderDate = order.orderDate || new Date().toISOString().split('T')[0];
+            if (order.orderDate && order.orderDate.includes(' ')) {
+              orderDate = order.orderDate.split(' ')[0];
+            }
+            
+            // Get amount from order detail (preferred) or calculate from quantity * unitPrice
+            const detail = order.detail || order.orderDetail || null;
+            let quantity = 1;
+            let unitPrice = 0;
+            let amount = 0;
+            
+            if (detail) {
+              // Get from detail object
+              quantity = parseInt(detail.quantity || '1');
+              unitPrice = parseFloat(detail.unitPrice || 0);
+              amount = quantity * unitPrice;
+            } else {
+              // Fallback: try to get from order directly
+              quantity = parseInt(order.quantity || '1');
+              unitPrice = parseFloat(order.unitPrice || 0);
+              amount = quantity * unitPrice;
+            }
+            
+            // Get IDs
+            const customerId = order.customerId || order.customer_id;
+            const modelId = order.modelId || order.model_id;
+            const staffId = order.dealerStaffId || order.dealer_staff_id || order.salespersonId;
+            
+            // Get names from maps or order data
+            const customerName = customerNameMap.get(customerId) || order.customerName || `Customer ${customerId || 'N/A'}`;
+            const vehicleName = vehicleNameMap.get(modelId) || order.vehicleName || `Model ${modelId || 'N/A'}`;
+            
+            // ✅ FIX: Get username from order response - backend returns dealerStaffName
+            // Backend OrderService.GetListOrderByDealerStaffId() returns dealerStaffName field
+            const staffName = order.dealerStaffName || order.username || order.salespersonName || 
+                            order.staffName || order.staffUsername || 
+                            (staffId ? `Staff ${staffId}` : 'N/A');
+            
+            // If we have username from order, add it to map for future use
+            if (staffId && (order.dealerStaffName || order.username || order.salespersonName || 
+                          order.staffName || order.staffUsername)) {
+              const staffIdInt = parseInt(staffId);
+              if (!isNaN(staffIdInt)) {
+                const username = order.dealerStaffName || order.username || order.salespersonName || 
+                               order.staffName || order.staffUsername;
+                if (username && username !== `Staff ${staffId}` && username !== 'N/A' && username !== 'Unknown') {
+                  staffNameMap.set(staffIdInt, username);
+                }
+              }
+            }
+            
+            // Transform order - include ALL orders regardless of status or detail
+            const transformed = {
+              id: `OF-${order.orderId}`,
+              orderId: order.orderId,
+              customer: customerName,
+              customerId: customerId,
+              salesperson: staffName,
+              dealerStaffId: staffId,
+              vehicle: vehicleName,
+              modelId: modelId,
+              serialId: order.serialId || null,
+              amount: amount,
+              quantity: quantity,
+              unitPrice: unitPrice,
+              status: order.status || 'Pending', // Default to 'Pending' if null
+              orderDate: orderDate,
+              createdDate: orderDate,
+              isSpecialOrder: order.isCustom || false,
+              flaggedForCompany: order.flaggedForCompany || false,
+              orderDetailId: order.orderDetailId || null,
+              confirmationId: order.confirmationId || null,
+              agreement: order.agreement || null,
+              confirmationDateTime: order.confirmationDateTime || null
+            };
+            
+            return transformed;
+          } catch (err) {
+            console.error(`❌ Error transforming order ${order.orderId}:`, err);
+            // Even if transform fails, still return a basic order object
+            const staffId = order.dealerStaffId || order.dealer_staff_id || order.salespersonId;
+            const staffIdInt = staffId ? parseInt(staffId) : null;
+            const usernameFromMap = staffIdInt ? staffNameMap.get(staffIdInt) : null;
+            // ✅ FIX: Prioritize dealerStaffName from backend response
+            const staffName = order.dealerStaffName || usernameFromMap || order.username || 
+                            order.salespersonName || order.staffName || order.staffUsername ||
+                            (staffId ? `Staff ${staffId}` : 'N/A');
+            
+            // Try to get amount from detail even in error case
+            const detail = order.detail || order.orderDetail || null;
+            let amount = 0;
+            if (detail) {
+              const qty = parseInt(detail.quantity || '1');
+              const price = parseFloat(detail.unitPrice || 0);
+              amount = qty * price;
+            }
+            
+            return {
+              id: `OF-${order.orderId}`,
+              orderId: order.orderId,
+              customer: `Customer ${order.customerId || 'N/A'}`,
+              customerId: order.customerId,
+              salesperson: staffName,
+              dealerStaffId: staffId,
+              vehicle: `Model ${order.modelId || 'N/A'}`,
+              modelId: order.modelId,
+              serialId: null,
+              amount: amount,
+              quantity: 1,
+              unitPrice: 0,
+              status: order.status || 'Pending',
+              orderDate: new Date().toISOString().split('T')[0],
+              createdDate: new Date().toISOString().split('T')[0],
+              isSpecialOrder: false,
+              flaggedForCompany: false,
+              orderDetailId: null,
+              confirmationId: null,
+              agreement: null,
+              confirmationDateTime: null
+            };
+          }
+        }).filter(Boolean);
+        
+        // Update staff map from orders (extract staff names if available)
+        const newStaffMap = new Map(staffNameMap);
+        transformedOrders.forEach(order => {
+          if (order.dealerStaffId && order.salesperson && order.salesperson !== `Staff ${order.dealerStaffId}`) {
+            newStaffMap.set(order.dealerStaffId, order.salesperson);
+          }
+        });
+        setStaffMap(newStaffMap);
+        
+        console.log(`✅ Transformed ${transformedOrders.length} orders (should match raw count: ${response.data.data.length})`);
+        console.log(`📋 Orders by status:`, transformedOrders.reduce((acc, o) => {
+          acc[o.status] = (acc[o.status] || 0) + 1;
+          return acc;
+        }, {}));
+        
+        setOrderForms(transformedOrders);
+      } else {
+        console.warn('⚠️ API response not successful or no data:', response.data);
+        setOrderForms([]);
+        setError(response.data?.message || 'Failed to load orders');
+      }
+    } catch (err) {
+      console.error('❌ Error fetching orders:', err);
+      setOrderForms([]);
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        setError('Authentication failed. Please log in again.');
+      } else {
+        setError(err.response?.data?.message || 'Failed to load orders');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Get unique staff list
   const staffList = [...new Set(orderForms.map(of => of.salesperson))];

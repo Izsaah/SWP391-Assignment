@@ -1,20 +1,17 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Layout from '../layout/Layout';
 import { useNavigate } from 'react-router';
 import {
   Tag,
   Search,
-  Filter,
-  Eye,
-  X,
   ChevronRight,
   Calendar,
   DollarSign,
   TrendingUp,
   CheckCircle,
   XCircle,
-  Settings
 } from 'lucide-react';
+import { fetchDealerPromotions } from '../services/promotionsService';
 
 const Promotions = () => {
   const navigate = useNavigate();
@@ -23,9 +20,25 @@ const Promotions = () => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(false);
 
   // Promotions data - to be fetched from API
   const [promotions, setPromotions] = useState([]);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      const res = await fetchDealerPromotions();
+      if (res.success) {
+        setPromotions(res.data || []);
+      } else {
+        setPromotions([]);
+        console.warn('Failed to load promotions:', res.message);
+      }
+      setLoading(false);
+    };
+    load();
+  }, []);
 
   // Get all available vehicle models
   const vehicleModels = [...new Set(promotions.map(p => p.vehicleModel))];
@@ -49,10 +62,10 @@ const Promotions = () => {
   };
 
   const formatDiscountValue = (type, value) => {
-    if (type === 'Percentage') {
-      return `${value}%`;
-    }
-    return formatCurrency(value);
+    if (!type) return value ? `${value}%` : 'N/A';
+    const t = type.toString().toLowerCase();
+    if (t.includes('percent') || t.includes('rate')) return `${value}%`;
+    return value ? formatCurrency(value) : 'N/A';
   };
 
   const getStatusBadge = (status) => {
@@ -72,30 +85,35 @@ const Promotions = () => {
     );
   };
 
-  // Filter promotions
-  const filteredPromotions = promotions.filter(promotion => {
-    // Model filter
+  // Compute active status by date range then filter
+  const filteredPromotions = useMemo(() => promotions.filter(promotion => {
+    const now = new Date();
+    const start = promotion.startDate ? new Date(promotion.startDate) : null;
+    const end = promotion.endDate ? new Date(promotion.endDate) : null;
+    const isActive = (!start || start <= now) && (!end || now <= end);
+    const status = isActive ? 'Active' : 'Inactive';
+    promotion._status = status;
+
+    // Model filter (not used currently, keep placeholder)
     if (modelFilter !== 'all' && promotion.vehicleModel !== modelFilter) return false;
 
     // Status filter
-    if (statusFilter !== 'all' && promotion.dealerStatus.toLowerCase() !== statusFilter.toLowerCase()) return false;
+    if (statusFilter !== 'all' && status.toLowerCase() !== statusFilter.toLowerCase()) return false;
 
     // Date range filter
-    if (dateFrom && promotion.validFrom < dateFrom) return false;
-    if (dateTo && promotion.validTo > dateTo) return false;
+    if (dateFrom && (promotion.startDate || '') < dateFrom) return false;
+    if (dateTo && (promotion.endDate || '') > dateTo) return false;
 
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      const matches = 
-        promotion.code.toLowerCase().includes(query) ||
-        promotion.fromManufacturer.toLowerCase().includes(query) ||
-        promotion.vehicleModel.toLowerCase().includes(query);
+      const matches = (promotion.description || '').toLowerCase().includes(query) ||
+        (promotion.type || '').toLowerCase().includes(query);
       if (!matches) return false;
     }
 
     return true;
-  });
+  }), [promotions, modelFilter, statusFilter, dateFrom, dateTo, searchQuery]);
 
   // Handle toggle status
   const handleToggleStatus = (promotionId, currentStatus) => {
@@ -150,9 +168,7 @@ const Promotions = () => {
                 <CheckCircle className="w-5 h-5 text-green-600" />
               </div>
               <div className="ml-4">
-                <p className="text-2xl font-bold text-gray-900">
-                  {promotions.filter(p => p.dealerStatus === 'Active').length}
-                </p>
+                <p className="text-2xl font-bold text-gray-900">{promotions.filter(p => p._status === 'Active').length}</p>
                 <p className="text-sm text-gray-600">Active</p>
               </div>
             </div>
@@ -164,9 +180,7 @@ const Promotions = () => {
                 <TrendingUp className="w-5 h-5 text-purple-600" />
               </div>
               <div className="ml-4">
-                <p className="text-2xl font-bold text-gray-900">
-                  {promotions.reduce((sum, p) => sum + p.appliedCount, 0)}
-                </p>
+                <p className="text-2xl font-bold text-gray-900">{promotions.length}</p>
                 <p className="text-sm text-gray-600">Total Applied</p>
               </div>
             </div>
@@ -178,9 +192,7 @@ const Promotions = () => {
                 <DollarSign className="w-5 h-5 text-yellow-600" />
               </div>
               <div className="ml-4">
-                <p className="text-2xl font-bold text-gray-900">
-                  {promotions.filter(p => p.dealerStatus === 'Active').length}
-                </p>
+                <p className="text-2xl font-bold text-gray-900">{promotions.filter(p => p._status === 'Active').length}</p>
                 <p className="text-sm text-gray-600">Active Now</p>
               </div>
             </div>
@@ -190,11 +202,8 @@ const Promotions = () => {
         {/* Filters */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-2">
-              <Filter className="w-4 h-4 text-gray-600" />
-              <h3 className="text-sm font-semibold text-gray-900">Filters</h3>
-              <span className="text-xs text-gray-500">({filteredPromotions.length} results)</span>
-            </div>
+            <h3 className="text-sm font-semibold text-gray-900">Filters</h3>
+            <span className="text-xs text-gray-500">({filteredPromotions.length} results)</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -256,7 +265,7 @@ const Promotions = () => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
                   type="text"
-                  placeholder="Search by code, manufacturer..."
+                  placeholder="Search promotions..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -272,18 +281,8 @@ const Promotions = () => {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                    Promotion Code
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                    From Manufacturer
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                    Vehicle Model/Variant
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                    Discount Type
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Promotion</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Type</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                     Value
                   </th>
@@ -294,7 +293,7 @@ const Promotions = () => {
                     Valid To
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                    Dealer Status
+                    Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                     Actions
@@ -305,33 +304,22 @@ const Promotions = () => {
                 {filteredPromotions.map((promotion) => (
                   <tr key={promotion.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{promotion.code}</div>
+                      <div className="text-sm font-medium text-gray-900">{promotion.description || '-'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-700">{promotion.fromManufacturer}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{promotion.vehicleModel}</div>
-                        <div className="text-xs text-gray-500">{promotion.vehicleVariant}</div>
-                      </div>
+                      <span className="text-sm text-gray-700">{promotion.type || '-'}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-700">{promotion.discountType}</span>
+                      <span className="text-sm font-semibold text-gray-900">{formatDiscountValue(promotion.type, promotion.discountRate)}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-semibold text-gray-900">
-                        {formatDiscountValue(promotion.discountType, promotion.value)}
-                      </span>
+                      <span className="text-sm text-gray-700">{promotion.startDate ? formatDate(promotion.startDate) : '-'}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-700">{formatDate(promotion.validFrom)}</span>
+                      <span className="text-sm text-gray-700">{promotion.endDate ? formatDate(promotion.endDate) : '-'}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-700">{formatDate(promotion.validTo)}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(promotion.dealerStatus)}
+                      {getStatusBadge(promotion._status || 'Inactive')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
@@ -340,16 +328,6 @@ const Promotions = () => {
                           className="text-blue-600 hover:text-blue-900 text-xs font-medium"
                         >
                           View
-                        </button>
-                        <button
-                          onClick={() => handleToggleStatus(promotion.id, promotion.dealerStatus)}
-                          className={`text-xs font-medium ${
-                            promotion.dealerStatus === 'Active'
-                              ? 'text-red-600 hover:text-red-900'
-                              : 'text-green-600 hover:text-green-900'
-                          }`}
-                        >
-                          {promotion.dealerStatus === 'Active' ? 'Deactivate' : 'Activate'}
                         </button>
                       </div>
                     </td>

@@ -44,6 +44,7 @@ import ContractsEVM from './EVM/pages/manager/Contracts';
 import Users from './EVM/pages/manager/Users';
 import SalesReport from './EVM/pages/manager/SalesReport';
 import InventoryReport from './EVM/pages/manager/InventoryReport';
+const Approvals = React.lazy(() => import('./EVM/pages/manager/Approvals'));
 import VehicleCatalog from './EVM/pages/manager/VehicleCatalog';
 
 // Role-based redirect for root path with auth check
@@ -54,10 +55,10 @@ const RoleRedirect = () => {
     if (savedToken && savedUser) {
       const user = JSON.parse(savedUser);
       const role = user?.roles?.[0]?.roleName;
-      const normalized = role === 'Dealer Manager' ? 'MANAGER' : role === 'Dealer Staff' ? 'STAFF' : role;
+      const normalized = role === 'Dealer Manager' ? 'MANAGER' : role === 'Dealer Staff' ? 'STAFF' : (role ? role.toUpperCase() : role);
       if (normalized === 'MANAGER') return <Navigate to="/manager/dashboard" />;
       if (normalized === 'STAFF') return <Navigate to="/staff/dashboard" />;
-      if (role === 'EVM' || role === 'ADMIN') return <Navigate to="/evm" />;
+      if (normalized === 'EVM' || normalized === 'ADMIN') return <Navigate to="/evm" />;
     }
   } catch {
     // ignore and fall through to login
@@ -215,7 +216,7 @@ function App() {
         <Route 
           path="/manager/sales/payment" 
           element={
-            <ProtectedRoute allowRoles={['MANAGER']}>
+            <ProtectedRoute allowRoles={['MANAGER', 'EVM', 'ADMIN']}>
               <ManagerPayment />
             </ProtectedRoute>
           } 
@@ -223,7 +224,7 @@ function App() {
         <Route 
           path="/manager/sales/delivery" 
           element={
-            <ProtectedRoute allowRoles={['MANAGER']}>
+            <ProtectedRoute allowRoles={['MANAGER', 'EVM', 'ADMIN']}>
               <ManagerDelivery />
             </ProtectedRoute>
           } 
@@ -312,6 +313,7 @@ function App() {
           <Route path="users" element={<Users />} />
           <Route path="sales-report" element={<SalesReport />} />
           <Route path="inventory-report" element={<InventoryReport />} />
+          <Route path="approvals" element={<React.Suspense fallback={<div />}> <Approvals /> </React.Suspense>} />
         </Route>
 
         {/* Legacy redirects - redirect old paths to new role-based paths */}

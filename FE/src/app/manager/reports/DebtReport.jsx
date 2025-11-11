@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Layout from '../layout/Layout';
 import {
   DollarSign,
@@ -24,8 +24,27 @@ const DebtReport = () => {
   const [selectedContract, setSelectedContract] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
-  // Debt data - to be fetched from API
+  // Debt data from BE
   const [debtData, setDebtData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError('');
+      const { fetchCustomerDebtSummary } = await import('../services/reportsService');
+      const res = await fetchCustomerDebtSummary();
+      if (res.success) {
+        setDebtData(res.data || []);
+      } else {
+        setDebtData([]);
+        setError(res.message || 'Failed to load debts');
+      }
+      setLoading(false);
+    };
+    load();
+  }, []);
 
   // Get unique staff list
   const staffList = [...new Set(debtData.map(d => d.assignedStaff))];
@@ -232,18 +251,13 @@ const DebtReport = () => {
 
         {/* Table */}
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          {error && <div className="p-3 text-sm text-red-700 bg-red-50 border-b border-red-200">{error}</div>}
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                     Customer
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                    Contract ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                    Payment Type
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                     Total Amount
@@ -254,32 +268,17 @@ const DebtReport = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                     Outstanding
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                    Due Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                    Aging
-                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredDebtData.map((debt) => (
                   <tr 
-                    key={debt.contractId} 
+                    key={debt.customerName} 
                     className="hover:bg-gray-50 cursor-pointer"
                     onClick={() => handleViewDetail(debt)}
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{debt.customerName}</div>
-                      <div className="text-xs text-gray-500">{debt.assignedStaff}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-700">{debt.contractId}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-700">
-                        {getPaymentTypeLabel(debt.paymentType, debt.installmentMonths)}
-                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="text-sm font-semibold text-gray-900">
@@ -295,12 +294,6 @@ const DebtReport = () => {
                       <span className="text-sm text-red-600 font-medium">
                         {formatCurrency(debt.outstanding)}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-700">{formatDate(debt.dueDate)}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getAgingBadge(debt.aging)}
                     </td>
                   </tr>
                 ))}

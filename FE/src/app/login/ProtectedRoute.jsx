@@ -22,17 +22,20 @@ export default function ProtectedRoute({ children, allowRoles }) {
     }
 
     // Check role permissions (if allowRoles is specified)
-    const userRole = currentUser?.roles?.[0]?.roleName; // Backend returns: "Dealer Manager", "Dealer Staff", "Admin", "Customer"
+    const userRole = currentUser?.roles?.[0]?.roleName; // e.g. "Dealer Manager", "Dealer Staff", "Admin", "EVM"
 
-    // Normalize role names: support both backend format ("Dealer Manager"/"Dealer Staff") and short format ("MANAGER"/"STAFF")
+    // Normalize role names (case-insensitive) and map dealer roles
     const normalizedRole =
         userRole === 'Dealer Manager'
             ? 'MANAGER'
             : userRole === 'Dealer Staff'
             ? 'STAFF'
-            : userRole;
+            : (userRole ? userRole.toUpperCase() : userRole);
 
-    if (allowRoles && !allowRoles.includes(normalizedRole) && !allowRoles.includes(userRole)) {
+    // Prepare allowed list case-insensitively
+    const allowedUpper = (allowRoles || []).map(r => (r ? r.toUpperCase() : r));
+
+    if (allowRoles && !allowedUpper.includes(normalizedRole)) {
         return (
             <div className="flex items-center justify-center h-screen">
                 <div className="text-center">

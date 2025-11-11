@@ -76,7 +76,7 @@ public class UserAccountDAO {
     }
 
     public UserAccountDTO login(String email, String password) {
-        List<UserAccountDTO> users = retrieve("email = ? AND password = ?", email, password);
+        List<UserAccountDTO> users = retrieve("email = ? AND password = ? AND is_active = 1", email, password);
         return (users != null && !users.isEmpty()) ? users.get(0) : null;
     }
 
@@ -96,11 +96,7 @@ public class UserAccountDAO {
 
     public List<Integer> getStaffIdsByDealer(int dealerId) throws ClassNotFoundException, SQLException {
         List<Integer> staffIds = new ArrayList<>();
-        // Get all users in dealer (both MANAGER role_id = 2 and STAFF role_id = 3)
-        // This allows Manager to see orders created by both Managers and Staff in the same dealer
-        String sql = "SELECT u.user_id FROM UserAccount u " +
-                     "INNER JOIN UserRole ur ON u.user_id = ur.user_id " +
-                     "WHERE u.dealer_id = ? AND ur.role_id IN (2, 3)";
+        String sql = "SELECT user_id FROM UserAccount WHERE dealer_id = ?";
         try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, dealerId);
             ResultSet rs = ps.executeQuery();

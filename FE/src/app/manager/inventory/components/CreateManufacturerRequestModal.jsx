@@ -21,11 +21,13 @@ const CreateManufacturerRequestModal = ({ isOpen, onClose, onSuccess }) => {
   // Load brands on mount
   useEffect(() => {
     if (isOpen) {
-      const brandsList = getBrands();
-      setBrands(brandsList);
+      (async () => {
+        const brandsList = await getBrands();
+        setBrands(brandsList || []);
+      })();
       // Reset form when modal opens
       setFormData({
-        brand: '',
+        brand: 'EV',
         model: '',
         color: '',
         quantity: '',
@@ -41,8 +43,10 @@ const CreateManufacturerRequestModal = ({ isOpen, onClose, onSuccess }) => {
   // Update models when brand changes
   useEffect(() => {
     if (formData.brand) {
-      const models = getModelsByBrand(formData.brand);
-      setAvailableModels(models);
+      (async () => {
+        const models = await getModelsByBrand(formData.brand);
+        setAvailableModels(models || []);
+      })();
       // Reset model and color when brand changes
       setFormData(prev => ({ ...prev, model: '', color: '', price: '' }));
       setAvailableColors([]);
@@ -55,8 +59,10 @@ const CreateManufacturerRequestModal = ({ isOpen, onClose, onSuccess }) => {
   // Update colors when model changes
   useEffect(() => {
     if (formData.brand && formData.model) {
-      const colors = getColorsByBrandAndModel(formData.brand, formData.model);
-      setAvailableColors(colors);
+      (async () => {
+        const colors = await getColorsByBrandAndModel(formData.brand, formData.model);
+        setAvailableColors(colors || []);
+      })();
       // Reset color and price when model changes
       setFormData(prev => ({ ...prev, color: '', price: '' }));
     } else {
@@ -67,10 +73,12 @@ const CreateManufacturerRequestModal = ({ isOpen, onClose, onSuccess }) => {
   // Auto-fill price when color is selected
   useEffect(() => {
     if (formData.brand && formData.model && formData.color) {
-      const price = getPriceByModelAndColor(formData.brand, formData.model, formData.color);
-      if (price !== null) {
-        setFormData(prev => ({ ...prev, price: price.toString() }));
-      }
+      (async () => {
+        const price = await getPriceByModelAndColor(formData.brand, formData.model, formData.color);
+        if (price !== null && price !== undefined) {
+          setFormData(prev => ({ ...prev, price: price.toString() }));
+        }
+      })();
     }
   }, [formData.brand, formData.model, formData.color]);
 
@@ -167,7 +175,7 @@ const CreateManufacturerRequestModal = ({ isOpen, onClose, onSuccess }) => {
         notes: formData.notes.trim()
       };
 
-      const result = createManufacturerRequest(requestData);
+      const result = await createManufacturerRequest(requestData);
       
       if (result.success) {
         if (onSuccess) {
@@ -222,17 +230,13 @@ const CreateManufacturerRequestModal = ({ isOpen, onClose, onSuccess }) => {
                 name="brand"
                 value={formData.brand}
                 onChange={handleChange}
+                disabled
                 className={`w-full h-[40px] px-4 border rounded-[10px] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors ${
                   errors.brand ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                }`}
+                } ${'bg-gray-100 cursor-not-allowed'}`}
                 required
               >
-                <option value="">Select Brand</option>
-                {brands.map(brand => (
-                  <option key={brand.brandId} value={brand.brandName}>
-                    {brand.brandName}
-                  </option>
-                ))}
+                <option value="EV">EV</option>
               </select>
               {errors.brand && (
                 <p className="mt-1 text-sm text-red-600">{errors.brand}</p>

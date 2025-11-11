@@ -14,6 +14,7 @@ import java.util.Map;
 import model.dao.VehicleVariantDAO;
 import model.dto.VehicleVariantDTO;
 import model.service.OrderService;
+import utils.JwtUtil;
 import utils.RequestUtils;
 import utils.ResponseUtils;
 
@@ -31,18 +32,21 @@ public class CreateOrderController extends HttpServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
         try {
+            // Extract dealerstaffId from JWT token
+            String token = JwtUtil.extractToken(req);
+            int dealerstaffId = JwtUtil.extractUserId(token);
+
             Map<String, Object> params = RequestUtils.extractParams(req);
 
-            // Validate required fields
-            if (!params.containsKey("customerId") || !params.containsKey("dealerstaffId")
+            // Validate required fields (removed dealerstaffId from required params)
+            if (!params.containsKey("customerId")
                     || !params.containsKey("modelId") || !params.containsKey("quantity")) {
-                ResponseUtils.error(resp, "Missing required parameters: customerId, dealerstaffId, modelId, quantity");
+                ResponseUtils.error(resp, "Missing required parameters: customerId, modelId, quantity");
                 return;
             }
 
             // Parse required parameters
-            int customerId = Integer.parseInt(params.get("customerId").toString());
-            int dealerstaffId = Integer.parseInt(params.get("dealerstaffId").toString());
+            int customerId = Integer.parseInt(params.get("customerId").toString()) ;
             int modelId = Integer.parseInt(params.get("modelId").toString());
             int quantity = Integer.parseInt(params.get("quantity").toString());
 
@@ -56,29 +60,6 @@ public class CreateOrderController extends HttpServlet {
             Integer variantId = null;
             double unitPrice = 0.0;
 
-            // First, try to get unitPrice from request (frontend sends basePrice/totalPrice)
-            if (params.containsKey("unitPrice") && params.get("unitPrice") != null) {
-                try {
-                    unitPrice = Double.parseDouble(params.get("unitPrice").toString());
-                } catch (NumberFormatException e) {
-                    // Ignore, will try other methods
-                }
-            } else if (params.containsKey("basePrice") && params.get("basePrice") != null) {
-                try {
-                    unitPrice = Double.parseDouble(params.get("basePrice").toString());
-                } catch (NumberFormatException e) {
-                    // Ignore, will try other methods
-                }
-} else if (params.containsKey("totalPrice") && params.get("totalPrice") != null) {
-                try {
-                    // If totalPrice is provided, divide by quantity to get unit price
-                    double totalPrice = Double.parseDouble(params.get("totalPrice").toString());
-                    unitPrice = totalPrice / quantity;
-                } catch (NumberFormatException e) {
-                    // Ignore, will try other methods
-                }
-            }
-
             if (params.containsKey("variantId") && params.get("variantId") != null
                     && !params.get("variantId").toString().trim().isEmpty()) {
                 variantId = Integer.parseInt(params.get("variantId").toString());
@@ -89,10 +70,7 @@ public class CreateOrderController extends HttpServlet {
                         ResponseUtils.error(resp, "Variant not found with ID: " + variantId);
                         return;
                     }
-                    // Use variant price if no price was provided from frontend, or if variant price is higher
-                    if (unitPrice <= 0 || variant.getPrice() > 0) {
-                        unitPrice = variant.getPrice();
-                    }
+                    unitPrice = variant.getPrice();
                 }
             }
 
@@ -108,15 +86,16 @@ public class CreateOrderController extends HttpServlet {
                     ? Boolean.parseBoolean(params.get("isCustom").toString())
                     : false;
 
-            // Create order via service
+            // Create order via service (using dealerstaffId from token)
             int orderId = service.HandlingCreateOrder(customerId, dealerstaffId, modelId,
                     status, variantId, quantity, unitPrice, isCustom);
 
             // Return response
             if (orderId > 0) {
                 String message = String.format(
-                        "Order ID: %d | Variant: %s | Unit Price: %.2f%s",
+                        "Order ID: %d | Dealer Staff ID: %d | Variant: %s | Unit Price: %.2f%s",
                         orderId,
+                        dealerstaffId,
                         variantId != null && variantId > 0 ? variantId : "Auto-Generated",
                         unitPrice,
                         isCustom ? " | Status: Custom (Pending Confirmation)" : ""
@@ -126,11 +105,13 @@ public class CreateOrderController extends HttpServlet {
                 ResponseUtils.error(resp, "Failed to create order");
             }
 
+        } catch (utils.AuthException e) {
+            ResponseUtils.error(resp, "Authentication failed: " + e.getMessage());
         } catch (NumberFormatException e) {
             ResponseUtils.error(resp, "Invalid number format: " + e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
-ResponseUtils.error(resp, "Error creating order: " + e.getMessage());
+            ResponseUtils.error(resp, "Error creating order: " + e.getMessage());
         }
     }
 }

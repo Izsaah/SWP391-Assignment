@@ -30,21 +30,31 @@ public class FeedBackService {
                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         return FDAO.create(customer_id, order_id, type, content, status, created_at);
     }
-    public boolean deleteFeedBack(int feedback_id){
-    return FDAO.delete(feedback_id);
+
+    public boolean deleteFeedBack(int feedback_id) {
+        return FDAO.delete(feedback_id);
     }
-    public List<CustomerDTO> getAllFeedBackFromCustomerName(String name){
-        List<CustomerDTO> customer= CDAO.findByName(name);
-           if (customer == null || customer.isEmpty()) {
+
+    public List<CustomerDTO> getAllFeedBackFromCustomerName(String name) {
+        List<CustomerDTO> customer = CDAO.findByName(name);
+        if (customer == null || customer.isEmpty()) {
             return new ArrayList<>();
         }
-        for(CustomerDTO tmp:customer){
-        int Customerid=tmp.getCustomerId();
-            List<FeedbackDTO> feedbacks=FDAO.getFeedbackByCustomerId(Customerid);
-            if(feedbacks!=null){
-            tmp.setFeedBackList(feedbacks);
+        for (CustomerDTO tmp : customer) {
+            int Customerid = tmp.getCustomerId();
+            List<FeedbackDTO> feedbacks = FDAO.getFeedbackByCustomerId(Customerid);
+            if (feedbacks != null) {
+                tmp.setFeedBackList(feedbacks);
             }
         }
-    return customer;
+        return customer;
+    }
+
+    public List<FeedbackDTO> getFeedbackByCustomerAndDealer(int customerId, int dealerId) {
+        if (customerId <= 0 || dealerId <= 0) {
+            throw new IllegalArgumentException("Customer ID and Dealer ID must be positive numbers");
+        }
+
+        return FDAO.getFeedbackByCustomerIdAndDealer(customerId, dealerId);
     }
 }

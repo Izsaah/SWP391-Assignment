@@ -20,10 +20,7 @@ import {
   MessageSquare,
   UserCog,
   TrendingUp,
-  Building2,
-  PieChart,
   TruckIcon,
-  UserCheck,
   Truck,
   Tag,
 } from "lucide-react";
@@ -298,36 +295,10 @@ const menuItems = [
         path: "/manager/reports/sales-performance"
       },
       {
-        id: "inventory-report",
-        label: "Inventory Report",
-        icon: PieChart,
-        path: "/manager/reports/inventory"
-      },
-      {
         id: "debt-report",
         label: "Debt Report",
         icon: DollarSign,
         path: "/manager/reports/debt"
-      }
-    ]
-  },
-  { 
-    id: "staff-management", 
-    label: "Staff Management", 
-    icon: UserCog, 
-    path: "/manager/staff",
-    subItems: [
-      {
-        id: "staff-list",
-        label: "Staff List",
-        icon: Users,
-        path: "/manager/staff/list"
-      },
-      {
-        id: "performance-tracking",
-        label: "Performance Tracking",
-        icon: UserCheck,
-        path: "/manager/staff/performance"
       }
     ]
   },
@@ -337,12 +308,6 @@ const menuItems = [
     icon: Settings, 
     path: "/manager/settings",
     subItems: [
-      {
-        id: "dealer-profile",
-        label: "Dealer Profile",
-        icon: Building2,
-        path: "/manager/settings/dealer-profile"
-      },
       {
         id: "account-settings",
         label: "Account Settings",

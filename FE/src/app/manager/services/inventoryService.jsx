@@ -2,6 +2,30 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
+// Centralized auth error handling for token expiry/invalid
+export const handleAuthError = (error) => {
+  const status = error?.response?.status;
+  const message =
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    error?.message ||
+    '';
+  const isAuthError =
+    status === 401 ||
+    status === 403 ||
+    status === 400 && /invalid|expired token/i.test(message || '');
+
+  if (isAuthError) {
+    try {
+      localStorage.removeItem('token');
+    } catch {}
+    // Redirect to login
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
+  }
+};
+
 /**
  * Fix image URL - Thêm base URL nếu cần
  */
@@ -131,6 +155,7 @@ export const getVehicles = async (filters = {}) => {
     return vehicles;
   } catch (error) {
     console.error('Error fetching vehicles:', error);
+    handleAuthError(error);
     
     // Log chi tiết lỗi để debug
     if (error.response) {
@@ -346,55 +371,452 @@ export const createStockRequest = async (modelId, quantity, notes = '') => {
  * Get brands, models, colors from API
  * These can be enhanced to call actual API endpoints when available
  */
+// In-memory cache for models to support brand/model/color lookups
+let cachedModels = null;
+const ensureModels = async () => {
+  if (cachedModels) return cachedModels;
+  const token = localStorage.getItem('token');
+  const isNgrokUrl = API_URL?.includes('ngrok');
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  };
+  if (isNgrokUrl) headers['ngrok-skip-browser-warning'] = 'true';
+  const res = await axios.post(`${API_URL}/staff/viewVehicle`, {}, { headers });
+  cachedModels = res.data?.data || [];
+  return cachedModels;
+};
+
 export const getBrands = async () => {
-  // TODO: Replace with actual API endpoint
-  return [
-    { brandId: 1, brandName: 'Tesla' },
-    { brandId: 2, brandName: 'VinFast' },
-    { brandId: 3, brandName: 'BYD' },
-    { brandId: 4, brandName: 'Porsche' },
-  ];
+  const models = await ensureModels();
+  // Assuming `brandName` may exist on model; if not, deduce from modelName prefix
+  const brandSet = new Map();
+  models.forEach(m => {
+    const brand = m.brandName || (m.modelName ? m.modelName.split(' ')[0] : 'Unknown');
+    if (!brandSet.has(brand)) {
+      brandSet.set(brand, { brandId: brandSet.size + 1, brandName: brand });
+    }
+  });
+  return Array.from(brandSet.values());
 };
 
 export const getModelsByBrand = async (brandName) => {
-  // TODO: Replace with actual API endpoint
   if (!brandName || brandName === '') return [];
-  return [];
+  const models = await ensureModels();
+  // Filter by brandName (simple startsWith match against modelName if brand field absent)
+  const filtered = models.filter(m => {
+    const brand = m.brandName || (m.modelName ? m.modelName.split(' ')[0] : '');
+    return brand.toLowerCase() === brandName.toLowerCase();
+  });
+  return filtered.map(m => ({
+    modelId: m.modelId,
+    modelName: m.modelName,
+    lists: m.lists || []
+  }));
 };
 
 export const getColorsByBrandAndModel = async (brandName, modelName) => {
-  // TODO: Replace with actual API endpoint
   if (!brandName || !modelName) return [];
-  return [];
+  const models = await getModelsByBrand(brandName);
+  const model = models.find(m => m.modelName === modelName);
+  if (!model) return [];
+  const colors = (model.lists || []).filter(v => v.isActive).map(v => v.color).filter(Boolean);
+  // Unique
+  return Array.from(new Set(colors));
 };
 
 export const getPriceByModelAndColor = async (brandName, modelName, color) => {
-  // TODO: Replace with actual API endpoint
   if (!brandName || !modelName || !color) return null;
-  return null;
+  const models = await getModelsByBrand(brandName);
+  const model = models.find(m => m.modelName === modelName);
+  if (!model) return null;
+  const variant = (model.lists || []).find(v => v.isActive && v.color === color);
+  return variant ? variant.price : null;
 };
 
 export const createManufacturerRequest = async (requestData) => {
   try {
     const token = localStorage.getItem('token');
-    // TODO: Replace with actual API endpoint when available
-    const request = {
-      requestId: `REQ-${Date.now()}`,
-      brand: requestData.brand,
-      model: requestData.model,
-      color: requestData.color,
-      quantity: requestData.quantity,
-      price: requestData.price || null,
-      notes: requestData.notes || '',
-      status: 'Pending',
-      createdAt: new Date().toISOString(),
+    const isNgrokUrl = API_URL?.includes('ngrok');
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
     };
-    
-    console.log('Manufacturer Request Created:', request);
-    return { success: true, data: request };
+    if (isNgrokUrl) headers['ngrok-skip-browser-warning'] = 'true';
+
+    // Resolve modelId and variantId from names
+    const models = await getModelsByBrand(requestData.brand);
+    const model = models.find(m => m.modelName === requestData.model);
+    if (!model) {
+      return { success: false, message: 'Model not found' };
+    }
+    const variant = (model.lists || []).find(v => v.color === requestData.color);
+    const payload = {
+      modelId: model.modelId,
+      quantity: requestData.quantity,
+      status: 'Pending',
+      isCustom: true,
+    };
+    if (variant && variant.variantId) {
+      payload.variantId = variant.variantId;
+    }
+
+    const res = await axios.post(`${API_URL}/staff/createOrderFromDealer`, payload, { headers });
+    if (res.data?.status === 'success') {
+      return { success: true, data: res.data?.data || res.data };
+    }
+    return { success: false, message: res.data?.message || 'Failed to submit request' };
   } catch (error) {
     console.error('Error creating manufacturer request:', error);
-    return { success: false, message: error.message };
+    handleAuthError(error);
+    return { success: false, message: error.response?.data?.message || error.message };
+  }
+};
+
+/**
+ * Fetch all manufacturer requests created by this dealer (customer_id = 0)
+ * Backend controller: /api/staff/viewOrderFromDealer
+ */
+export const fetchManufacturerRequests = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    const isNgrokUrl = API_URL?.includes('ngrok');
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+    if (isNgrokUrl) headers['ngrok-skip-browser-warning'] = 'true';
+
+    // Prepare variant lookup maps to resolve color when BE omits it
+    const modelsForLookup = await ensureModels().catch(() => []);
+    const normalizeId = (id) => {
+      if (id === null || id === undefined) return null;
+      return String(id);
+    };
+    const variantIdToColor = new Map();
+    const variantIdToModelName = new Map();
+    const modelIdToModelName = new Map();
+    // Map to store serialId -> variantId mapping
+    // We'll build this from order data by matching serialId with variants of the same modelId
+    const serialIdToVariantId = new Map();
+    
+    if (Array.isArray(modelsForLookup)) {
+      modelsForLookup.forEach((m) => {
+        const lists = m?.lists || [];
+        const mid = normalizeId(m?.modelId ?? m?.model_id);
+        if (mid) modelIdToModelName.set(mid, m?.modelName || '');
+        lists.forEach((v) => {
+          const rawVid = v?.variantId ?? v?.variant_id;
+          const vid = normalizeId(rawVid);
+          if (vid != null) {
+            if (v?.color) variantIdToColor.set(vid, v.color);
+            const modelName = m?.modelName || '';
+            const version = v?.versionName || v?.version_name || '';
+            const composite = [modelName, version].filter(Boolean).join(' ').trim();
+            if (composite) variantIdToModelName.set(vid, composite);
+          }
+        });
+      });
+    }
+
+    // Controller expects POST (with token to derive dealerId)
+    let res;
+    try {
+      res = await axios.post(`${API_URL}/staff/viewOrderFromDealer`, {}, { headers });
+    } catch (postErr) {
+      if (postErr.response?.status === 405) {
+        res = await axios.get(`${API_URL}/staff/viewOrderFromDealer`, { headers });
+      } else {
+        throw postErr;
+      }
+    }
+
+    const data = res.data?.data || [];
+
+    // First, build serialId -> variantId map from order data
+    // We'll use modelId to narrow down which variants to check
+    // For each order detail with serialId, try to match with variants of the same modelId
+    data.forEach((order) => {
+      const orderModelId = normalizeId(order.modelId ?? order.model_id);
+      const getDetailArray = (o) => {
+        if (Array.isArray(o.details)) return o.details;
+        if (Array.isArray(o.orderDetails)) return o.orderDetails;
+        if (Array.isArray(o.orderDetail)) return o.orderDetail;
+        if (o.detail && typeof o.detail === 'object') return [o.detail];
+        return [];
+      };
+      
+      const details = getDetailArray(order);
+      details.forEach((d) => {
+        const serialId = d?.serialId ?? d?.serial_id;
+        if (serialId && !serialIdToVariantId.has(serialId)) {
+          // Try to find variantId from modelId
+          // If model has only one variant, use that variant
+          // Otherwise, we'll need to fetch from API or use first matching variant
+          if (orderModelId && modelsForLookup) {
+            const model = modelsForLookup.find(m => 
+              normalizeId(m?.modelId ?? m?.model_id) === orderModelId
+            );
+            if (model) {
+              const variants = model?.lists || [];
+              // If model has only one variant, use it
+              if (variants.length === 1) {
+                const vid = normalizeId(variants[0]?.variantId ?? variants[0]?.variant_id);
+                if (vid) {
+                  serialIdToVariantId.set(serialId, vid);
+                }
+              } else if (variants.length > 1) {
+                // If multiple variants, we can't be sure which one
+                // But we can try to match by checking if there's a variant with matching characteristics
+                // For now, we'll use the first variant as fallback (not perfect but better than nothing)
+                // In a real scenario, you'd need to fetch variantId from serialId via API
+                const vid = normalizeId(variants[0]?.variantId ?? variants[0]?.variant_id);
+                if (vid) {
+                  serialIdToVariantId.set(serialId, vid);
+                }
+              }
+            }
+          }
+        }
+      });
+    });
+
+    // Group by orderId and aggregate quantity across details per order
+    // Backend may return each order detail as a separate object (same orderId, different orderDetailId)
+    const grouped = new Map();
+
+    const getOrderId = (o) => {
+      // Try orderId first, then check detail.orderId
+      const id = o.orderId || o.order_id;
+      if (id) return id;
+      if (o.detail && (o.detail.orderId || o.detail.order_id)) {
+        return o.detail.orderId || o.detail.order_id;
+      }
+      return null;
+    };
+
+    const getDetailArray = (o) => {
+      // Support multiple possible shapes from BE
+      if (Array.isArray(o.details)) return o.details;
+      if (Array.isArray(o.orderDetails)) return o.orderDetails;
+      if (Array.isArray(o.orderDetail)) return o.orderDetail;
+      if (o.detail && typeof o.detail === 'object') return [o.detail];
+      return [];
+    };
+
+    // First pass: collect all data by orderId
+    // Backend returns each order detail as a separate OrderDTO (same orderId, different orderDetailId)
+    // Each OrderDTO has a single 'detail' (OrderDetailDTO) containing quantity
+    data.forEach((order) => {
+      const orderId = getOrderId(order);
+      if (!orderId) return;
+
+      // Extract quantity from order.detail (single OrderDetailDTO) or order.details (array)
+      // Backend structure: OrderDTO has either 'detail' (single) or 'details' (array)
+      let itemQuantity = 0;
+      let itemUnitPrice = null;
+      let itemVariantId = null;
+      let itemModelId = null;
+      let itemColor = '';
+      let itemModel = '';
+
+      // Check for single detail object first (most common case from BE)
+      if (order.detail && typeof order.detail === 'object') {
+        const d = order.detail;
+        const q = d?.quantity != null ? parseInt(d.quantity) : 0;
+        if (!isNaN(q)) itemQuantity = q;
+        if (d?.unitPrice != null) itemUnitPrice = parseFloat(d.unitPrice);
+        // Try to get variantId from detail first
+        itemVariantId = normalizeId(d?.variantId ?? d?.variant_id);
+        itemModelId = normalizeId(d?.modelId ?? d?.model_id);
+        
+        // If variantId not found in detail, try to get from serialId using our map
+        if (!itemVariantId && d?.serialId) {
+          const serialId = d.serialId;
+          // First, check if we already have this serialId mapped
+          if (serialIdToVariantId.has(serialId)) {
+            itemVariantId = serialIdToVariantId.get(serialId);
+          } else {
+            // Try to find variantId from modelId and variants
+            // If model has only one variant, use that variant
+            if (itemModelId && modelsForLookup) {
+              const model = modelsForLookup.find(m => 
+                normalizeId(m?.modelId ?? m?.model_id) === itemModelId
+              );
+              if (model) {
+                const variants = model?.lists || [];
+                // If model has only one variant, use it
+                if (variants.length === 1) {
+                  const vid = normalizeId(variants[0]?.variantId ?? variants[0]?.variant_id);
+                  if (vid) {
+                    itemVariantId = vid;
+                    serialIdToVariantId.set(serialId, vid); // Cache for future use
+                  }
+                } else if (variants.length > 1) {
+                  // Multiple variants: try to match by checking variant characteristics
+                  // For now, use first variant as fallback
+                  // In production, you'd fetch variantId from serialId via API
+                  const vid = normalizeId(variants[0]?.variantId ?? variants[0]?.variant_id);
+                  if (vid) {
+                    itemVariantId = vid;
+                    serialIdToVariantId.set(serialId, vid); // Cache for future use
+                  }
+                }
+              }
+            }
+          }
+        }
+      } else {
+        // Check for details array
+        const details = getDetailArray(order);
+        if (details.length > 0) {
+          // If details array exists, sum quantities from all details
+          details.forEach((d) => {
+            const q = d?.quantity != null ? parseInt(d.quantity) : 0;
+            if (!isNaN(q)) itemQuantity += q;
+            if (itemUnitPrice === null && d?.unitPrice != null) {
+              itemUnitPrice = parseFloat(d.unitPrice);
+            }
+            if (!itemVariantId) {
+              itemVariantId = normalizeId(d?.variantId ?? d?.variant_id);
+              // If still not found, try to get from serialId
+              if (!itemVariantId && d?.serialId) {
+                const serialId = d.serialId;
+                if (serialIdToVariantId.has(serialId)) {
+                  itemVariantId = serialIdToVariantId.get(serialId);
+                }
+              }
+            }
+            if (!itemModelId) {
+              itemModelId = normalizeId(d?.modelId ?? d?.model_id);
+            }
+          });
+        } else {
+          // When no details, try flattened fields on order object
+          const q = order.quantity != null ? parseInt(order.quantity) : 0;
+          if (!isNaN(q)) itemQuantity = q;
+          itemUnitPrice = order.unitPrice != null ? parseFloat(order.unitPrice) : null;
+          itemVariantId = normalizeId(order.variantId ?? order.variant_id);
+          itemModelId = normalizeId(order.modelId ?? order.model_id);
+        }
+      }
+
+      // Fallback: get modelId from order object if not found in detail
+      if (!itemModelId) {
+        itemModelId = normalizeId(order.modelId ?? order.model_id);
+      }
+
+      // Resolve color and model from variant/model IDs or direct fields
+      if (!itemColor) {
+        itemColor =
+          order.color ||
+          order.colorName ||
+          order.colour ||
+          order.color_name ||
+          (itemVariantId != null ? (variantIdToColor.get(itemVariantId) || '') : '');
+      }
+      if (!itemModel) {
+        itemModel =
+          order.modelName ||
+          order.vehicleName ||
+          (itemModelId ? (modelIdToModelName.get(itemModelId) || '') : '') ||
+          (itemVariantId != null ? (variantIdToModelName.get(itemVariantId) || '') : '');
+      }
+
+      // Get confirmation agreement status
+      const confirmation = order.confirmation;
+      const agreement = confirmation?.agreement || order.agreement || '';
+      const agreementLower = agreement.toString().toLowerCase();
+      
+      // Determine status from confirmation
+      let itemStatus = 'Pending';
+      if (agreementLower === 'agree') {
+        itemStatus = 'Approved';
+      } else if (agreementLower === 'disagree' || agreementLower === 'reject') {
+        itemStatus = 'Rejected';
+      }
+
+      // Get or create grouped entry
+      const existing = grouped.get(orderId);
+      if (existing) {
+        // Aggregate: add quantity to existing entry
+        existing.quantity += itemQuantity;
+        if (itemColor) existing._colors.add(itemColor);
+        if (itemModel) existing._models.add(itemModel);
+        if (itemUnitPrice != null && !isNaN(itemUnitPrice)) {
+          existing._prices.add(itemUnitPrice);
+        }
+        // Keep the earliest date
+        const newDate = order.orderDate || order.createdAt || order.date;
+        if (newDate && (!existing.createdAt || newDate < existing.createdAt)) {
+          existing.createdAt = newDate;
+        }
+        // Collect confirmation statuses
+        existing._confirmations.add(itemStatus);
+      } else {
+        // Create new entry
+        const priceSet = new Set();
+        if (itemUnitPrice != null && !isNaN(itemUnitPrice)) {
+          priceSet.add(itemUnitPrice);
+        }
+        grouped.set(orderId, {
+          requestId: orderId,
+          quantity: itemQuantity,
+          status: itemStatus,
+          createdAt: order.orderDate || order.createdAt || order.date || null,
+          _models: new Set(itemModel ? [itemModel] : []),
+          _colors: new Set(itemColor ? [itemColor] : []),
+          _prices: priceSet,
+          _confirmations: new Set([itemStatus]),
+        });
+      }
+    });
+
+    // Finalize rows: convert sets to display values
+    const rows = Array.from(grouped.values()).map((r) => {
+      const modelCount = r._models.size;
+      const colorCount = r._colors.size;
+      const priceCount = r._prices.size;
+      const confirmations = r._confirmations || new Set();
+
+      // Determine final price: use if all items share same price, otherwise null
+      let finalPrice = null;
+      if (priceCount === 1) {
+        finalPrice = Array.from(r._prices)[0];
+      }
+
+      // Determine final status from all confirmations
+      // If all are Approved -> Approved
+      // If any is Rejected -> Rejected
+      // Otherwise -> Pending
+      let finalStatus = 'Pending';
+      const confirmationArray = Array.from(confirmations);
+      if (confirmationArray.length > 0) {
+        if (confirmationArray.every(s => s === 'Approved')) {
+          finalStatus = 'Approved';
+        } else if (confirmationArray.some(s => s === 'Rejected')) {
+          finalStatus = 'Rejected';
+        } else {
+          finalStatus = 'Pending';
+        }
+      }
+
+      return {
+        requestId: r.requestId,
+        modelName: modelCount === 1 ? Array.from(r._models)[0] : modelCount > 1 ? 'Multiple Models' : 'N/A',
+        color: colorCount === 1 ? Array.from(r._colors)[0] : colorCount > 1 ? 'Mixed' : (colorCount === 0 ? 'N/A' : ''),
+        quantity: r.quantity, // This is now the aggregated total quantity
+        price: finalPrice,
+        status: finalStatus,
+        createdAt: r.createdAt,
+      };
+    });
+
+    return { success: true, data: rows };
+  } catch (error) {
+    console.error('Error fetching manufacturer requests:', error);
+    handleAuthError(error);
+    return { success: false, message: error.response?.data?.message || error.message, data: [] };
   }
 };
 
