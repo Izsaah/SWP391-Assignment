@@ -10,11 +10,13 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Map;
 import model.dto.TestDriveScheduleDTO;
 import model.dto.UserAccountDTO;
 import model.service.TestDriveScheduleService;
 import model.service.UserAccountService;
 import utils.JwtUtil;
+import utils.RequestUtils;
 import utils.ResponseUtils;
 
 /**
@@ -50,10 +52,14 @@ public class GetTestDriveScheduleByCustomerAndDealerController extends HttpServl
                 return;
             }
             
-            // Get customer ID from request parameter
-            String customerIdParam = req.getParameter("customer_id");
+            // Extract parameters using RequestUtils
+            Map<String, Object> params = RequestUtils.extractParams(req);
             
-            if (customerIdParam == null || customerIdParam.isEmpty()) {
+            // Get customer ID from parameters
+            Object customerIdObj = params.get("customer_id");
+            String customerIdParam = (customerIdObj == null) ? null : customerIdObj.toString();
+            
+            if (customerIdParam == null || customerIdParam.trim().isEmpty()) {
                 ResponseUtils.error(resp, "Customer ID is required");
                 return;
             }
