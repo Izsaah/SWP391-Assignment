@@ -157,6 +157,45 @@ public class TestDriveScheduleDAO {
 
         return list;
     }
+<<<<<<< HEAD
+=======
+public List<TestDriveScheduleDTO> getTestDriveSchedulesByDealerOrNone(Integer dealerId) throws ClassNotFoundException {
+    String query = "SELECT tds.appointment_id, tds.customer_id, tds.serial_id, tds.schedule_at, tds.status, ua.dealer_id "
+                 + "FROM TestDriveSchedule tds "
+                 + "LEFT JOIN [Order] o ON tds.customer_id = o.customer_id "
+                 + "LEFT JOIN UserAccount ua ON o.dealer_staff_id = ua.user_id "
+                 + (dealerId != null ? "WHERE ua.dealer_id = ? OR ua.dealer_id IS NULL" : "");
+
+    List<TestDriveScheduleDTO> list = new ArrayList<>();
+
+    try (Connection conn = DbUtils.getConnection();
+         PreparedStatement ps = conn.prepareStatement(query)) {
+
+        if (dealerId != null) {
+            ps.setInt(1, dealerId);
+        }
+
+        try (ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                TestDriveScheduleDTO schedule = new TestDriveScheduleDTO(
+                        rs.getInt("appointment_id"),
+                        rs.getInt("customer_id"),
+                        rs.getString("serial_id"),
+                        rs.getString("schedule_at"),
+                        rs.getString("status")
+                );
+                // optional: store dealer_id in schedule if you add that field
+                list.add(schedule);
+            }
+        }
+
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
+
+    return list;
+}
+>>>>>>> origin/master
 
     public TestDriveScheduleDTO updateStatus(int appointment_id, String status) {
         String updateSql = "UPDATE " + TABLE_NAME + " SET status=? WHERE appointment_id=?";
