@@ -42,7 +42,7 @@ public class GetCustomerDebSummaryByDealerController extends HttpServlet {
             }
 
             // Step 2: Extract dealer ID (depends on your Jwt payload)
-            int dealerId = JwtUtil.extractUserId(token); // ⚠️ Make sure this method exists in your JwtUtil
+            int dealerId = JwtUtil.extractUserId(token); //  Make sure this method exists in your JwtUtil
             if (dealerId <= 0) {
                 ResponseUtils.error(resp, "Dealer ID not found or unauthorized");
                 return;
