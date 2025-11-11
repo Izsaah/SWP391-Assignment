@@ -32,6 +32,9 @@ public class ViewInventoryService {
                     VehicleModelDTO model = modelList.get(0);
 
                     if (model.isIsActive()) {
+                        int availableCount = inventoryDAO.getAvailableSerialCountByModelId(inventory.getModelId());
+                        inventory.setQuantity(String.valueOf(availableCount));
+
                         inventory.setList(modelList);
                         activeInventories.add(inventory);
                     }

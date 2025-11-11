@@ -54,4 +54,47 @@ public class InventoryDAO {
     public List<InventoryDTO> getInventoryByModelId(int id) {
         return retrieve("model_id = ?", id);
     }
+
+    public int getAvailableSerialCountByModelId(int modelId) {
+        String sql = "SELECT COUNT(DISTINCT vs.serial_id) as available_count "
+                + "FROM VehicleSerial vs "
+                + "INNER JOIN VehicleVariant vv ON vs.variant_id = vv.variant_id "
+                + "WHERE vv.model_id = ? "
+                // Exclude serials ordered by actual customers
+                + "AND vs.serial_id NOT IN ("
+                + "    SELECT od.serial_id "
+                + "    FROM OrderDetail od "
+                + "    INNER JOIN [Order] o ON od.order_id = o.order_id "
+                + "    WHERE od.serial_id IS NOT NULL "
+                + "    AND o.customer_id > 0"
+                + ") "
+                // AND (unordered OR ordered by dealers - not actual customers)
+                + "AND ("
+                + "    vs.serial_id NOT IN ("
+                + "        SELECT od2.serial_id "
+                + "        FROM OrderDetail od2 "
+                + "        WHERE od2.serial_id IS NOT NULL"
+                + "    ) "
+                + "    OR vs.serial_id IN ("
+                + "        SELECT od3.serial_id "
+                + "        FROM OrderDetail od3 "
+                + "        INNER JOIN [Order] o3 ON od3.order_id = o3.order_id "
+                + "        WHERE od3.serial_id IS NOT NULL "
+                + "        AND o3.customer_id = 0"
+                + "    )"
+                + ")";
+
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, modelId);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("available_count");
+            }
+        } catch (Exception e) {
+            System.err.println("Error in getAvailableSerialCountByModelId(): " + e.getMessage());
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
 }
