@@ -1,5 +1,6 @@
 package model.service;
 
+import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -369,6 +370,121 @@ public class PaymentService {
             e.printStackTrace();
         }
         return responseList;
+    }
+
+    public List<Map<String, Object>> getCustomerDebtSummaryByDealer(int dealerId) {
+        List<Map<String, Object>> responseList = new ArrayList<>();
+
+        try {
+            Map<Integer, Map<String, Object>> customerDebtMap = new LinkedHashMap<>();
+
+            List<InstallmentPlanDTO> plans = installDAO.getActiveOrOverduePlans();
+            if (plans == null || plans.isEmpty()) {
+                return responseList;
+            }
+
+            for (InstallmentPlanDTO plan : plans) {
+
+                PaymentDTO payment = paymentDAO.findPaymentById(plan.getPaymentId());
+                if (payment == null) {
+                    continue;
+                }
+
+                OrderDTO order = orderDAO.getById(payment.getOrderId());
+                if (order == null) {
+                    continue;
+                }
+
+                // ✅ Check dealer ownership
+                UserAccountDTO dealerStaff = userAccountDAO.getUserById(order.getDealerStaffId());
+                if (dealerStaff == null || dealerStaff.getDealerId() != dealerId) {
+                    continue;
+                }
+
+                int customerId = order.getCustomerId();
+                if (customerId <= 0) {
+                    continue;
+                }
+
+                List<CustomerDTO> customerList = customerDAO.findById(customerId);
+                if (customerList == null || customerList.isEmpty()) {
+                    continue;
+                }
+
+                CustomerDTO customer = customerList.get(0);
+
+                // ✅ Safe parsing
+                BigDecimal monthlyPay = new BigDecimal(plan.getMonthlyPay() == null ? "0" : plan.getMonthlyPay());
+                int remainingTerm = parseIntSafe(plan.getTermMonth());
+                BigDecimal principal = BigDecimal.valueOf(payment.getAmount());
+
+                // ✅ Compute original term
+                int originalTerm = (monthlyPay.compareTo(BigDecimal.ZERO) > 0)
+                        ? principal.divide(monthlyPay, 0, BigDecimal.ROUND_HALF_UP).intValue()
+                        : remainingTerm;
+
+                if (originalTerm < remainingTerm) {
+                    originalTerm = remainingTerm;
+                }
+
+                // ✅ Compute totals
+                BigDecimal totalAmount = monthlyPay.multiply(BigDecimal.valueOf(originalTerm));
+                int paidMonths = Math.max(0, originalTerm - remainingTerm);
+                BigDecimal paidAmount = monthlyPay.multiply(BigDecimal.valueOf(paidMonths));
+                BigDecimal outstanding = monthlyPay.multiply(BigDecimal.valueOf(remainingTerm));
+
+                if (remainingTerm <= 0) {
+                    outstanding = BigDecimal.ZERO;
+                    paidAmount = totalAmount;
+                }
+
+                // ✅ Add or accumulate per customer
+                Map<String, Object> summary = customerDebtMap.get(customerId);
+                if (summary == null) {
+                    summary = new LinkedHashMap<>();
+                    summary.put("customerId", customer.getCustomerId());
+                    summary.put("name", customer.getName());
+                    summary.put("email", customer.getEmail());
+                    summary.put("phoneNumber", customer.getPhoneNumber());
+                    summary.put("dealerId", dealerId);
+
+                    summary.put("totalOutstandingDebt", outstanding.toPlainString());
+                    summary.put("totalPaidAmount", paidAmount.toPlainString());
+                    summary.put("totalPlans", 1);
+
+                    customerDebtMap.put(customerId, summary);
+
+                } else {
+                    BigDecimal currentDebt = new BigDecimal(summary.get("totalOutstandingDebt").toString());
+                    BigDecimal currentPaid = new BigDecimal(summary.get("totalPaidAmount").toString());
+                    int plansCount = (int) summary.get("totalPlans");
+
+                    BigDecimal updatedDebt = currentDebt.add(outstanding);
+                    BigDecimal updatedPaid = currentPaid.add(paidAmount);
+
+                    summary.put("totalOutstandingDebt", updatedDebt.toPlainString());
+                    summary.put("totalPaidAmount", updatedPaid.toPlainString());
+                    summary.put("totalPlans", plansCount + 1);
+                }
+            }
+
+            responseList.addAll(customerDebtMap.values());
+
+        } catch (Exception e) {
+            System.err.println("ERROR in getCustomerDebtSummaryByDealer: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        return responseList;
+    }
+
+
+    private int parseIntSafe(String value) {
+        try {
+            return Integer.parseInt(value);
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
 }
