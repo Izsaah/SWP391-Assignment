@@ -115,7 +115,16 @@ public class FeedbackDAO {
     
 
     public List<FeedbackDTO> getFeedbackByCustomerId(int customer_id) {
-        // Uses the existing retrieve method with a specific condition and parameter.
         return retrieve("customer_id = ?", customer_id);
+    }
+    
+    public List<FeedbackDTO> getFeedbackByCustomerIdAndDealer(int customerId, int dealerId) {
+        String query = "SELECT DISTINCT f.feedback_id, f.customer_id, f.order_id, f.type, f.content, f.status, f.created_at " +
+                       "FROM Feedback f " +
+                       "INNER JOIN orders o ON f.order_id = o.order_id " +
+                       "INNER JOIN user_account ua ON o.dealer_staff_id = ua.user_id " +
+                       "WHERE f.customer_id = ? AND ua.dealer_id = ?";
+        
+        return retrieve(query, customerId, dealerId);
     }
 }

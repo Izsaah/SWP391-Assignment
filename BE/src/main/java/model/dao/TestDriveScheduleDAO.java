@@ -26,7 +26,7 @@ public class TestDriveScheduleDAO {
 
     public List<TestDriveScheduleDTO> retrieve(String condition, Object... params) {
         String sql = "SELECT * FROM " + TABLE_NAME + " WHERE " + condition;
-        try (Connection conn = DbUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
             for (int i = 0; i < params.length; i++) {
                 ps.setObject(i + 1, params[i]);
             }
@@ -49,12 +49,12 @@ public class TestDriveScheduleDAO {
             String status) {
 
         String checkSql = "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE serial_id = ? AND date = ?";
-        try (Connection conn = DbUtils.getConnection(); PreparedStatement checkPs = conn.prepareStatement(checkSql)) {
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement checkPs = conn.prepareStatement(checkSql)) {
 
             checkPs.setString(1, serial_id);
             checkPs.setString(2, date);
 
-            try (ResultSet rs = checkPs.executeQuery()) {
+            try ( ResultSet rs = checkPs.executeQuery()) {
                 if (rs.next() && rs.getInt(1) > 0) {
                     return null;
                 }
@@ -73,8 +73,7 @@ public class TestDriveScheduleDAO {
 
         int generatedAppointmentId = -1;
 
-        try (Connection conn = DbUtils.getConnection();
-             PreparedStatement insertPs = conn.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS)) {
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement insertPs = conn.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS)) {
 
             insertPs.setInt(1, customer_id);
             insertPs.setString(2, serial_id);
@@ -84,7 +83,7 @@ public class TestDriveScheduleDAO {
             int affectedRows = insertPs.executeUpdate();
 
             if (affectedRows > 0) {
-                try (ResultSet rs = insertPs.getGeneratedKeys()) {
+                try ( ResultSet rs = insertPs.getGeneratedKeys()) {
                     if (rs.next()) {
                         generatedAppointmentId = rs.getInt(1);
                     }
@@ -108,9 +107,20 @@ public class TestDriveScheduleDAO {
         return (results != null && !results.isEmpty()) ? results.get(0) : null;
     }
 
+    public TestDriveScheduleDTO getTestDriveScheduleByCustomerIdAndDealer(int customerId, int dealerId) {
+        String query = "SELECT DISTINCT tds.appointment_id, tds.customer_id, tds.serial_id, tds.date, tds.status "
+                + "FROM test_drive_schedule tds "
+                + "INNER JOIN orders o ON tds.customer_id = o.customer_id "
+                + "INNER JOIN user_account ua ON o.dealer_staff_id = ua.user_id "
+                + "WHERE tds.customer_id = ? AND ua.dealer_id = ?";
+
+        List<TestDriveScheduleDTO> results = retrieve(query, customerId, dealerId);
+        return (results != null && !results.isEmpty()) ? results.get(0) : null;
+    }
+
     public TestDriveScheduleDTO updateStatus(int appointment_id, String status) {
         String updateSql = "UPDATE " + TABLE_NAME + " SET status=? WHERE appointment_id=?";
-        try (Connection conn = DbUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(updateSql)) {
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(updateSql)) {
 
             ps.setString(1, status);
             ps.setInt(2, appointment_id);

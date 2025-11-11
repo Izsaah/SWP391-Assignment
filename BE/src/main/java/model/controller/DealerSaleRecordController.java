@@ -10,44 +10,59 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import model.dto.SaleRecordDTO;
+import model.dto.UserAccountDTO;
 import model.service.SaleRecordService;
+import model.service.UserAccountService;
+import utils.JwtUtil;
 import utils.RequestUtils;
 import utils.ResponseUtils;
 
-@WebServlet("/api/staff/dealerSalesRecords")
+@WebServlet("/api/manager/dealerSalesRecords")
 public class DealerSaleRecordController extends HttpServlet {
 
     private final SaleRecordService service = new SaleRecordService();
+    private final UserAccountService userAccountService = new UserAccountService();
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
         try {
-            Map<String, Object> params = RequestUtils.extractParams(req);
+            // Extract token and get dealer staff ID from JWT
+            String token = JwtUtil.extractToken(req);
+            int dealerStaffId = JwtUtil.extractUserId(token);
 
-            Object dealerIdObj = params.get("dealerId");
-            String dealerIdParam = (dealerIdObj == null) ? null : dealerIdObj.toString();
-            
-            Object startDateObj = params.get("startDate");
-            String startDate = (startDateObj == null) ? null : startDateObj.toString();
-            
-            Object endDateObj = params.get("endDate");
-            String endDate = (endDateObj == null) ? null : endDateObj.toString();
+            // Get dealer staff user account using service layer
+            UserAccountDTO staff = userAccountService.getDealerStaffById(dealerStaffId);
 
-
-            if (dealerIdParam == null || dealerIdParam.trim().isEmpty()) {
-                ResponseUtils.error(resp, "Missing required field: dealerId");
+            if (staff == null) {
+                ResponseUtils.error(resp, "Staff account not found");
                 return;
             }
+
+            // Get dealer ID from staff account
+            int dealerId = staff.getDealerId();
+
+            if (dealerId <= 0) {
+                ResponseUtils.error(resp, "No dealer associated with this staff account");
+                return;
+            }
+
+            // Extract date parameters from request
+            Map<String, Object> params = RequestUtils.extractParams(req);
+
+            Object startDateObj = params.get("startDate");
+            String startDate = (startDateObj == null) ? null : startDateObj.toString();
+
+            Object endDateObj = params.get("endDate");
+            String endDate = (endDateObj == null) ? null : endDateObj.toString();
 
             if (startDate == null || startDate.trim().isEmpty() || endDate == null || endDate.trim().isEmpty()) {
                 ResponseUtils.error(resp, "Both 'startDate' and 'endDate' are required.");
                 return;
             }
 
-            int dealerId = Integer.parseInt(dealerIdParam);
-
+            // Get sales records for the dealer
             List<SaleRecordDTO> sales = service.getCombinedSaleRecordsForDealerByDateRange(
                     dealerId, startDate, endDate
             );
@@ -58,8 +73,8 @@ public class DealerSaleRecordController extends HttpServlet {
                 ResponseUtils.success(resp, "Successfully retrieved dealer sales records.", sales);
             }
 
-        } catch (NumberFormatException e) {
-            ResponseUtils.error(resp, "Invalid 'dealerId': must be a number.");
+        } catch (utils.AuthException e) {
+            ResponseUtils.error(resp, "Authentication failed: " + e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
             ResponseUtils.error(resp, "Error fetching dealer sales records: " + e.getMessage());
