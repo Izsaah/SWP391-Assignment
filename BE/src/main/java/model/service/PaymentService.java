@@ -19,6 +19,9 @@ public class PaymentService {
     private final DealerDAO dealerDAO = new DealerDAO();
     private final DealerPromotionDAO dealerPromoDAO = new DealerPromotionDAO();
     private final CustomerDAO customerDAO = new CustomerDAO();
+    private final VehicleModelDAO modelDAO = new VehicleModelDAO();
+    private final VehicleVariantDAO variantDAO = new VehicleVariantDAO();
+    private final VehicleSerialDAO serialDAO = new VehicleSerialDAO();
 
     public PaymentDTO processPayment(int orderId, String method, InstallmentPlanDTO plan) throws ClassNotFoundException, SQLException {
         System.out.println("DEBUG: Starting payment processing for order_id = " + orderId);
@@ -193,6 +196,13 @@ public class PaymentService {
                     continue; // Skip orders not from this dealer
                 }
 
+                // Get dealer name
+                String dealerName = "Unknown";
+                DealerDTO dealer = dealerDAO.GetDealerById(dealerId);
+                if (dealer != null) {
+                    dealerName = dealer.getDealerName();
+                }
+
                 int customerId = order.getCustomerId();
                 if (customerId <= 0) {
                     continue;
@@ -203,6 +213,36 @@ public class PaymentService {
                     continue;
                 }
                 CustomerDTO customer = customerList.get(0);
+
+                // Get model information
+                int modelId = order.getModelId();
+                String modelName = "Unknown";
+                List<VehicleModelDTO> modelList = modelDAO.viewVehicleModelById(modelId);
+                if (modelList != null && !modelList.isEmpty()) {
+                    modelName = modelList.get(0).getModelName();
+                }
+
+                // Get order detail for serial_id
+                OrderDetailDTO detail = orderDetailDAO.getOrderDetailByOrderId(order.getOrderId());
+                String serialId = null;
+                Integer variantId = null;
+                String variantName = null;
+
+                if (detail != null) {
+                    serialId = detail.getSerialId();
+
+                    // Get variant info from serial_id
+                    if (serialId != null && !serialId.trim().isEmpty()) {
+                        VehicleSerialDTO vehicleSerial = serialDAO.getSerialBySerialId(serialId);
+                        if (vehicleSerial != null && vehicleSerial.getVariantId() > 0) {
+                            variantId = vehicleSerial.getVariantId();
+                            VehicleVariantDTO variant = variantDAO.getVariantById(variantId);
+                            if (variant != null) {
+                                variantName = variant.getVersionName();
+                            }
+                        }
+                    }
+                }
 
                 // Parse values
                 double monthlyPay = 0.0;
@@ -256,27 +296,33 @@ public class PaymentService {
                     paidAmount = totalAmountWithInterest;
                 }
 
-                // Debug logging
-                System.out.println("DEBUG: Customer " + customer.getCustomerId() + " (Dealer: " + dealerId + ")");
-                System.out.println("  Monthly Pay: " + monthlyPay);
-                System.out.println("  Original Term Months (calculated): " + originalTermMonth);
-                System.out.println("  Remaining Term Months: " + remainingTermMonth);
-                System.out.println("  Paid Months: " + paidMonths);
-                System.out.println("  Total Amount: " + totalAmountWithInterest);
-                System.out.println("  Outstanding: " + outstanding);
-                System.out.println("  Paid Amount: " + paidAmount);
-
                 Map<String, Object> map = new LinkedHashMap<>();
+                // Customer info
                 map.put("customerId", customer.getCustomerId());
                 map.put("name", customer.getName());
                 map.put("address", customer.getAddress());
                 map.put("email", customer.getEmail());
                 map.put("phoneNumber", customer.getPhoneNumber());
+
+                // Vehicle info
+                map.put("modelId", modelId);
+                map.put("modelName", modelName);
+                map.put("variantId", variantId);
+                map.put("variantName", variantName);
+                map.put("serialId", serialId);
+
+                // Dealer info
+                map.put("dealerId", dealerId);
+                map.put("dealerName", dealerName);
+
+                // Installment plan info
                 map.put("planId", plan.getPlanId());
                 map.put("interestRate", plan.getInterestRate());
                 map.put("termMonth", plan.getTermMonth());
                 map.put("monthlyPay", plan.getMonthlyPay());
                 map.put("status", plan.getStatus());
+
+                // Payment info
                 map.put("paymentId", payment.getPaymentId());
                 map.put("orderId", payment.getOrderId());
                 map.put("totalAmount", totalAmountWithInterest);
@@ -284,7 +330,6 @@ public class PaymentService {
                 map.put("method", payment.getMethod());
                 map.put("outstandingAmount", outstanding);
                 map.put("paidAmount", paidAmount);
-                map.put("dealerId", dealerId); // Include dealer ID in response
 
                 responseList.add(map);
             }
@@ -302,6 +347,13 @@ public class PaymentService {
             List<PaymentDTO> allPayments = paymentDAO.getAllPayment();
             if (allPayments == null || allPayments.isEmpty()) {
                 return responseList;
+            }
+
+            // Get dealer name once (optimization)
+            String dealerName = "Unknown";
+            DealerDTO dealer = dealerDAO.GetDealerById(dealerId);
+            if (dealer != null) {
+                dealerName = dealer.getDealerName();
             }
 
             for (PaymentDTO payment : allPayments) {
@@ -332,14 +384,44 @@ public class PaymentService {
 
                 CustomerDTO customer = customerList.get(0);
 
+                // Get model information
+                int modelId = order.getModelId();
+                String modelName = "Unknown";
+                List<VehicleModelDTO> modelList = modelDAO.viewVehicleModelById(modelId);
+                if (modelList != null && !modelList.isEmpty()) {
+                    modelName = modelList.get(0).getModelName();
+                }
+
+                // Get order detail for serial_id and variant info
+                OrderDetailDTO detail = orderDetailDAO.getOrderDetailByOrderId(order.getOrderId());
+                String serialId = null;
+                Integer variantId = null;
+                String variantName = null;
+
+                if (detail != null) {
+                    serialId = detail.getSerialId();
+
+                    // Get variant info from serial_id
+                    if (serialId != null && !serialId.trim().isEmpty()) {
+                        VehicleSerialDTO vehicleSerial = serialDAO.getSerialBySerialId(serialId);
+                        if (vehicleSerial != null && vehicleSerial.getVariantId() > 0) {
+                            variantId = vehicleSerial.getVariantId();
+                            VehicleVariantDTO variant = variantDAO.getVariantById(variantId);
+                            if (variant != null) {
+                                variantName = variant.getVersionName();
+                            }
+                        }
+                    }
+                }
+
                 // Get order details for calculated total
                 List<OrderDetailDTO> orderDetails = orderDetailDAO.getOrderDetailListByOrderId(payment.getOrderId());
                 double calculatedTotal = 0.0;
                 if (orderDetails != null && !orderDetails.isEmpty()) {
-                    for (OrderDetailDTO detail : orderDetails) {
+                    for (OrderDetailDTO od : orderDetails) {
                         try {
-                            int quantity = Integer.parseInt(detail.getQuantity());
-                            double unitPrice = detail.getUnitPrice();
+                            int quantity = Integer.parseInt(od.getQuantity());
+                            double unitPrice = od.getUnitPrice();
                             calculatedTotal += quantity * unitPrice;
                         } catch (NumberFormatException e) {
                             e.printStackTrace();
@@ -350,23 +432,38 @@ public class PaymentService {
                 double totalAmount = payment.getAmount();
 
                 Map<String, Object> map = new LinkedHashMap<>();
+                // Customer info
                 map.put("customerId", customer.getCustomerId());
                 map.put("name", customer.getName());
                 map.put("address", customer.getAddress());
                 map.put("email", customer.getEmail());
                 map.put("phoneNumber", customer.getPhoneNumber());
+
+                // Vehicle info
+                map.put("modelId", modelId);
+                map.put("modelName", modelName);
+                map.put("variantId", variantId);
+                map.put("variantName", variantName);
+                map.put("serialId", serialId);
+
+                // Dealer info
+                map.put("dealerId", dealerId);
+                map.put("dealerName", dealerName);
+
+                // Payment info
                 map.put("paymentId", payment.getPaymentId());
                 map.put("orderId", payment.getOrderId());
                 map.put("totalAmount", totalAmount);
+                map.put("calculatedTotal", calculatedTotal);
                 map.put("paymentDate", payment.getPaymentDate());
                 map.put("method", payment.getMethod());
-                map.put("outstandingAmount", 0.0);
                 map.put("paidAmount", totalAmount);
-                map.put("dealerId", dealerId); // include dealer ID in response
+
                 responseList.add(map);
             }
 
         } catch (Exception e) {
+            System.err.println("ERROR in getCustomersWithTTStatusByDealer: " + e.getMessage());
             e.printStackTrace();
         }
         return responseList;
@@ -477,7 +574,6 @@ public class PaymentService {
 
         return responseList;
     }
-
 
     private int parseIntSafe(String value) {
         try {
