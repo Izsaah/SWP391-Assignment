@@ -123,4 +123,53 @@ public class VehicleSerialDAO {
         return list;
     }
 
+    public List<VehicleSerialDTO> getUnorderedOrDealerOrderedSerialsByVariantIdAndDealer(int variantId, int dealerId) {
+        String sql = "SELECT DISTINCT vs.serial_id, vs.variant_id "
+                + "FROM VehicleSerial vs "
+                + "WHERE vs.variant_id = ? "
+                // Exclude serials ordered by actual customers
+                + "AND vs.serial_id NOT IN ("
+                + "    SELECT od.serial_id "
+                + "    FROM OrderDetail od "
+                + "    INNER JOIN [Order] o ON od.order_id = o.order_id "
+                + "    WHERE od.serial_id IS NOT NULL "
+                + "    AND o.customer_id > 0"
+                + ") "
+                // AND (unordered OR ordered by this specific dealer)
+                + "AND ("
+                + "    vs.serial_id NOT IN ("
+                + "        SELECT od2.serial_id "
+                + "        FROM OrderDetail od2 "
+                + "        WHERE od2.serial_id IS NOT NULL"
+                + "    ) "
+                + "    OR vs.serial_id IN ("
+                + "        SELECT od3.serial_id "
+                + "        FROM OrderDetail od3 "
+                + "        INNER JOIN [Order] o3 ON od3.order_id = o3.order_id "
+                + "        INNER JOIN UserAccount ua ON o3.dealer_staff_id = ua.user_id "
+                + "        WHERE od3.serial_id IS NOT NULL "
+                + "        AND o3.customer_id = 0 "
+                + "        AND ua.dealer_id = ?"
+                + "    )"
+                + ")";
+
+        List<VehicleSerialDTO> list = new ArrayList<>();
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, variantId);
+            ps.setInt(2, dealerId);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                VehicleSerialDTO serial = new VehicleSerialDTO();
+                serial.setSerialId(rs.getString("serial_id"));
+                serial.setVariantId(rs.getInt("variant_id"));
+                list.add(serial);
+            }
+            return list;
+        } catch (Exception e) {
+            System.err.println("Error in getUnorderedOrDealerOrderedSerialsByVariantIdAndDealer(): " + e.getMessage());
+            e.printStackTrace();
+        }
+        return list;
+    }
 }

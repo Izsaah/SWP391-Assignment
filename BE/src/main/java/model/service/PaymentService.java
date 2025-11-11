@@ -395,7 +395,7 @@ public class PaymentService {
                     continue;
                 }
 
-                // ✅ Check dealer ownership
+                // Check dealer ownership
                 UserAccountDTO dealerStaff = userAccountDAO.getUserById(order.getDealerStaffId());
                 if (dealerStaff == null || dealerStaff.getDealerId() != dealerId) {
                     continue;
@@ -413,12 +413,12 @@ public class PaymentService {
 
                 CustomerDTO customer = customerList.get(0);
 
-                // ✅ Safe parsing
+                // Safe parsing
                 BigDecimal monthlyPay = new BigDecimal(plan.getMonthlyPay() == null ? "0" : plan.getMonthlyPay());
                 int remainingTerm = parseIntSafe(plan.getTermMonth());
                 BigDecimal principal = BigDecimal.valueOf(payment.getAmount());
 
-                // ✅ Compute original term
+                // Compute original term
                 int originalTerm = (monthlyPay.compareTo(BigDecimal.ZERO) > 0)
                         ? principal.divide(monthlyPay, 0, BigDecimal.ROUND_HALF_UP).intValue()
                         : remainingTerm;
@@ -427,7 +427,7 @@ public class PaymentService {
                     originalTerm = remainingTerm;
                 }
 
-                // ✅ Compute totals
+                // Compute totals
                 BigDecimal totalAmount = monthlyPay.multiply(BigDecimal.valueOf(originalTerm));
                 int paidMonths = Math.max(0, originalTerm - remainingTerm);
                 BigDecimal paidAmount = monthlyPay.multiply(BigDecimal.valueOf(paidMonths));
@@ -438,7 +438,7 @@ public class PaymentService {
                     paidAmount = totalAmount;
                 }
 
-                // ✅ Add or accumulate per customer
+                // Add or accumulate per customer
                 Map<String, Object> summary = customerDebtMap.get(customerId);
                 if (summary == null) {
                     summary = new LinkedHashMap<>();
