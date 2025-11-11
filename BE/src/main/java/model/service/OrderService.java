@@ -14,12 +14,14 @@ import model.dao.ConfirmationDAO;
 import model.dao.OrderDAO;
 import model.dao.OrderDetailDAO;
 import model.dao.UserAccountDAO;
+import model.dao.VehicleModelDAO;
 import model.dao.VehicleSerialDAO;
 import model.dao.VehicleVariantDAO;
 import model.dto.ConfirmationDTO;
 import model.dto.OrderDTO;
 import model.dto.OrderDetailDTO;
 import model.dto.UserAccountDTO;
+import model.dto.VehicleModelDTO;
 import model.dto.VehicleSerialDTO;
 import model.dto.VehicleVariantDTO;
 import utils.DbUtils;
@@ -29,10 +31,11 @@ public class OrderService {
     private final ConfirmationDAO confirmationDAO = new ConfirmationDAO();
     private final OrderDAO orderDAO = new OrderDAO();
     private final VehicleVariantDAO variantDAO = new VehicleVariantDAO();
+    private final VehicleModelDAO modelDAO = new VehicleModelDAO();
     private final VehicleSerialDAO vehicleSerialDAO = new VehicleSerialDAO();
     private final OrderDetailDAO orderDetailDAO = new OrderDetailDAO();
     private final UserAccountDAO userDAO = new UserAccountDAO();
-    
+
     public int HandlingCreateOrder(
             int customerId,
             int dealerstaffId,
@@ -318,7 +321,33 @@ public class OrderService {
 
                 // Get dealer staff name
                 UserAccountDTO dealerStaff = userDAO.getUserById(order.getDealerStaffId());
-                String staffName = (dealerStaff != null) ? dealerStaff.getUsername(): "Unknown";
+                String staffName = (dealerStaff != null) ? dealerStaff.getUsername() : "Unknown";
+
+                // Get model name
+                String modelName = "Unknown";
+                List<VehicleModelDTO> modelList = modelDAO.viewVehicleModelById(order.getModelId());
+                if (modelList != null && !modelList.isEmpty()) {
+                    modelName = modelList.get(0).getModelName();
+                }
+
+                // Get variant name and serial_id from order detail
+                String variantName = null;
+                String serialId = null;
+
+                if (detail != null) {
+                    serialId = detail.getSerialId();
+
+                    // Get variant info from serial_id
+                    if (serialId != null && !serialId.trim().isEmpty()) {
+                        VehicleSerialDTO vehicleSerial = vehicleSerialDAO.getSerialBySerialId(serialId);
+                        if (vehicleSerial != null && vehicleSerial.getVariantId() > 0) {
+                            VehicleVariantDTO variant = variantDAO.getVariantById(vehicleSerial.getVariantId());
+                            if (variant != null) {
+                                variantName = variant.getVersionName();
+                            }
+                        }
+                    }
+                }
 
                 // Build enriched map
                 Map<String, Object> orderMap = new LinkedHashMap<>();
@@ -327,6 +356,9 @@ public class OrderService {
                 orderMap.put("dealerStaffId", order.getDealerStaffId());
                 orderMap.put("dealerStaffName", staffName);
                 orderMap.put("modelId", order.getModelId());
+                orderMap.put("modelName", modelName);
+                orderMap.put("variantName", variantName);
+                orderMap.put("serialId", serialId);
                 orderMap.put("orderDate", order.getOrderDate());
                 orderMap.put("status", order.getStatus());
                 orderMap.put("detail", detail);
