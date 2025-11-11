@@ -25,7 +25,7 @@ public class getCustomerDebSummaryByDealerController extends HttpServlet {
     private final  PaymentService PS = new PaymentService();
     
     @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
         try {
             // Step 1: Validate and extract dealer staff info from JWT token
