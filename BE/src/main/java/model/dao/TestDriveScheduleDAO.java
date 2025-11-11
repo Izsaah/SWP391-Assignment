@@ -19,83 +19,71 @@ public class TestDriveScheduleDAO {
                 rs.getInt("appointment_id"),
                 rs.getInt("customer_id"),
                 rs.getString("serial_id"),
-                rs.getString("date"),
+                rs.getString("schedule_at"), // changed from "date"
                 rs.getString("status")
         );
     }
 
     public List<TestDriveScheduleDTO> retrieve(String condition, Object... params) {
         String sql = "SELECT * FROM " + TABLE_NAME + " WHERE " + condition;
-        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+        List<TestDriveScheduleDTO> list = new ArrayList<>();
+        try (Connection conn = DbUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
             for (int i = 0; i < params.length; i++) {
                 ps.setObject(i + 1, params[i]);
             }
-            ResultSet rs = ps.executeQuery();
-            List<TestDriveScheduleDTO> list = new ArrayList<>();
-            while (rs.next()) {
-                list.add(mapToTestDriveSchedule(rs));
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapToTestDriveSchedule(rs));
+                }
             }
-            return list;
+
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return null;
+        return list;
     }
 
-    public TestDriveScheduleDTO create(
-            int customer_id,
-            String serial_id,
-            String date,
-            String status) {
-
-        String checkSql = "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE serial_id = ? AND date = ?";
-        try ( Connection conn = DbUtils.getConnection();  PreparedStatement checkPs = conn.prepareStatement(checkSql)) {
+    public TestDriveScheduleDTO create(int customer_id, String serial_id, String scheduleAt, String status) throws ClassNotFoundException {
+        String checkSql = "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE serial_id = ? AND schedule_at = ?";
+        try (Connection conn = DbUtils.getConnection();
+             PreparedStatement checkPs = conn.prepareStatement(checkSql)) {
 
             checkPs.setString(1, serial_id);
-            checkPs.setString(2, date);
+            checkPs.setString(2, scheduleAt);
 
-            try ( ResultSet rs = checkPs.executeQuery()) {
-                if (rs.next() && rs.getInt(1) > 0) {
-                    return null;
-                }
+            try (ResultSet rs = checkPs.executeQuery()) {
+                if (rs.next() && rs.getInt(1) > 0) return null;
             }
+
         } catch (SQLException e) {
-            e.printStackTrace();
-            return null;
-        } catch (Exception e) {
             e.printStackTrace();
             return null;
         }
 
         String insertSql = "INSERT INTO " + TABLE_NAME
-                + " (customer_id, serial_id, date, status)"
-                + " VALUES (?, ?, ?, ?)";
+                + " (customer_id, serial_id, schedule_at, status) VALUES (?, ?, ?, ?)";
 
-        int generatedAppointmentId = -1;
-
-        try ( Connection conn = DbUtils.getConnection();  PreparedStatement insertPs = conn.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS)) {
+        try (Connection conn = DbUtils.getConnection();
+             PreparedStatement insertPs = conn.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS)) {
 
             insertPs.setInt(1, customer_id);
             insertPs.setString(2, serial_id);
-            insertPs.setString(3, date);
+            insertPs.setString(3, scheduleAt);
             insertPs.setString(4, status);
 
             int affectedRows = insertPs.executeUpdate();
-
             if (affectedRows > 0) {
-                try ( ResultSet rs = insertPs.getGeneratedKeys()) {
+                try (ResultSet rs = insertPs.getGeneratedKeys()) {
                     if (rs.next()) {
-                        generatedAppointmentId = rs.getInt(1);
+                        return new TestDriveScheduleDTO(rs.getInt(1), customer_id, serial_id, scheduleAt, status);
                     }
                 }
-
-                if (generatedAppointmentId != -1) {
-                    return new TestDriveScheduleDTO(generatedAppointmentId, customer_id, serial_id, date, status);
-                }
             }
+
         } catch (SQLException e) {
-            e.printStackTrace();
-        } catch (Exception e) {
             e.printStackTrace();
         }
 
@@ -107,89 +95,80 @@ public class TestDriveScheduleDAO {
         return (results != null && !results.isEmpty()) ? results.get(0) : null;
     }
 
-// Get a single test drive schedule for a customer filtered by dealer
-public TestDriveScheduleDTO getTestDriveScheduleByCustomerIdAndDealer(int customerId, int dealerId) throws ClassNotFoundException {
-    String query = "SELECT DISTINCT tds.appointment_id, tds.customer_id, tds.serial_id, tds.date, tds.status "
-            + "FROM TestDriveSchedule tds "
-            + "INNER JOIN [Order] o ON tds.customer_id = o.customer_id "
-            + "INNER JOIN [UserAccount] ua ON o.dealer_staff_id = ua.user_id "
-            + "WHERE tds.customer_id = ? AND ua.dealer_id = ?";
+    public TestDriveScheduleDTO getTestDriveScheduleByCustomerIdAndDealer(int customerId, int dealerId) throws ClassNotFoundException {
+        String query = "SELECT DISTINCT tds.appointment_id, tds.customer_id, tds.serial_id, tds.schedule_at, tds.status "
+                + "FROM TestDriveSchedule tds "
+                + "INNER JOIN [Order] o ON tds.customer_id = o.customer_id "
+                + "INNER JOIN [UserAccount] ua ON o.dealer_staff_id = ua.user_id "
+                + "WHERE tds.customer_id = ? AND ua.dealer_id = ?";
 
-    try (Connection conn = DbUtils.getConnection();
-         PreparedStatement ps = conn.prepareStatement(query)) {
+        try (Connection conn = DbUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(query)) {
 
-        ps.setInt(1, customerId);
-        ps.setInt(2, dealerId);
+            ps.setInt(1, customerId);
+            ps.setInt(2, dealerId);
 
-        try (ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) {
-                return new TestDriveScheduleDTO(
-                        rs.getInt("appointment_id"),
-                        rs.getInt("customer_id"),
-                        rs.getString("serial_id"),
-                        rs.getString("date"),
-                        rs.getString("status")
-                );
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new TestDriveScheduleDTO(
+                            rs.getInt("appointment_id"),
+                            rs.getInt("customer_id"),
+                            rs.getString("serial_id"),
+                            rs.getString("schedule_at"),
+                            rs.getString("status")
+                    );
+                }
             }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
 
-    } catch (SQLException e) {
-        e.printStackTrace();
+        return null;
     }
 
-    return null;
-}
+    public List<TestDriveScheduleDTO> getTestDriveSchedulesByDealer(int dealerId) throws ClassNotFoundException {
+        String query = "SELECT DISTINCT tds.appointment_id, tds.customer_id, tds.serial_id, tds.schedule_at, tds.status "
+                + "FROM TestDriveSchedule tds "
+                + "INNER JOIN [Order] o ON tds.customer_id = o.customer_id "
+                + "INNER JOIN [UserAccount] ua ON o.dealer_staff_id = ua.user_id "
+                + "WHERE ua.dealer_id = ?";
 
-// Get all test drive schedules for a dealer
-public List<TestDriveScheduleDTO> getTestDriveSchedulesByDealer(int dealerId) throws ClassNotFoundException {
-    String query = "SELECT DISTINCT tds.appointment_id, tds.customer_id, tds.serial_id, tds.date, tds.status "
-            + "FROM TestDriveSchedule tds "
-            + "INNER JOIN [Order] o ON tds.customer_id = o.customer_id "
-            + "INNER JOIN [UserAccount] ua ON o.dealer_staff_id = ua.user_id "
-            + "WHERE ua.dealer_id = ?";
+        List<TestDriveScheduleDTO> list = new ArrayList<>();
+        try (Connection conn = DbUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(query)) {
 
-    List<TestDriveScheduleDTO> list = new ArrayList<>();
-
-    try (Connection conn = DbUtils.getConnection();
-         PreparedStatement ps = conn.prepareStatement(query)) {
-
-        ps.setInt(1, dealerId);
-
-        try (ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                list.add(new TestDriveScheduleDTO(
-                        rs.getInt("appointment_id"),
-                        rs.getInt("customer_id"),
-                        rs.getString("serial_id"),
-                        rs.getString("date"),
-                        rs.getString("status")
-                ));
+            ps.setInt(1, dealerId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(new TestDriveScheduleDTO(
+                            rs.getInt("appointment_id"),
+                            rs.getInt("customer_id"),
+                            rs.getString("serial_id"),
+                            rs.getString("schedule_at"),
+                            rs.getString("status")
+                    ));
+                }
             }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
 
-    } catch (SQLException e) {
-        e.printStackTrace();
+        return list;
     }
-
-    return list;
-}
-
-
 
     public TestDriveScheduleDTO updateStatus(int appointment_id, String status) {
         String updateSql = "UPDATE " + TABLE_NAME + " SET status=? WHERE appointment_id=?";
-        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(updateSql)) {
+        try (Connection conn = DbUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(updateSql)) {
 
             ps.setString(1, status);
             ps.setInt(2, appointment_id);
 
             if (ps.executeUpdate() > 0) {
-
                 List<TestDriveScheduleDTO> results = retrieve("appointment_id=?", appointment_id);
-
-                if (results != null && !results.isEmpty()) {
-                    return results.get(0);
-                }
+                if (results != null && !results.isEmpty()) return results.get(0);
             }
 
         } catch (Exception e) {

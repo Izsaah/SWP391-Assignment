@@ -16,7 +16,7 @@ public class TestDriveScheduleService {
     /**
      * Create a new test drive schedule for a customer.
      */
-    public TestDriveScheduleDTO createTestDriveSchedule(int customerId, String serialId, String date) {
+    public TestDriveScheduleDTO createTestDriveSchedule(int customerId, String serialId, String date) throws ClassNotFoundException {
         if (customerId <= 0 || serialId == null || serialId.trim().isEmpty() || date == null || date.trim().isEmpty()) {
             throw new IllegalArgumentException("Invalid input parameters for creating test drive schedule.");
         }
