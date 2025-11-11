@@ -21,11 +21,11 @@ import utils.ResponseUtils;
  * @author ACER
  */
 @WebServlet("/api/staff/getCustomerDebt")
-public class getCustomerDebSummaryByDealerController extends HttpServlet {
+public class GetCustomerDebSummaryByDealerController extends HttpServlet {
     private final  PaymentService PS = new PaymentService();
     
     @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
         try {
             // Step 1: Validate and extract dealer staff info from JWT token
