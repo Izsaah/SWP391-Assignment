@@ -56,5 +56,21 @@ public class TestDriveScheduleService {
 
         return null;
     }
+    
+    public TestDriveScheduleDTO getTestDriveScheduleByCustomerAndDealer(int customerId, int dealerId) {
+        // Validate inputs
+        if (customerId <= 0 || dealerId <= 0) {
+            throw new IllegalArgumentException("Customer ID and Dealer ID must be positive numbers");
+        }
+
+        // Call DAO method
+        TestDriveScheduleDTO schedule = TDDAO.getTestDriveScheduleByCustomerIdAndDealer(customerId, dealerId);
+        
+        if (schedule == null) {
+            System.out.println("No test drive found for customer " + customerId + " at dealer " + dealerId);
+        }
+
+        return schedule;
+    }
 
 }

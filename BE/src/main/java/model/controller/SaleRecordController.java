@@ -10,7 +10,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import model.dto.SaleRecordDTO;
+import model.dto.UserAccountDTO;
 import model.service.SaleRecordService;
+import model.service.UserAccountService;
+import utils.JwtUtil;
 import utils.RequestUtils;
 import utils.ResponseUtils;
 
@@ -18,16 +21,27 @@ import utils.ResponseUtils;
 public class SaleRecordController extends HttpServlet {
 
     private final SaleRecordService service = new SaleRecordService();
+    private final UserAccountService userAccountService = new UserAccountService();
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
         try {
+            // Extract token and get dealer staff ID from JWT
+            String token = JwtUtil.extractToken(req);
+            int dealerStaffId = JwtUtil.extractUserId(token);
+            
+            // Get dealer staff user account using service layer
+            UserAccountDTO staff = userAccountService.getDealerStaffById(dealerStaffId);
+            
+            if (staff == null) {
+                ResponseUtils.error(resp, "Staff account not found");
+                return;
+            }
+            
+            // Extract date parameters from request
             Map<String, Object> params = RequestUtils.extractParams(req);
-
-            Object staffIdObj = params.get("dealerStaffId");
-            String staffIdParam = (staffIdObj == null) ? null : staffIdObj.toString();
             
             Object startDateObj = params.get("startDate");
             String startDate = (startDateObj == null) ? null : startDateObj.toString();
@@ -35,18 +49,12 @@ public class SaleRecordController extends HttpServlet {
             Object endDateObj = params.get("endDate");
             String endDate = (endDateObj == null) ? null : endDateObj.toString();
 
-            if (staffIdParam == null || staffIdParam.trim().isEmpty()) {
-                ResponseUtils.error(resp, "Missing required field: dealerStaffId");
-                return;
-            }
-
             if (startDate == null || startDate.trim().isEmpty() || endDate == null || endDate.trim().isEmpty()) {
                 ResponseUtils.error(resp, "Both 'startDate' and 'endDate' are required.");
                 return;
             }
 
-            int dealerStaffId = Integer.parseInt(staffIdParam);
-
+            // Get sales records for the authenticated staff
             List<SaleRecordDTO> sales = service.getCombinedSaleRecordsForStaffByDateRange(
                     dealerStaffId,
                     startDate,
@@ -59,8 +67,8 @@ public class SaleRecordController extends HttpServlet {
                 ResponseUtils.success(resp, "Successfully retrieved summarized sales records.", sales);
             }
 
-        } catch (NumberFormatException e) {
-            ResponseUtils.error(resp, "Invalid 'dealerStaffId': must be a number.");
+        } catch (utils.AuthException e) {
+            ResponseUtils.error(resp, "Authentication failed: " + e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
             ResponseUtils.error(resp, "Error fetching sales records: " + e.getMessage());

@@ -50,32 +50,11 @@ public class FeedBackService {
         return customer;
     }
 
-    public CustomerDTO getFeedbackByCustomerId(int customerId) {
-        try {
-            // Get customer by ID
-            List<CustomerDTO> customerList = CDAO.findById(customerId);
-
-            if (customerList == null || customerList.isEmpty()) {
-                return null;
-            }
-
-            // Get the first customer (should be only one with specific ID)
-            CustomerDTO customer = customerList.get(0);
-
-            // Get all feedbacks for this customer
-            List<FeedbackDTO> feedbacks = FDAO.getFeedbackByCustomerId(customerId);
-
-            if (feedbacks != null) {
-                customer.setFeedBackList(feedbacks);
-            } else {
-                customer.setFeedBackList(new ArrayList<>());
-            }
-
-            return customer;
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
+    public List<FeedbackDTO> getFeedbackByCustomerAndDealer(int customerId, int dealerId) {
+        if (customerId <= 0 || dealerId <= 0) {
+            throw new IllegalArgumentException("Customer ID and Dealer ID must be positive numbers");
         }
+
+        return FDAO.getFeedbackByCustomerIdAndDealer(customerId, dealerId);
     }
 }
