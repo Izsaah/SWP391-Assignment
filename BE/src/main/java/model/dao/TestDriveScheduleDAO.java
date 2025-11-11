@@ -157,8 +157,6 @@ public class TestDriveScheduleDAO {
 
         return list;
     }
-<<<<<<< HEAD
-=======
 public List<TestDriveScheduleDTO> getTestDriveSchedulesByDealerOrNone(Integer dealerId) throws ClassNotFoundException {
     String query = "SELECT tds.appointment_id, tds.customer_id, tds.serial_id, tds.schedule_at, tds.status, ua.dealer_id "
                  + "FROM TestDriveSchedule tds "
@@ -195,7 +193,6 @@ public List<TestDriveScheduleDTO> getTestDriveSchedulesByDealerOrNone(Integer de
 
     return list;
 }
->>>>>>> origin/master
 
     public TestDriveScheduleDTO updateStatus(int appointment_id, String status) {
         String updateSql = "UPDATE " + TABLE_NAME + " SET status=? WHERE appointment_id=?";
