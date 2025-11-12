@@ -9,6 +9,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import model.dto.VehicleModelDTO;
@@ -19,23 +20,29 @@ import utils.DbUtils;
  * @author Admin
  */
 public class VehicleModelDAO {
+
     private static final String TABLE_NAME = "VehicleModel";
+
     private VehicleModelDTO mapToVehicleModel(ResultSet rs) throws SQLException {
         return new VehicleModelDTO(
-            rs.getInt("model_id"),
-            rs.getString("model_name"),
-            rs.getString("description"),
-            rs.getBoolean("is_active")
+                rs.getInt("model_id"),
+                rs.getString("model_name"),
+                rs.getString("description"),
+                rs.getBoolean("is_active")
         );
     }
 
     public List<VehicleModelDTO> retrieve(String condition, Object... params) {
         String sql = "SELECT * FROM " + TABLE_NAME + " WHERE " + condition;
-        try (Connection conn = DbUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            for (int i = 0; i < params.length; i++) ps.setObject(i + 1, params[i]);
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+            for (int i = 0; i < params.length; i++) {
+                ps.setObject(i + 1, params[i]);
+            }
             ResultSet rs = ps.executeQuery();
             List<VehicleModelDTO> list = new ArrayList<>();
-            while (rs.next()) list.add(mapToVehicleModel(rs));
+            while (rs.next()) {
+                list.add(mapToVehicleModel(rs));
+            }
             return list;
         } catch (Exception e) {
             System.err.println("Error in retrieve(): " + e.getMessage());
@@ -43,29 +50,29 @@ public class VehicleModelDAO {
         }
         return null;
     }
-    
-    public List<VehicleModelDTO> viewAllVehicleModel(){
-         return retrieve("1 = 1");
+
+    public List<VehicleModelDTO> viewAllVehicleModel() {
+        return retrieve("1 = 1");
     }
-    
-    public List<VehicleModelDTO> viewVehicleModelIsActive(){
-         return retrieve("is_active = 1");
+
+    public List<VehicleModelDTO> viewVehicleModelIsActive() {
+        return retrieve("is_active = 1");
     }
-    public List<VehicleModelDTO> SearchVehicleModel(String model_name){
-        return retrieve("model_name=?",model_name);
+
+    public List<VehicleModelDTO> SearchVehicleModel(String model_name) {
+        return retrieve("model_name=?", model_name);
     }
 
     public List<VehicleModelDTO> viewVehicleModelById(int modelId) {
         return retrieve("model_id=?", modelId);
     }
-    
+
     public VehicleModelDTO create(String modelName, String description) {
         String sql = "INSERT INTO " + TABLE_NAME + " (model_name, description, is_active) VALUES (?, ?, 1)";
-        try (Connection conn = DbUtils.getConnection(); 
-             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, modelName);
             ps.setString(2, description);
-            
+
             int affectedRows = ps.executeUpdate();
             if (affectedRows > 0) {
                 ResultSet generatedKeys = ps.getGeneratedKeys();
@@ -83,12 +90,11 @@ public class VehicleModelDAO {
 
     public boolean update(int modelId, String modelName, String description) {
         String sql = "UPDATE " + TABLE_NAME + " SET model_name = ?, description = ? WHERE model_id = ?";
-        try (Connection conn = DbUtils.getConnection(); 
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, modelName);
             ps.setString(2, description);
             ps.setInt(3, modelId);
-            
+
             int affectedRows = ps.executeUpdate();
             return affectedRows > 0;
         } catch (Exception e) {
@@ -100,10 +106,9 @@ public class VehicleModelDAO {
 
     public boolean disable(int modelId) {
         String sql = "UPDATE " + TABLE_NAME + " SET is_active = 0 WHERE model_id = ?";
-        try (Connection conn = DbUtils.getConnection(); 
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, modelId);
-            
+
             int affectedRows = ps.executeUpdate();
             return affectedRows > 0;
         } catch (Exception e) {
@@ -115,10 +120,9 @@ public class VehicleModelDAO {
 
     public boolean enable(int modelId) {
         String sql = "UPDATE " + TABLE_NAME + " SET is_active = 1 WHERE model_id = ?";
-        try (Connection conn = DbUtils.getConnection(); 
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, modelId);
-            
+
             int affectedRows = ps.executeUpdate();
             return affectedRows > 0;
         } catch (Exception e) {
@@ -126,5 +130,37 @@ public class VehicleModelDAO {
             e.printStackTrace();
         }
         return false;
+    }
+
+    public double handleCalculateConsumptionRate(int modelId)
+            throws SQLException, ClassNotFoundException {
+
+        String sql
+                = "SELECT "
+                + "   COUNT(DISTINCT CASE WHEN o.customer_id > 0 THEN od.serial_id END) AS sold_serials "
+                + "FROM VehicleSerial vs "
+                + "INNER JOIN VehicleVariant vv ON vs.variant_id = vv.variant_id "
+                + "LEFT JOIN OrderDetail od ON vs.serial_id = od.serial_id "
+                + "LEFT JOIN [Order] o ON od.order_id = o.order_id "
+                + "WHERE vv.model_id = ? "
+                + "  AND (o.order_date IS NULL OR "
+                + // Cho phép serial chưa order
+                "       (YEAR(o.order_date) = YEAR(GETDATE()) AND MONTH(o.order_date) = MONTH(GETDATE())))";
+
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, modelId);
+
+            try ( ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    int soldSerials = rs.getInt("sold_serials");
+                    int daysInMonth = YearMonth.now().lengthOfMonth();
+
+                    return daysInMonth > 0 ? (double) soldSerials / daysInMonth : 0.0;
+                }
+            }
+        }
+
+        return 0.0;
     }
 }
