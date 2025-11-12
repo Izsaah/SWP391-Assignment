@@ -467,25 +467,20 @@ const CustomerDetail = () => {
       try {
         const result = await getTestDrivesByCustomerId(customerId);
         if (result.success && result.data) {
-          // Transform test drives to include vehicle names
           const transformedTestDrives = result.data.map((drive) => {
             const serialId = drive.serialId || drive.serial_id;
             let vehicleName = 'N/A';
-            
-            // Try to map serialId to vehicle name using vehiclesData
+
             if (serialId && serialId.length >= 3 && vehiclesData.length > 0) {
               const prefix = serialId.substring(0, 3).toUpperCase();
-              // Try to find matching model by prefix (e.g., FAL -> EV Falcon, HAW -> EV Hawk)
               const matchedModel = vehiclesData.find(model => {
                 const modelName = (model.modelName || model.name || '').toUpperCase();
-                // Extract first 3 chars from model name and compare
                 const modelPrefix = modelName.substring(0, Math.min(3, modelName.length)).replace(/\s/g, '');
-                // Check if model name contains the prefix or prefix matches model prefix
                 return modelName.includes(prefix) || 
                        prefix.includes(modelPrefix) ||
                        modelPrefix === prefix;
               });
-              
+
               if (matchedModel) {
                 vehicleName = matchedModel.modelName || matchedModel.name || `Model (${prefix})`;
               } else {
@@ -494,17 +489,25 @@ const CustomerDetail = () => {
             } else if (serialId) {
               vehicleName = `Serial: ${serialId}`;
             }
-            
+
+            const rawStatus = drive.status || drive.rawStatus || drive.raw_status || 'PENDING';
+            const statusStr = String(rawStatus || '').trim();
+            let baseStatus = statusStr;
+            if (statusStr.includes('_')) {
+              baseStatus = statusStr.substring(0, statusStr.lastIndexOf('_'));
+            }
+
             return {
               appointmentId: drive.appointmentId || drive.appointment_id || drive.id || 'N/A',
               serialId: serialId || 'N/A',
               vehicleName: vehicleName,
               date: drive.date || drive.scheduleDate || drive.schedule_at || 'N/A',
-              status: drive.status || 'Pending',
+              status: baseStatus || 'Pending',
+              rawStatus: statusStr,
               customerId: drive.customerId || drive.customer_id
             };
           });
-          
+
           setTestDrives(transformedTestDrives);
         } else {
           setTestDrives([]);
