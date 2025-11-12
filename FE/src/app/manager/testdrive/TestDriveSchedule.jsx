@@ -467,27 +467,7 @@ const TestDriveSchedule = () => {
             </div>
 
             {/* Drawer Footer */}
-            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 flex items-center justify-between space-x-3">
-              <div className="flex items-center space-x-2">
-                {selectedAppointment.status !== 'Completed' && selectedAppointment.status !== 'Cancelled' && (
-                  <button
-                    onClick={handleCancelAppointment}
-                    className="px-4 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 transition-colors flex items-center space-x-2"
-                  >
-                    <XCircle className="w-4 h-4" />
-                    <span>Cancel Appointment</span>
-                  </button>
-                )}
-                {selectedAppointment.status === 'Pending' && (
-                  <button
-                    onClick={handleMarkCompleted}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center space-x-2"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    <span>Mark Completed</span>
-                  </button>
-                )}
-              </div>
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 flex items-center justify-end space-x-3">
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setIsDrawerOpen(false)}

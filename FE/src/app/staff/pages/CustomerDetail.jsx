@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import Layout from '../layout/Layout';
 import { viewOrdersByCustomerId } from '../services/orderService';
 import { getCustomerById, getFeedbackByCustomerId, getTestDrivesByCustomerId } from '../services/customerDetailService';
-import { fetchInventory, fetchAllVariants } from '../services/inventoryService';
-import { createTestDrive } from '../services/testDriveService';
+import { fetchInventory } from '../services/inventoryService';
+import { createFeedback } from '../../manager/services/feedbackService';
 import {
   ChevronRight,
   Phone,
@@ -21,7 +21,10 @@ import {
   Clock,
   CheckCircle,
   ArrowLeft,
-  RefreshCw
+  RefreshCw,
+  X,
+  XCircle,
+  Loader2
 } from 'lucide-react';
 
 const CustomerDetail = () => {
@@ -38,11 +41,9 @@ const CustomerDetail = () => {
   const [loadingFeedbacks, setLoadingFeedbacks] = useState(false);
   const [vehicleMap, setVehicleMap] = useState(new Map()); // modelId -> modelName
   const [vehiclesData, setVehiclesData] = useState([]); // Store vehicles for serialId mapping
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [scheduleForm, setScheduleForm] = useState({ serialId: '', date: '' });
-  const [scheduling, setScheduling] = useState(false);
-  const [scheduleError, setScheduleError] = useState('');
-  const [availableSerials, setAvailableSerials] = useState([]);
+  const [showCreateFeedbackModal, setShowCreateFeedbackModal] = useState(false);
+  const [feedbackForm, setFeedbackForm] = useState({ orderId: '', type: 'Feedback', status: 'New', content: '' });
+  const [creatingFeedback, setCreatingFeedback] = useState(false);
 
   // Helper function to extract numeric customer ID from URL parameter
   // Handles formats like: "1", "C-1", or any string containing numbers
@@ -454,6 +455,30 @@ const CustomerDetail = () => {
     }
   }, [vehicleMap, customerId]);
 
+  // Parse status helper (same as TestDrives.jsx)
+  const parseStatus = useCallback((status) => {
+    if (!status) {
+      return { baseStatus: 'PENDING', encodedStatus: '', dealerId: null };
+    }
+    const statusStr = String(status).trim();
+    if (!statusStr.includes('_')) {
+      return {
+        baseStatus: statusStr.toUpperCase(),
+        encodedStatus: statusStr,
+        dealerId: null
+      };
+    }
+    const lastUnderscore = statusStr.lastIndexOf('_');
+    const baseStatus = statusStr.substring(0, lastUnderscore).toUpperCase();
+    const dealerIdPart = statusStr.substring(lastUnderscore + 1);
+    const dealerId = dealerIdPart && !Number.isNaN(Number(dealerIdPart)) ? Number(dealerIdPart) : null;
+    return {
+      baseStatus,
+      encodedStatus: statusStr,
+      dealerId
+    };
+  }, []);
+
   // Fetch test drives and map serialId to vehicle names
   useEffect(() => {
     const fetchTestDrives = async () => {
@@ -490,12 +515,8 @@ const CustomerDetail = () => {
               vehicleName = `Serial: ${serialId}`;
             }
 
-            const rawStatus = drive.status || drive.rawStatus || drive.raw_status || 'PENDING';
-            const statusStr = String(rawStatus || '').trim();
-            let baseStatus = statusStr;
-            if (statusStr.includes('_')) {
-              baseStatus = statusStr.substring(0, statusStr.lastIndexOf('_'));
-            }
+            const parsed = parseStatus(drive.status || drive.rawStatus || drive.raw_status || 'PENDING');
+            const baseStatus = parsed.baseStatus;
 
             return {
               appointmentId: drive.appointmentId || drive.appointment_id || drive.id || 'N/A',
@@ -503,7 +524,7 @@ const CustomerDetail = () => {
               vehicleName: vehicleName,
               date: drive.date || drive.scheduleDate || drive.schedule_at || 'N/A',
               status: baseStatus || 'Pending',
-              rawStatus: statusStr,
+              rawStatus: parsed.encodedStatus || drive.status,
               customerId: drive.customerId || drive.customer_id
             };
           });
@@ -522,7 +543,7 @@ const CustomerDetail = () => {
     };
     
     fetchTestDrives();
-  }, [customerId, vehiclesData]);
+  }, [customerId, vehiclesData, parseStatus]);
 
   // Fetch feedbacks
   useEffect(() => {
@@ -576,23 +597,38 @@ const CustomerDetail = () => {
     );
   };
 
+  // Get status badge (same as TestDrives.jsx)
   const getTestDriveStatusBadge = (status) => {
-    if (status === 'Completed') {
+    const statusLower = (status || '').toLowerCase().trim();
+    
+    if (statusLower === 'completed') {
       return (
-        <span className="inline-flex items-center text-green-600 text-sm">
-          <CheckCircle className="w-4 h-4 mr-1" />
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          <CheckCircle className="w-3 h-3 mr-1" />
           Completed
         </span>
       );
-    } else if (status === 'Scheduled') {
+    } else if (statusLower === 'pending') {
       return (
-        <span className="inline-flex items-center text-blue-600 text-sm">
-          <Clock className="w-4 h-4 mr-1" />
-          Scheduled
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+          <Clock className="w-3 h-3 mr-1" />
+          Pending
+        </span>
+      );
+    } else if (statusLower === 'cancelled' || statusLower === 'canceled') {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+          <XCircle className="w-3 h-3 mr-1" />
+          Cancelled
         </span>
       );
     }
-    return status;
+    
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+        {status || 'Unknown'}
+      </span>
+    );
   };
 
   // Customer detail is read-only for schedules; no inline status edits here
@@ -692,19 +728,17 @@ const CustomerDetail = () => {
 
               {/* Quick Actions */}
               <div className="space-y-1.5">
-              <button onClick={async ()=>{
-                  setScheduleError('');
-                  const serialsFromModels = Array.from(new Set(
-                    vehiclesData.flatMap(m => (Array.isArray(m.lists)? m.lists: []).map(v => v.serialId || v.serial_id).filter(Boolean))
-                  ));
-                  if (serialsFromModels.length > 0) {
-                    setAvailableSerials(serialsFromModels);
-                  } else {
-                    const variants = await fetchAllVariants();
-                    const serials = Array.from(new Set((variants || []).map(v => v.serialId || v.serial_id).filter(Boolean)));
-                    setAvailableSerials(serials);
-                  }
-                  setShowScheduleModal(true);
+              <button onClick={() => {
+                  navigate('/staff/customers/test-drives', {
+                    state: {
+                      customerData: {
+                        customerId: customerId,
+                        name: customer?.name || '',
+                        email: customer?.email || '',
+                        phone: customer?.phoneNumber || ''
+                      }
+                    }
+                  });
                 }} className="w-full bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors text-sm">
                   <Calendar className="w-4 h-4" />
                   <span>Schedule Test Drive</span>
@@ -811,102 +845,6 @@ const CustomerDetail = () => {
                           <p className="text-xs font-medium text-gray-900">{customer.address}</p>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Schedule Test Drive Modal */}
-                {showScheduleModal && (
-                  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-                      <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
-                        <h4 className="text-base font-semibold text-gray-900">Schedule Test Drive</h4>
-                        <button onClick={()=>setShowScheduleModal(false)} className="text-gray-500 hover:text-gray-700">&times;</button>
-                      </div>
-                      <form
-                        onSubmit={async (e) => {
-                          e.preventDefault();
-                          if (!customerId) return;
-                          if (!scheduleForm.serialId || !scheduleForm.date) {
-                            setScheduleError('Please select serial and date.');
-                            return;
-                          }
-                          setScheduling(true);
-                          setScheduleError('');
-                          try {
-                            const res = await createTestDrive({
-                              customer_id: customerId,
-                              serial_id: scheduleForm.serialId,
-                              date: scheduleForm.date,
-                              status: 'Pending'
-                            });
-                            if (res.success) {
-                              setShowScheduleModal(false);
-                              setScheduleForm({ serialId: '', date: '' });
-                              // refresh list
-                              try {
-                                const r = await getTestDrivesByCustomerId(customerId);
-                                if (r.success && r.data) {
-                                  const td = r.data.map((drive) => ({
-                                    appointmentId: drive.appointmentId || drive.appointment_id || drive.id || 'N/A',
-                                    serialId: drive.serialId || drive.serial_id,
-                                    vehicleName: drive.serialId || drive.serial_id,
-                                    date: drive.date || drive.scheduleDate || drive.schedule_at || 'N/A',
-                                    status: drive.status || 'Pending',
-                                    customerId: drive.customerId || drive.customer_id
-                                  }));
-                                  setTestDrives(td);
-                                }
-                              } catch {
-                                // Ignore refresh errors
-                              }
-                            } else {
-                              setScheduleError(res.message || 'Failed to create test drive.');
-                            }
-                          } catch {
-                            setScheduleError('Failed to create test drive. Make sure serial and date are selected.');
-                          } finally {
-                            setScheduling(false);
-                          }
-                        }}
-                        className="p-5 space-y-4"
-                      >
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Vehicle Serial ID</label>
-                          <select
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                            value={scheduleForm.serialId}
-                            onChange={(e)=>setScheduleForm(f=>({...f, serialId: e.target.value}))}
-                            required
-                          >
-                            <option value="">Select serial...</option>
-                            {availableSerials.map((serial, idx)=>(
-                              <option key={idx} value={serial}>{serial}</option>
-                            ))}
-                          </select>
-                          {availableSerials.length === 0 && (
-                            <p className="text-xs text-yellow-700 mt-1">No serials available. Please check inventory or try again later.</p>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
-                          <input
-                            type="date"
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                            value={scheduleForm.date}
-                            onChange={(e)=>setScheduleForm(f=>({...f, date: e.target.value}))}
-                            min={new Date().toISOString().slice(0,10)}
-                            required
-                          />
-                        </div>
-                        {scheduleError && <div className="text-xs text-red-600">{scheduleError}</div>}
-                        <div className="pt-2 flex justify-end space-x-2">
-                          <button type="button" onClick={()=>setShowScheduleModal(false)} className="px-4 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200">Cancel</button>
-                          <button type="submit" disabled={scheduling || !scheduleForm.serialId || !scheduleForm.date} className="px-4 py-2 text-sm rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-60">
-                            {scheduling ? 'Creating...' : 'Create'}
-                          </button>
-                        </div>
-                      </form>
                     </div>
                   </div>
                 )}
@@ -1050,7 +988,6 @@ const CustomerDetail = () => {
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Vehicle</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Status</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Created</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Action</th>
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
@@ -1060,18 +997,6 @@ const CustomerDetail = () => {
                                 <td className="px-4 py-4 text-sm text-gray-700">{order.vehicle}</td>
                                 <td className="px-4 py-4">{getQuoteStatusBadge(order.status)}</td>
                                 <td className="px-4 py-4 text-sm text-gray-700">{order.createdDate}</td>
-                                <td className="px-4 py-4">
-                                  <div className="flex items-center space-x-2">
-                                    <button className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors">
-                                      <Eye className="w-4 h-4 text-blue-600" />
-                                    </button>
-                                    {(order.status === 'Pending' || order.status === 'pending') && (
-                                      <button className="p-1.5 hover:bg-green-50 rounded-lg transition-colors">
-                                        <Edit className="w-4 h-4 text-green-600" />
-                                      </button>
-                                    )}
-                                  </div>
-                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -1086,20 +1011,18 @@ const CustomerDetail = () => {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold text-gray-900">Test Drive Schedule</h3>
-                      <button onClick={async ()=>{
-                        setScheduleError('');
-                        const serialsFromModels = Array.from(new Set(
-                          vehiclesData.flatMap(m => (Array.isArray(m.lists)? m.lists: []).map(v => v.serialId || v.serial_id).filter(Boolean))
-                        ));
-                        if (serialsFromModels.length > 0) {
-                          setAvailableSerials(serialsFromModels);
-                        } else {
-                          const variants = await fetchAllVariants();
-                          const serials = Array.from(new Set((variants || []).map(v => v.serialId || v.serial_id).filter(Boolean)));
-                          setAvailableSerials(serials);
-                        }
-                        setShowScheduleModal(true);
-                      }} className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
+                      <button onClick={() => {
+                          navigate('/staff/customers/test-drives', {
+                            state: {
+                              customerData: {
+                                customerId: customerId,
+                                name: customer?.name || '',
+                                email: customer?.email || '',
+                                phone: customer?.phoneNumber || ''
+                              }
+                            }
+                          });
+                        }} className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
                         <Plus className="w-4 h-4" />
                         <span className="text-sm font-medium">Schedule Test Drive</span>
                       </button>
@@ -1134,7 +1057,15 @@ const CustomerDetail = () => {
                                 </td>
                                 <td className="px-4 py-4 text-sm text-gray-700">{drive.serialId || 'N/A'}</td>
                                 <td className="px-4 py-4 text-sm text-gray-700">{drive.vehicleName || 'N/A'}</td>
-                                <td className="px-4 py-4 text-sm text-gray-700">{drive.date || 'N/A'}</td>
+                                <td className="px-4 py-4 text-sm text-gray-700">
+                                  {drive.date && drive.date !== 'N/A' 
+                                    ? new Date(drive.date).toLocaleDateString('en-US', {
+                                        month: 'long',
+                                        day: 'numeric',
+                                        year: 'numeric'
+                                      })
+                                    : 'N/A'}
+                                </td>
                                 <td className="px-4 py-4">{getTestDriveStatusBadge(drive.status || 'Scheduled')}</td>
                               </tr>
                             ))}
@@ -1150,6 +1081,20 @@ const CustomerDetail = () => {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold text-gray-900">Feedback & Complaints</h3>
+                      <button
+                        onClick={() => {
+                          if (orders.length === 0) {
+                            alert('No orders available. Please create an order first before adding feedback.');
+                            return;
+                          }
+                          setFeedbackForm({ orderId: '', type: 'Feedback', status: 'New', content: '' });
+                          setShowCreateFeedbackModal(true);
+                        }}
+                        className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span className="text-sm font-medium">Create Feedback</span>
+                      </button>
                     </div>
 
                     {loadingFeedbacks ? (
@@ -1168,49 +1113,39 @@ const CustomerDetail = () => {
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Date</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Type</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Feedback</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Rating</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Category</th>
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
                             {feedbacks.map((feedback, index) => {
-                              const feedbackDate = feedback.date || feedback.feedbackDate || 'N/A';
-                              const feedbackType = feedback.type || 'Feedback';
+                              // Format date from createdAt or created_at
+                              const rawDate = feedback.createdAt || feedback.created_at || feedback.date || feedback.feedbackDate || null;
+                              const feedbackDate = rawDate 
+                                ? new Date(rawDate).toLocaleDateString('en-GB', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric'
+                                  })
+                                : 'N/A';
+                              
+                              // Map type: "Feedback" or "Compliment" -> "Khen ngợi", "Complaint" -> "Complaint"
+                              const rawType = feedback.type || 'Feedback';
+                              const feedbackType = rawType === 'Complaint' ? 'Complaint' : 'Khen ngợi';
+                              
                               const feedbackContent = feedback.content || feedback.feedbackContent || 'N/A';
-                              const feedbackRating = feedback.rating || 0;
-                              const feedbackCategory = feedback.category || 'N/A';
                               
                               return (
-                                <tr key={feedback.id || index} className="hover:bg-gray-50">
+                                <tr key={feedback.feedbackId || feedback.feedback_id || feedback.id || index} className="hover:bg-gray-50">
                                   <td className="px-4 py-4 text-sm text-gray-700">{feedbackDate}</td>
                                   <td className="px-4 py-4">
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${
-                                      feedbackType === 'Feedback' 
-                                        ? 'bg-blue-100 text-blue-700 border-blue-200'
-                                        : 'bg-red-100 text-red-700 border-red-200'
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                      feedbackType === 'Complaint'
+                                        ? 'bg-red-100 text-red-700'
+                                        : 'bg-green-100 text-green-700'
                                     }`}>
                                       {feedbackType}
                                     </span>
                                   </td>
                                   <td className="px-4 py-4 text-sm text-gray-700">{feedbackContent}</td>
-                                  <td className="px-4 py-4">
-                                    <div className="flex items-center">
-                                      {[...Array(5)].map((_, i) => (
-                                        <svg
-                                          key={i}
-                                          className={`w-4 h-4 ${
-                                            i < feedbackRating ? 'text-yellow-400' : 'text-gray-300'
-                                          }`}
-                                          fill="currentColor"
-                                          viewBox="0 0 20 20"
-                                        >
-                                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                        </svg>
-                                      ))}
-                                      <span className="ml-2 text-sm text-gray-600">({feedbackRating})</span>
-                                    </div>
-                                  </td>
-                                  <td className="px-4 py-4 text-sm text-gray-700">{feedbackCategory}</td>
                                 </tr>
                               );
                             })}
@@ -1226,6 +1161,138 @@ const CustomerDetail = () => {
                       </div>
         </div>
       </div>
+
+      {/* Create Feedback Modal */}
+      {showCreateFeedbackModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-lg w-full">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold">Create Feedback</h3>
+              <button 
+                onClick={() => setShowCreateFeedbackModal(false)} 
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!customerId || !feedbackForm.orderId || !feedbackForm.content) {
+                  alert('Please fill in all required fields');
+                  return;
+                }
+                setCreatingFeedback(true);
+                try {
+                  const res = await createFeedback({
+                    customer_id: customerId,
+                    order_id: feedbackForm.orderId,
+                    type: feedbackForm.type,
+                    content: feedbackForm.content,
+                    status: feedbackForm.status
+                  });
+                  if (res.success) {
+                    setShowCreateFeedbackModal(false);
+                    setFeedbackForm({ orderId: '', type: 'Feedback', status: 'New', content: '' });
+                    // Refresh feedback list
+                    const result = await getFeedbackByCustomerId(customerId);
+                    if (result.success && result.data) {
+                      setFeedbacks(result.data || []);
+                    }
+                    alert('Feedback created successfully');
+                  } else {
+                    alert(res.message || 'Failed to create feedback');
+                  }
+                } catch (error) {
+                  console.error('Error creating feedback:', error);
+                  alert('Failed to create feedback');
+                } finally {
+                  setCreatingFeedback(false);
+                }
+              }}
+              className="p-4 space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
+                <div className="px-3 py-2 border border-gray-200 rounded bg-gray-50 text-sm">
+                  {customer?.name || `Customer ${customerId}`} (ID: {customerId})
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Order <span className="text-red-500">*</span></label>
+                <select
+                  value={feedbackForm.orderId}
+                  onChange={(e) => setFeedbackForm({ ...feedbackForm, orderId: e.target.value })}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Select order...</option>
+                  {orders.map(order => {
+                    const id = order.orderId || order.id?.replace('ORD-', '');
+                    return (
+                      <option key={id} value={id}>
+                        Order #{id} - {order.vehicle} - {order.price}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                  <select
+                    value={feedbackForm.type}
+                    onChange={(e) => setFeedbackForm({ ...feedbackForm, type: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="Feedback">Feedback</option>
+                    <option value="Complaint">Complaint</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={feedbackForm.status}
+                    onChange={(e) => setFeedbackForm({ ...feedbackForm, status: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="New">New</option>
+                    <option value="Assigned">Assigned</option>
+                    <option value="Resolved">Resolved</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Content <span className="text-red-500">*</span></label>
+                <textarea
+                  rows={4}
+                  value={feedbackForm.content}
+                  onChange={(e) => setFeedbackForm({ ...feedbackForm, content: e.target.value })}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Write customer feedback/complaint..."
+                />
+              </div>
+              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateFeedbackModal(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingFeedback}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded disabled:opacity-50 transition-colors"
+                >
+                  {creatingFeedback ? 'Creating...' : 'Create'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };

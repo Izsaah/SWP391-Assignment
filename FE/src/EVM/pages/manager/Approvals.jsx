@@ -18,6 +18,16 @@ const Approvals = () => {
     error: '',
     availableColors: [],
   });
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [customApprovalModal, setCustomApprovalModal] = useState({
+    open: false,
+    row: null,
+    versionName: '',
+    color: '',
+    unitPrice: '',
+    error: '',
+    availableColors: [],
+  });
   const [confirmModal, setConfirmModal] = useState({
     open: false,
     type: '', // 'approve' | 'reject'
@@ -34,6 +44,41 @@ const Approvals = () => {
     orderId: null,
     row: null,
   });
+
+  const getCustomerId = useCallback((entry) => {
+    if (!entry) return null;
+    const raw = entry.firstItem || entry;
+    const value =
+      raw?.customerId ??
+      raw?.customer_id ??
+      entry.customerId ??
+      entry.customer_id ??
+      null;
+    if (value === null || value === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }, []);
+
+  const isStaffCustomOrder = useCallback(
+    (entry) => {
+      const customerId = getCustomerId(entry);
+      return customerId != null && customerId > 0;
+    },
+    [getCustomerId]
+  );
+
+  const isManufacturerRequest = useCallback(
+    (entry) => {
+      const customerId = getCustomerId(entry);
+      return customerId == null || customerId === 0;
+    },
+    [getCustomerId]
+  );
+
+  const resolveIsCustom = useCallback(
+    (entry) => isStaffCustomOrder(entry),
+    [isStaffCustomOrder]
+  );
 
   const getCustomerId = useCallback((entry) => {
     if (!entry) return null;
@@ -133,6 +178,12 @@ const Approvals = () => {
         return typeFilter === 'custom' ? isCustom : !isCustom;
       });
     }
+    if (typeFilter !== 'all') {
+      data = data.filter((i) => {
+        const isCustom = resolveIsCustom(i);
+        return typeFilter === 'custom' ? isCustom : !isCustom;
+      });
+    }
     if (query) {
       const q = query.toLowerCase();
       data = data.filter((i) =>
@@ -142,6 +193,7 @@ const Approvals = () => {
       );
     }
     return data;
+  }, [items, query, onlyPending, typeFilter, isRowRejected, resolveIsCustom]);
   }, [items, query, onlyPending, typeFilter, isRowRejected, resolveIsCustom]);
 
   const handleDecision = async (row, decision, extra = {}) => {
@@ -240,6 +292,41 @@ const Approvals = () => {
     closeCustomApprovalModal();
   };
 
+  const closeCustomApprovalModal = () => {
+    setCustomApprovalModal({
+      open: false,
+      row: null,
+      versionName: '',
+      color: '',
+      unitPrice: '',
+      error: '',
+      availableColors: [],
+    });
+  };
+
+  const submitCustomApproval = async () => {
+    if (!customApprovalModal.row) return;
+    const versionName = customApprovalModal.versionName.trim();
+    const color = customApprovalModal.color.trim();
+    const unitPriceValue = Number(customApprovalModal.unitPrice);
+
+    if (!versionName || !color || !Number.isFinite(unitPriceValue) || unitPriceValue <= 0) {
+      setCustomApprovalModal((prev) => ({
+        ...prev,
+        error: 'Please provide version name, color, and a valid unit price greater than 0.',
+      }));
+      return;
+    }
+
+    setCustomApprovalModal((prev) => ({ ...prev, error: '' }));
+    await handleDecision(customApprovalModal.row, 'Agree', {
+      versionName,
+      color,
+      unitPrice: unitPriceValue,
+    });
+    closeCustomApprovalModal();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -284,6 +371,18 @@ const Approvals = () => {
             <option value="standard">Standard</option>
           </select>
         </div>
+        <div className="flex items-center gap-2 text-sm text-gray-700">
+          <span>Type:</span>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          >
+            <option value="all">All</option>
+            <option value="custom">Custom</option>
+            <option value="standard">Standard</option>
+          </select>
+        </div>
       </div>
 
       {error && (
@@ -296,6 +395,7 @@ const Approvals = () => {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Model</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Color</th>
@@ -321,6 +421,7 @@ const Approvals = () => {
                 const isApproved = row.isApproved ?? (agreementLower === 'agree' || agreementLower === 'approved');
               const isRejected = row.isRejected ?? (agreementLower === 'reject' || agreementLower === 'rejected' || agreementLower === 'disagree' || agreementLower === 'disagreed');
                 const isCustomOrder = isStaffCustomOrder(row);
+                const isCustomOrder = isStaffCustomOrder(row);
 
               if (isRejected) {
                 return null;
@@ -329,6 +430,17 @@ const Approvals = () => {
                 return (
                   <tr key={`${orderId}-${idx}`} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">#{orderId}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1 ${
+                          isCustomOrder
+                            ? 'bg-purple-100 text-purple-800'
+                            : 'bg-sky-100 text-sky-800'
+                        }`}
+                      >
+                        {isCustomOrder ? 'Custom' : 'Standard'}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1 ${
@@ -368,6 +480,25 @@ const Approvals = () => {
                       <div className="flex items-center gap-2">
                         <button
                           disabled={!isPending || loading}
+                          onClick={() => {
+                            const baseRow = row.firstItem || row;
+                            if (isStaffCustomOrder(baseRow)) {
+                              setCustomApprovalModal({
+                                open: true,
+                                row: baseRow,
+                                versionName: '',
+                                color: '',
+                                unitPrice: '',
+                                error: '',
+                                availableColors:
+                                  (row.availableColors && row.availableColors.length > 0
+                                    ? row.availableColors
+                                    : baseRow.availableColors) || [],
+                              });
+                            } else {
+                              openConfirmModal(baseRow, 'approve');
+                            }
+                          }}
                           onClick={() => {
                             const baseRow = row.firstItem || row;
                             if (isStaffCustomOrder(baseRow)) {

@@ -22,6 +22,7 @@ import { createTestDrive, updateTestDriveStatus, getTestDrivesByCustomerId, getD
 const TestDrives = () => {
   const location = useLocation();
   const vehicleData = location.state?.vehicleData;
+  const customerData = location.state?.customerData;
   const [testDrives, setTestDrives] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -175,20 +176,57 @@ const TestDrives = () => {
     loadTestDrives();
   }, [vehicles.length, fetchAllTestDrives]);
 
-  // Auto-open create modal and pre-fill vehicle data when coming from Inventory
+  // Auto-open create modal and pre-fill data when coming from Inventory or Customer Detail
   useEffect(() => {
-    if (vehicleData && customers.length > 0) {
-      // Pre-fill form with vehicle data
-      if (vehicleData.serialId) {
-        setFormData(prev => ({
-          ...prev,
-          serialId: vehicleData.serialId,
-        }));
+    if (customers.length > 0) {
+      if (customerData) {
+        // Pre-select customer when coming from Customer Detail
+        const customerId = customerData.customerId;
+        if (customerId) {
+          setFormData(prev => ({
+            ...prev,
+            customerId: String(customerId),
+            customerName: customerData.name || ''
+          }));
+          
+          // Check for existing schedule
+          (async () => {
+            try {
+              const res = await getTestDrivesByCustomerId(parseInt(customerId));
+              const scheduleData = res.success && res.data && res.data.length > 0 ? res.data[0] : null;
+              if (scheduleData) {
+                const parsed = parseStatus(scheduleData.status || '');
+                setExistingSchedule({
+                  ...scheduleData,
+                  status: parsed.baseStatus || scheduleData.status,
+                  rawStatus: parsed.encodedStatus || scheduleData.status,
+                  dealerId: parsed.dealerId
+                });
+              } else {
+                setExistingSchedule(null);
+              }
+              setAllowReplace(false);
+            } catch {
+              setExistingSchedule(null);
+              setAllowReplace(false);
+            }
+          })();
+        }
+        // Auto-open the create modal
+        setShowCreateModal(true);
+      } else if (vehicleData) {
+        // Pre-fill form with vehicle data when coming from Inventory
+        if (vehicleData.serialId) {
+          setFormData(prev => ({
+            ...prev,
+            serialId: vehicleData.serialId,
+          }));
+        }
+        // Auto-open the create modal
+        setShowCreateModal(true);
       }
-      // Auto-open the create modal
-      setShowCreateModal(true);
     }
-  }, [vehicleData, customers]);
+  }, [vehicleData, customerData, customers, parseStatus]);
 
   // Filter test drives
   const filteredTestDrives = testDrives.filter(drive => {

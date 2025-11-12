@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import Layout from '../layout/Layout';
 import { viewOrdersByCustomerId } from '../../staff/services/orderService';
-import { getCustomerById, getTestDrivesByCustomerId } from '../../staff/services/customerDetailService';
-import { getFeedbackByCustomer, createFeedback } from '../services/feedbackService';
+import { getCustomerById, getTestDrivesByCustomerId, getFeedbackByCustomerId } from '../../staff/services/customerDetailService';
+import { createFeedback } from '../services/feedbackService';
 import { fetchInventory } from '../../staff/services/inventoryService';
 import { getCompletedPayments, getCustomersWithActiveInstallments } from '../../staff/services/paymentService';
 import {
@@ -18,10 +18,10 @@ import {
   MessageSquare,
   Edit,
   Plus,
-  Eye,
+  ArrowLeft,
   Clock,
   CheckCircle,
-  ArrowLeft,
+  XCircle,
   RefreshCw,
   Users,
   TrendingUp,
@@ -49,25 +49,6 @@ const CustomerDetail = () => {
   const [creatingFeedback, setCreatingFeedback] = useState(false);
   const [feedbackForm, setFeedbackForm] = useState({ orderId: '', type: 'Feedback', status: 'New', content: '' });
 
-  const normalizeTestDriveStatus = (status) => {
-    if (!status) return 'Pending';
-    const base = status.includes('_') ? status.substring(0, status.lastIndexOf('_')) : status;
-    const normalized = base.toLowerCase();
-    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-  };
-
-  const formatTestDriveDate = (value) => {
-    if (!value) return 'N/A';
-    try {
-      return new Date(value).toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      });
-    } catch {
-      return value;
-    }
-  };
 
   // Helper function to extract numeric customer ID from URL parameter
   // Handles formats like: "1", "C-1", or any string containing numbers
@@ -515,6 +496,35 @@ const CustomerDetail = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paymentMap]);
 
+
+  // Fetch feedbacks
+  useEffect(() => {
+    const fetchFeedbacks = async () => {
+      if (!customerId) {
+        setLoadingFeedbacks(false);
+        setFeedbacks([]);
+        return;
+      }
+      
+      setLoadingFeedbacks(true);
+      try {
+        const result = await getFeedbackByCustomerId(customerId);
+        if (result.success && result.data) {
+          setFeedbacks(result.data || []);
+        } else {
+          setFeedbacks([]);
+        }
+      } catch (error) {
+        console.error('Error fetching feedbacks:', error);
+        setFeedbacks([]);
+      } finally {
+        setLoadingFeedbacks(false);
+      }
+    };
+    
+    fetchFeedbacks();
+  }, [customerId]);
+
   // Fetch test drives and map serialId to vehicle names
   useEffect(() => {
     const fetchTestDrives = async () => {
@@ -574,7 +584,6 @@ const CustomerDetail = () => {
         }
       } catch {
         // Error is already handled in the service, just set empty array
-        // Don't log as error since 404 is expected if endpoint doesn't exist
         setTestDrives([]);
       } finally {
         setLoadingTestDrives(false);
@@ -584,33 +593,58 @@ const CustomerDetail = () => {
     fetchTestDrives();
   }, [customerId, vehiclesData]);
 
-  // Fetch feedbacks
-  useEffect(() => {
-    const fetchFeedbacks = async () => {
-      if (!customerId) {
-        setLoadingFeedbacks(false);
-        setFeedbacks([]);
-        return;
-      }
-      
-      setLoadingFeedbacks(true);
-      try {
-        const result = await getFeedbackByCustomer(customerId);
-        if (result.success && result.data) {
-          setFeedbacks(result.data || []);
-        } else {
-          setFeedbacks([]);
-        }
-      } catch (error) {
-        console.error('Error fetching feedbacks:', error);
-        setFeedbacks([]);
-      } finally {
-        setLoadingFeedbacks(false);
-      }
-    };
+  const normalizeTestDriveStatus = (status) => {
+    if (!status) return 'Pending';
+    const base = status.includes('_') ? status.substring(0, status.lastIndexOf('_')) : status;
+    const normalized = base.toLowerCase();
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  };
+
+  const formatTestDriveDate = (value) => {
+    if (!value) return 'N/A';
+    try {
+      return new Date(value).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    } catch {
+      return value;
+    }
+  };
+
+  const getTestDriveStatusBadge = (status) => {
+    const statusLower = (status || '').toLowerCase().trim();
     
-    fetchFeedbacks();
-  }, [customerId]);
+    if (statusLower === 'completed') {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          <CheckCircle className="w-3 h-3 mr-1" />
+          Completed
+        </span>
+      );
+    } else if (statusLower === 'pending') {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+          <Clock className="w-3 h-3 mr-1" />
+          Pending
+        </span>
+      );
+    } else if (statusLower === 'cancelled' || statusLower === 'canceled') {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+          <XCircle className="w-3 h-3 mr-1" />
+          Cancelled
+        </span>
+      );
+    }
+    
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+        {status || 'Unknown'}
+      </span>
+    );
+  };
 
   const getQuoteStatusBadge = (status) => {
     // Normalize status to handle case-insensitive matching
@@ -636,24 +670,6 @@ const CustomerDetail = () => {
     );
   };
 
-  const getTestDriveStatusBadge = (status) => {
-    if (status === 'Completed') {
-      return (
-        <span className="inline-flex items-center text-green-600 text-sm">
-          <CheckCircle className="w-4 h-4 mr-1" />
-          Completed
-        </span>
-      );
-    } else if (status === 'Scheduled') {
-      return (
-        <span className="inline-flex items-center text-blue-600 text-sm">
-          <Clock className="w-4 h-4 mr-1" />
-          Scheduled
-        </span>
-      );
-    }
-    return status;
-  };
 
   // Helper function to mask phone number
   const maskPhone = (phone) => {
@@ -892,7 +908,21 @@ const CustomerDetail = () => {
 
               {/* Quick Actions */}
               <div className="space-y-1.5">
-                <button className="w-full bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors text-sm">
+                <button 
+                  onClick={() => {
+                    navigate('/manager/test-drive', {
+                      state: {
+                        customerData: {
+                          customerId: customerId,
+                          name: customer?.name || '',
+                          email: customer?.email || '',
+                          phone: customer?.phoneNumber || ''
+                        }
+                      }
+                    });
+                  }}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors text-sm"
+                >
                   <Calendar className="w-4 h-4" />
                   <span>Schedule Test Drive</span>
                 </button>
@@ -1331,7 +1361,6 @@ const CustomerDetail = () => {
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Status</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Created</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Staff</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Action</th>
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
@@ -1350,18 +1379,6 @@ const CustomerDetail = () => {
                                       <span className="text-xs text-gray-400">N/A</span>
                                   )}
                                 </td>
-                                  <td className="px-4 py-4">
-                                    <button
-                                      onClick={() => {
-                                        // Navigate to order detail or open modal
-                                        console.log('View order:', order);
-                                      }}
-                                      className="text-blue-600 hover:text-blue-900 p-1.5 hover:bg-blue-50 rounded-lg transition-colors"
-                                      title="View order details"
-                                    >
-                                      <Eye className="w-4 h-4" />
-                                    </button>
-                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -1377,7 +1394,21 @@ const CustomerDetail = () => {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold text-gray-900">Test Drive Schedule</h3>
-                      <button className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
+                      <button 
+                        onClick={() => {
+                          navigate('/manager/test-drive', {
+                            state: {
+                              customerData: {
+                                customerId: customerId,
+                                name: customer?.name || '',
+                                email: customer?.email || '',
+                                phone: customer?.phoneNumber || ''
+                              }
+                            }
+                          });
+                        }}
+                        className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
+                      >
                         <Plus className="w-4 h-4" />
                         <span className="text-sm font-medium">Schedule Test Drive</span>
                       </button>
@@ -1386,17 +1417,18 @@ const CustomerDetail = () => {
                     {loadingTestDrives ? (
                       <div className="text-center py-8">
                         <p className="text-gray-600">Loading test drives...</p>
-                            </div>
+                      </div>
                     ) : testDrives.length === 0 ? (
                       <div className="text-center py-8">
                         <p className="text-gray-600">No test drives scheduled for this customer.</p>
-                            </div>
+                      </div>
                     ) : (
                       <div className="overflow-x-auto">
                         <table className="w-full">
                           <thead className="bg-gray-50">
                             <tr>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">TestDrive ID</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Serial</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Vehicle</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Date</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Status</th>
@@ -1408,16 +1440,25 @@ const CustomerDetail = () => {
                                 <td className="px-4 py-4 text-sm font-medium text-gray-900">
                                   {drive.appointmentId !== 'N/A' ? `TD-${drive.appointmentId}` : 'N/A'}
                                 </td>
+                                <td className="px-4 py-4 text-sm text-gray-700">{drive.serialId || 'N/A'}</td>
                                 <td className="px-4 py-4 text-sm text-gray-700">{drive.vehicleName || 'N/A'}</td>
-                                <td className="px-4 py-4 text-sm text-gray-700">{drive.date || 'N/A'}</td>
-                                <td className="px-4 py-4">{getTestDriveStatusBadge(drive.status || 'Scheduled')}</td>
+                                <td className="px-4 py-4 text-sm text-gray-700">
+                                  {drive.date && drive.date !== 'N/A' 
+                                    ? new Date(drive.date).toLocaleDateString('en-US', {
+                                        month: 'long',
+                                        day: 'numeric',
+                                        year: 'numeric'
+                                      })
+                                    : 'N/A'}
+                                </td>
+                                <td className="px-4 py-4">{getTestDriveStatusBadge(drive.status || 'Pending')}</td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
-                          </div>
+                      </div>
                     )}
-                        </div>
+                  </div>
                 )}
 
                 {/* Feedback Tab */}
@@ -1450,53 +1491,42 @@ const CustomerDetail = () => {
                         <table className="w-full">
                           <thead className="bg-gray-50">
                             <tr>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Feedback ID</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Order ID</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Type</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Status</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Content</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Date</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Type</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Feedback</th>
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
                             {feedbacks.map((feedback, index) => {
-                              const feedbackId = feedback.feedbackId || feedback.feedback_id || feedback.id || `FB-${index + 1}`;
-                              const orderId = feedback.orderId || feedback.order_id || 'N/A';
-                              const feedbackType = feedback.type || 'Feedback';
-                              const feedbackStatus = feedback.status || 'New';
-                              const feedbackContent = feedback.content || 'N/A';
-                              const feedbackDate = feedback.createdAt || feedback.created_at || feedback.date || 'N/A';
+                              // Format date from createdAt or created_at
+                              const rawDate = feedback.createdAt || feedback.created_at || feedback.date || feedback.feedbackDate || null;
+                              const feedbackDate = rawDate 
+                                ? new Date(rawDate).toLocaleDateString('en-GB', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric'
+                                  })
+                                : 'N/A';
+                              
+                              // Map type: "Feedback" or "Compliment" -> "Khen ngợi", "Complaint" -> "Complaint"
+                              const rawType = feedback.type || 'Feedback';
+                              const feedbackType = rawType === 'Complaint' ? 'Complaint' : 'Khen ngợi';
+                              
+                              const feedbackContent = feedback.content || feedback.feedbackContent || 'N/A';
                               
                               return (
-                                <tr key={feedbackId} className="hover:bg-gray-50">
-                                  <td className="px-4 py-4 text-sm font-medium text-gray-900">{feedbackId}</td>
-                                  <td className="px-4 py-4 text-sm text-gray-700">{orderId}</td>
+                                <tr key={feedback.feedbackId || feedback.feedback_id || feedback.id || index} className="hover:bg-gray-50">
+                                  <td className="px-4 py-4 text-sm text-gray-700">{feedbackDate}</td>
                                   <td className="px-4 py-4">
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${
-                                      feedbackType === 'Feedback' 
-                                        ? 'bg-blue-100 text-blue-700 border-blue-200'
-                                        : 'bg-red-100 text-red-700 border-red-200'
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                      feedbackType === 'Complaint'
+                                        ? 'bg-red-100 text-red-700'
+                                        : 'bg-green-100 text-green-700'
                                     }`}>
                                       {feedbackType}
                                     </span>
                                   </td>
-                                  <td className="px-4 py-4">
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${
-                                      feedbackStatus === 'Resolved' 
-                                        ? 'bg-green-100 text-green-700 border-green-200'
-                                        : feedbackStatus === 'Assigned'
-                                        ? 'bg-blue-100 text-blue-700 border-blue-200'
-                                        : 'bg-yellow-100 text-yellow-700 border-yellow-200'
-                                    }`}>
-                                      {feedbackStatus}
-                                    </span>
-                                  </td>
-                                  <td className="px-4 py-4 text-sm text-gray-700 max-w-xs truncate" title={feedbackContent}>
-                                    {feedbackContent}
-                                  </td>
-                                  <td className="px-4 py-4 text-sm text-gray-700">
-                                    {feedbackDate !== 'N/A' ? formatDate(feedbackDate) : 'N/A'}
-                                  </td>
+                                  <td className="px-4 py-4 text-sm text-gray-700">{feedbackContent}</td>
                                 </tr>
                               );
                             })}
@@ -1546,7 +1576,7 @@ const CustomerDetail = () => {
                     setShowCreateFeedbackModal(false);
                     setFeedbackForm({ orderId: '', type: 'Feedback', status: 'New', content: '' });
                     // Refresh feedback list
-                    const result = await getFeedbackByCustomer(customerId);
+                    const result = await getFeedbackByCustomerId(customerId);
                     if (result.success && result.data) {
                       setFeedbacks(result.data || []);
                     }

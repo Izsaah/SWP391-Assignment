@@ -118,6 +118,15 @@ const Payment = () => {
             customerPhone: customer.phoneNumber || 'N/A',
             customerAddress: customer.address || 'N/A',
             
+            // Vehicle info (from backend) ✅
+            modelId: customer.modelId || null,
+            modelName: customer.modelName || 'N/A',
+            variantId: customer.variantId || null,
+            variantName: customer.variantName || 'N/A',
+            color: customer.color || 'N/A',
+            serialId: customer.serialId || 'N/A',
+            quantity: customer.quantity || '1',
+            
             // Payment info (from backend - calculated values) ✅
             paymentId: paymentId || null,
             orderId: orderId || null,
@@ -444,7 +453,15 @@ const Payment = () => {
              // Additional fields from backend response
              phone: payment.phoneNumber || payment.phone || payment.customerPhone || 'N/A',
              email: payment.email || payment.customerEmail || 'N/A',
-             vehicle: vehicleName // Vehicle name from backend
+             vehicle: vehicleName, // Vehicle name from backend
+             // Vehicle info (from backend) ✅
+             modelId: payment.modelId || null,
+             modelName: payment.modelName || vehicleName || 'N/A',
+             variantId: payment.variantId || null,
+             variantName: payment.variantName || 'N/A',
+             color: payment.color || 'N/A',
+             serialId: payment.serialId || 'N/A',
+             quantity: payment.quantity || '1'
            };
          });
          setCompletedPayments(transformedData);
@@ -487,57 +504,28 @@ const Payment = () => {
   const handleViewInvoice = async (payment, paymentType = 'installment') => {
     setInvoiceModal({ open: true, loading: true, error: '', data: null });
     try {
-      let order = null;
-      if (payment.customerId) {
-        const ordersResult = await viewOrdersByCustomerId(payment.customerId);
-        if (ordersResult.success && Array.isArray(ordersResult.data) && ordersResult.data.length > 0) {
-          if (payment.orderId) {
-            order =
-              ordersResult.data.find((o) => {
-                const oid =
-                  o.orderId ??
-                  o.order_id ??
-                  o.OrderId ??
-                  null;
-                return oid && Number(oid) === Number(payment.orderId);
-              }) ?? ordersResult.data[0];
-          } else {
-            order = ordersResult.data[0];
-          }
-        }
-      }
-
-      const detail = order?.detail || null;
-      const vehicleInfo = detail
-        ? {
-            model: detail.vehicleName || detail.modelName || (order?.modelName ?? (order?.modelId ? `Model ${order.modelId}` : 'N/A')),
-            variant: detail.variantName || detail.versionName || 'N/A',
-            color: detail.color || 'N/A',
-            serial: detail.serialId || 'N/A',
-            quantity: detail.quantity || '1',
-            unitPrice: detail.unitPrice || 0,
-          }
-        : {
-            model: payment.vehicle || (order?.modelName ?? (order?.modelId ? `Model ${order.modelId}` : 'N/A')),
-            variant: 'N/A',
-            color: payment.color || 'N/A',
-            serial: payment.serialId || 'N/A',
-            quantity: payment.quantity || '1',
-            unitPrice: payment.unitPrice || payment.amount || 0,
-          };
+      // ✅ Get all information directly from payment object (from backend API)
+      const vehicleInfo = {
+        model: payment.modelName || payment.vehicle || 'N/A',
+        variant: payment.variantName || 'N/A',
+        color: payment.color || 'N/A',
+        serial: payment.serialId || 'N/A',
+        quantity: payment.quantity || '1',
+        unitPrice: payment.unitPrice || (payment.totalAmount ? payment.totalAmount / parseFloat(payment.quantity || '1') : 0),
+      };
 
       const invoiceData = {
         paymentType,
         customer: {
-          name: payment.customerName || order?.customerName || 'N/A',
-          email: payment.customerEmail || payment.email || order?.customerEmail || 'N/A',
-          phone: payment.customerPhone || payment.phone || order?.customerPhone || 'N/A',
-          address: payment.customerAddress || order?.customerAddress || 'N/A',
+          name: payment.customerName || payment.name || 'N/A',
+          email: payment.customerEmail || payment.email || 'N/A',
+          phone: payment.customerPhone || payment.phone || payment.phoneNumber || 'N/A',
+          address: payment.customerAddress || payment.address || 'N/A',
         },
         order: {
-          orderId: payment.orderId || order?.orderId || order?.order_id || 'N/A',
-          orderDate: order?.orderDate || null,
-          salesperson: order?.dealerStaffName || 'N/A',
+          orderId: payment.orderId || 'N/A',
+          orderDate: payment.paymentDate || null,
+          salesperson: 'N/A',
         },
         payment: {
           total: payment.totalAmount ?? payment.amount ?? 0,
@@ -547,7 +535,7 @@ const Payment = () => {
           remainingMonths: payment.currentTermMonth ?? null,
           interestRate: payment.interestRate ?? null,
           status: payment.status || 'ACTIVE',
-          paymentDate: payment.paymentDate || order?.orderDate || null,
+          paymentDate: payment.paymentDate || null,
           method: payment.method || (paymentType === 'installment' ? 'TG' : 'TT'),
           planId: payment.planId ?? null,
         },
@@ -1722,10 +1710,6 @@ const Payment = () => {
                         <div>
                           <span className="font-medium text-gray-900">Variant:</span>{' '}
                           {invoiceModal.data?.vehicle?.variant || 'N/A'}
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-900">Color:</span>{' '}
-                          {invoiceModal.data?.vehicle?.color || 'N/A'}
                         </div>
                         <div>
                           <span className="font-medium text-gray-900">Serial / VIN:</span>{' '}
