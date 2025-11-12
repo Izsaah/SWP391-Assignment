@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '../layout/Layout';
-import { Plus, Eye, Edit2, Trash2, FileText, CheckCircle, Loader2, RefreshCw, AlertTriangle, X, Search } from 'lucide-react';
+import { Plus, Eye, Edit2, Trash2, FileText, CheckCircle, Loader2, RefreshCw, AlertTriangle, X, Search, Sparkles } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router';
 import { createOrder, viewOrdersByStaffId } from '../services/orderService';
 import { createPayment } from '../services/paymentService';
@@ -86,6 +86,41 @@ const OrderForm = () => {
     internalNotes: '',
     attachments: [],
   });
+
+  const isCustomOrder = formData.source === 'Custom';
+
+const activateCustomMode = useCallback(() => {
+  setSelectedVariant(null);
+  setFormData(prev => ({
+    ...prev,
+    source: 'Custom',
+    model: '',
+    modelId: '',
+    variantId: '',
+    basePrice: '',
+    discountCode: '',
+    discountAmount: '0',
+    totalPrice: '',
+    paymentMethod: 'Full Payment',
+    remainingAmount: '',
+    monthlyPayment: '',
+  }));
+}, []);
+
+const deactivateCustomMode = useCallback(() => {
+  setSelectedVariant(null);
+  setFormData(prev => ({
+    ...prev,
+    source: 'From Inventory',
+    model: '',
+    modelId: '',
+    variantId: '',
+    basePrice: '',
+    discountCode: '',
+    discountAmount: '0',
+    totalPrice: '',
+  }));
+}, []);
 
   // Transform backend OrderDTO to order form format
   const transformOrderToOrderForm = (order, customerName = null) => {
@@ -229,60 +264,66 @@ const OrderForm = () => {
     console.log('🚗 Selecting vehicle model:', model);
     
     setFormData(prev => {
+      const wasCustom = prev.source === 'Custom';
       const newData = {
         ...prev,
         model: model.modelName || model.name,
         modelId: model.modelId || model.id,
         vehicleId: model.modelId || model.id,
+        variantId: null
       };
-      
-      // If model has a default price, auto-fill it
-      // Check multiple possible price field names from BE
-      const modelPrice = model.basePrice || model.price || model.unitPrice || model.modelPrice || 0;
-      if (modelPrice > 0) {
-        newData.basePrice = modelPrice.toString();
-        // Auto-calculate total price (without VAT)
-        const baseNum = parseFloat(modelPrice);
-        const discountNum = parseFloat(prev.discountAmount || 0);
-        const qty = parseFloat(prev.quantity || 1);
-        const afterDiscount = (baseNum - discountNum) * qty;
-        newData.totalPrice = afterDiscount.toString();
-        console.log('💰 Auto-filled price:', modelPrice, 'Total:', afterDiscount);
+      if (wasCustom) {
+        newData.basePrice = '';
+        newData.totalPrice = '';
+        newData.discountCode = '';
+        newData.discountAmount = '0';
       } else {
-        console.log('⚠️ No price found in model, user must enter manually');
+        const modelPrice = model.basePrice || model.price || model.unitPrice || model.modelPrice || 0;
+        if (modelPrice > 0) {
+          newData.basePrice = modelPrice.toString();
+          const baseNum = parseFloat(modelPrice);
+          const discountNum = parseFloat(prev.discountAmount || 0);
+          const qty = parseFloat(prev.quantity || 1);
+          const afterDiscount = (baseNum - discountNum) * qty;
+          newData.totalPrice = afterDiscount.toString();
+          console.log('💰 Auto-filled price:', modelPrice, 'Total:', afterDiscount);
+        } else {
+          console.log('⚠️ No price found in model, user must enter manually');
+        }
       }
-      
+      newData.source = wasCustom ? 'Custom' : 'From Inventory';
       return newData;
     });
     setSelectedVariant(null);
   }, []);
 
+
   // Handle variant selection
   const handleVariantSelect = useCallback((variant, model) => {
     setSelectedVariant(variant);
     setFormData(prev => {
+      const wasCustom = prev.source === 'Custom';
       const basePrice = variant.price || 0;
       const newFormData = {
         ...prev,
         variantId: variant.variantId,
         color: variant.color || 'White',
-        basePrice: basePrice.toString(),
         model: model.modelName,
         modelId: model.modelId,
+        basePrice: wasCustom ? '' : basePrice.toString(),
       };
-      
-      // Calculate total price (without VAT)
-      const baseNum = parseFloat(basePrice) || 0;
-      const discountNum = parseFloat(prev.discountAmount || 0);
-      const qty = parseFloat(prev.quantity || 1);
-      
-      const afterDiscount = (baseNum - discountNum) * qty;
-      // No VAT calculation
-      
-      return {
-        ...newFormData,
-        totalPrice: afterDiscount.toString(),
-      };
+
+      if (wasCustom) {
+        newFormData.totalPrice = '';
+      } else {
+        const baseNum = parseFloat(basePrice) || 0;
+        const discountNum = parseFloat(prev.discountAmount || 0);
+        const qty = parseFloat(prev.quantity || 1);
+        const afterDiscount = (baseNum - discountNum) * qty;
+        newFormData.totalPrice = afterDiscount.toString();
+      }
+
+      return newFormData;
     });
   }, []);
 
@@ -402,6 +443,7 @@ const OrderForm = () => {
 
   // Calculate installment details (remaining amount and monthly payment)
   useEffect(() => {
+    if (isCustomOrder) return;
     if (formData.paymentMethod === 'Installment' && formData.totalPrice) {
       const totalPriceNum = parseFloat(formData.totalPrice) || 0;
       const months = parseInt(formData.installmentMonths) || 12;
@@ -454,8 +496,8 @@ const OrderForm = () => {
     }
     
     // Validate other required fields
-    if (!formData.modelId || !formData.basePrice) {
-      alert('Please fill in all required fields: Customer, Vehicle Model, and Price.');
+    if (!formData.modelId || (!isCustomOrder && !formData.basePrice)) {
+      alert('Please fill in all required fields: Customer and Vehicle Model.');
       return;
     }
 
@@ -468,28 +510,55 @@ const OrderForm = () => {
       }
       console.log('✅ Extracted dealerStaffId from JWT token:', dealerStaffId);
 
-      // Calculate unit price from total price and quantity
-      const totalPrice = parseFloat(formData.totalPrice || formData.basePrice || 0);
-      const quantity = parseInt(formData.quantity || '1');
-      const unitPrice = quantity > 0 ? totalPrice / quantity : totalPrice;
+      const parsedQuantity = parseInt(formData.quantity || '1', 10);
+      const quantity = Number.isNaN(parsedQuantity) || parsedQuantity <= 0 ? 1 : parsedQuantity;
 
-      // Use the already validated customerIdNum
-      const orderData = {
+      const baseOrderData = {
         customerId: customerIdNum,
         dealerstaffId: dealerStaffId,
-        modelId: parseInt(formData.modelId),
-        variantId: formData.variantId ? parseInt(formData.variantId) : null,
-        quantity: quantity,
-        unitPrice: unitPrice, // Send unit price to backend
-        basePrice: formData.basePrice || totalPrice.toString(), // Also send basePrice as fallback
-        totalPrice: totalPrice.toString(), // Also send totalPrice as fallback
+        modelId: parseInt(formData.modelId, 10),
+        variantId: formData.variantId ? parseInt(formData.variantId, 10) : null,
+        quantity,
         status: 'Pending',
-        isCustom: false
+        isCustom: isCustomOrder
       };
 
-      console.log('📤 Creating order with data:', orderData);
+      let orderData;
+      if (isCustomOrder) {
+        orderData = {
+          ...baseOrderData
+        };
+      } else {
+        const totalPrice = parseFloat(formData.totalPrice || formData.basePrice || 0);
+        const unitPrice = quantity > 0 ? totalPrice / quantity : totalPrice;
+        orderData = {
+          ...baseOrderData,
+          unitPrice
+        };
+      }
+
+      const payload = {
+        ...orderData,
+        customerId: Number(orderData.customerId),
+        dealerstaffId: Number(orderData.dealerstaffId),
+        modelId: Number(orderData.modelId),
+        quantity: Number(orderData.quantity),
+        status: orderData.status || 'Pending',
+      };
+
+      if (payload.variantId == null) {
+        delete payload.variantId;
+      }
+
+      if (isCustomOrder) {
+        delete payload.unitPrice;
+      } else {
+        payload.unitPrice = Number(orderData.unitPrice || 0);
+      }
+
+      console.log('📤 Creating order with data:', payload);
       
-      const orderResult = await createOrder(orderData);
+      const orderResult = await createOrder(payload);
       
       if (!orderResult.success) {
         alert(`❌ Failed to create order: ${orderResult.message}`);
@@ -508,6 +577,21 @@ const OrderForm = () => {
       }
 
       console.log('✅ Order created successfully, orderId:', orderId);
+
+      if (isCustomOrder) {
+        alert(
+          `✅ Custom vehicle request submitted!\n\n` +
+          `📋 Order ID: ${orderId}\n` +
+          `👤 Customer: ${formData.customer || 'N/A'}\n` +
+          `🚗 Model: ${formData.model || 'Pending selection'}\n\n` +
+          `The request has been sent to the EVM team for approval. You will be notified if it is approved or rejected.`
+        );
+
+        setIsCreateModalOpen(false);
+        resetForm();
+        await reloadAllOrders();
+        return;
+      }
 
       // Wait a moment for order to be fully committed to database
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -1255,9 +1339,6 @@ const OrderForm = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Date
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -1339,11 +1420,6 @@ const OrderForm = () => {
                           hour: '2-digit',
                           minute: '2-digit'
                         })}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center space-x-2">
-                        {/* Actions can be added here if needed */}
                       </div>
                     </td>
                   </tr>
@@ -1568,97 +1644,120 @@ const OrderForm = () => {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {vehicles.map((model) => (
-                        <div 
-                          key={model.modelId} 
-                          className={`border-2 rounded-lg p-4 relative transition-all ${
-                            formData.modelId === model.modelId 
-                              ? 'border-green-500 bg-green-50' 
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                          style={{ pointerEvents: 'auto', cursor: 'default' }}
-                        >
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex-1">
-                              <h4 className="font-semibold text-gray-900">{model.modelName}</h4>
-                              <p className="text-xs text-gray-500 mt-1">{model.description}</p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                console.log('🔘 Button clicked for model:', model);
-                                handleVehicleModelSelect(model);
-                              }}
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                              }}
-                              onMouseUp={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                              }}
-                              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer relative z-10 active:scale-95 ${
-                                formData.modelId === model.modelId
-                                  ? 'bg-green-600 text-white hover:bg-green-700 shadow-md'
-                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow'
-                              }`}
-                              style={{ 
-                                pointerEvents: 'auto',
-                                WebkitTapHighlightColor: 'transparent',
-                                touchAction: 'manipulation'
-                              }}
-                            >
-                              {formData.modelId === model.modelId ? '✓ Selected' : 'Select Model'}
-                            </button>
+                      <div
+                        onClick={() => (isCustomOrder ? deactivateCustomMode() : activateCustomMode())}
+                        className={`border-2 rounded-lg p-4 transition-all cursor-pointer relative ${
+                          isCustomOrder
+                            ? 'border-purple-500 bg-purple-50 shadow-md'
+                            : 'border-dashed border-purple-300 bg-purple-50/60 hover:border-purple-500 hover:bg-purple-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                              <Sparkles className="w-5 h-5 text-purple-500" />
+                              Custom Vehicle Request
+                            </h4>
+                            <p className="text-xs text-gray-500 mt-1 max-w-xl">
+                              Send a special build request to the EVM team. After approval, continue the customer process from this order list.
+                            </p>
                           </div>
-                          
-                          {formData.modelId === model.modelId && model.lists && model.lists.length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-gray-200">
-                              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                Select Variant <span className="text-red-500">*</span>
-                              </label>
-                              <div className="grid grid-cols-2 gap-2">
-                                {model.lists.map((variant) => (
-                                  <button
-                                    type="button"
-                                    key={variant.variantId}
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      console.log('🔘 Variant clicked:', variant);
-                                      handleVariantSelect(variant, model);
-                                    }}
-                                    className={`text-left p-3 border-2 rounded-lg transition-all cursor-pointer ${
-                                      formData.variantId === variant.variantId
-                                        ? 'border-blue-500 bg-blue-50'
-                                        : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
-                                    } ${!variant.isActive ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                    disabled={!variant.isActive}
-                                    style={{ pointerEvents: variant.isActive ? 'auto' : 'none' }}
-                                  >
-                                    <div className="font-semibold text-gray-900">{variant.versionName || 'Standard'}</div>
-                                    <div className="text-xs text-gray-600 mt-1">Color: {variant.color}</div>
-                                    <div className="text-sm font-bold text-green-600 mt-1">
-                                      {formatCurrency(variant.price || 0)}
-                                    </div>
-                                    {!variant.isActive && (
-                                      <div className="text-xs text-red-600 mt-1">Inactive</div>
-                                    )}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {formData.modelId === model.modelId && (!model.lists || model.lists.length === 0) && (
-                            <div className="mt-3 pt-3 border-t border-gray-200 text-sm text-yellow-600">
-                              ⚠️ No variants available for this model. A variant will be auto-generated when creating the order.
-                            </div>
-                          )}
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                              isCustomOrder ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 border border-purple-400'
+                            }`}
+                          >
+                            {isCustomOrder ? 'Selected' : 'Tap to use'}
+                          </span>
                         </div>
-                      ))}
+                        {isCustomOrder ? (
+                          <p className="text-xs text-purple-700 mt-3">
+                            Custom mode enabled. Pricing & payment inputs are locked until EVM approval. Select a base model below (optional).
+                          </p>
+                        ) : (
+                          <p className="text-xs text-purple-600 mt-3">
+                            Need a configuration that is not in stock? Choose this option to create a custom order for EVM approval.
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {vehicles.map((model) => {
+                          const isSelected = formData.modelId === model.modelId;
+                          return (
+                            <div
+                              key={model.modelId}
+                              onClick={() => handleVehicleModelSelect(model)}
+                              className={`border-2 rounded-lg p-4 transition-all cursor-pointer ${
+                                isSelected ? 'border-green-500 bg-green-50 shadow-sm' : 'border-gray-200 hover:border-green-400 hover:shadow'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1">
+                                  <h4 className="font-semibold text-gray-900">{model.modelName}</h4>
+                                  <p className="text-xs text-gray-500 mt-1">{model.description}</p>
+                                </div>
+                                <span
+                                  className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                    isSelected ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600'
+                                  }`}
+                                >
+                                  {isSelected ? 'Selected' : 'Select'}
+                                </span>
+                              </div>
+
+                              {isSelected && !isCustomOrder && model.lists && model.lists.length > 0 && (
+                                <div className="mt-3 pt-3 border-t border-gray-200">
+                                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Select Variant <span className="text-red-500">*</span>
+                                  </label>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {model.lists.map((variant) => (
+                                      <button
+                                        type="button"
+                                        key={variant.variantId}
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          handleVariantSelect(variant, model);
+                                        }}
+                                        className={`text-left p-3 border-2 rounded-lg transition-all cursor-pointer ${
+                                          formData.variantId === variant.variantId
+                                            ? 'border-blue-500 bg-blue-50'
+                                            : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
+                                        } ${!variant.isActive ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        disabled={!variant.isActive}
+                                        style={{ pointerEvents: variant.isActive ? 'auto' : 'none' }}
+                                      >
+                                        <div className="font-semibold text-gray-900">{variant.versionName || 'Standard'}</div>
+                                        <div className="text-xs text-gray-600 mt-1">Color: {variant.color}</div>
+                                        <div className="text-sm font-bold text-green-600 mt-1">
+                                          {formatCurrency(variant.price || 0)}
+                                        </div>
+                                        {!variant.isActive && (
+                                          <div className="text-xs text-red-600 mt-1">Inactive</div>
+                                        )}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {isSelected && !isCustomOrder && (!model.lists || model.lists.length === 0) && (
+                                <div className="mt-3 pt-3 border-t border-gray-200 text-sm text-yellow-600">
+                                  ⚠️ No variants available for this model. A variant will be auto-generated when creating the order.
+                                </div>
+                              )}
+
+                              {isSelected && isCustomOrder && (
+                                <div className="mt-3 pt-3 border-t border-gray-200 text-sm text-purple-700">
+                                  Variant selection is not required. EVM will set version and color during approval.
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 
@@ -1701,10 +1800,11 @@ const OrderForm = () => {
                       <input
                         type="number"
                         name="basePrice"
-                        value={formData.basePrice}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                        placeholder="1,020,000,000"
+                      value={isCustomOrder ? '' : formData.basePrice}
+                      onChange={handleInputChange}
+                      disabled={isCustomOrder}
+                      className={`w-full px-4 py-2.5 border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${isCustomOrder ? 'border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed' : 'border-gray-300'}`}
+                      placeholder={isCustomOrder ? 'Provided after EVM approval' : '1,020,000,000'}
                       />
                     </div>
 
@@ -1777,9 +1877,15 @@ const OrderForm = () => {
                       Total Price (₫) <span className="text-xs text-gray-500">*Auto-calculated</span>
                     </label>
                     <div className="w-full px-4 py-3 bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-400 rounded-lg">
-                      <span className="text-blue-800 font-bold text-xl">
-                        {formatCurrency(parseFloat(formData.totalPrice) || 0)}
-                      </span>
+                      {isCustomOrder ? (
+                        <span className="text-blue-800 font-semibold text-sm">
+                          Pending EVM approval. Pricing will be assigned after approval.
+                        </span>
+                      ) : (
+                        <span className="text-blue-800 font-bold text-xl">
+                          {formatCurrency(parseFloat(formData.totalPrice) || 0)}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -1813,11 +1919,12 @@ const OrderForm = () => {
                           key={method}
                           type="button"
                           onClick={() => setFormData(prev => ({ ...prev, paymentMethod: method }))}
+                          disabled={isCustomOrder}
                           className={`p-4 rounded-lg border-2 font-semibold transition-all ${
-                            formData.paymentMethod === method
+                            formData.paymentMethod === method && !isCustomOrder
                               ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
                               : 'border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50'
-                          }`}
+                          } ${isCustomOrder ? 'bg-gray-100 text-gray-400 cursor-not-allowed hover:border-gray-300 hover:bg-gray-100' : ''}`}
                         >
                           <div className="flex items-center justify-center space-x-2">
                             <span className="text-2xl">{method === 'Full Payment' ? '💵' : '🏦'}</span>
@@ -1895,6 +2002,11 @@ const OrderForm = () => {
                         )}
                       </div>
                     )}
+                    {isCustomOrder && (
+                      <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-800">
+                        Payment details will be entered after the EVM team approves the custom build.
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1931,7 +2043,7 @@ const OrderForm = () => {
                 <div className="flex items-center space-x-4">
                   <button
                     onClick={handleConfirmAndCreate}
-                    disabled={!formData.customerId || !formData.modelId || !formData.basePrice}
+                    disabled={!formData.customerId || !formData.modelId || (!isCustomOrder && !formData.basePrice)}
                     className="flex items-center space-x-2 px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed shadow-lg"
                   >
                     <span className="text-xl">✅</span>

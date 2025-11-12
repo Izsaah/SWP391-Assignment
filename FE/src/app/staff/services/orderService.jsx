@@ -44,6 +44,67 @@ export const createOrder = async (orderData) => {
 };
 
 /**
+ * Create a dealer custom order (special request to manufacturer/EVM)
+ * Backend endpoint: POST /api/staff/createOrderFromDealer
+ * @param {Object} payload - { modelId, quantity, variantId?, status?, isCustom? }
+ * @returns {Promise<{success:boolean,message:string,data?:any}>}
+ */
+export const createDealerCustomOrder = async (payload) => {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      return { success: false, message: 'Authentication token not found. Please log in again.' };
+    }
+
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+
+    if (API_URL?.includes('ngrok')) {
+      headers['ngrok-skip-browser-warning'] = 'true';
+    }
+
+    const body = {
+      status: 'Pending',
+      isCustom: true,
+      ...payload,
+    };
+
+    // Ensure numeric fields are numbers
+    if (body.modelId != null) body.modelId = Number(body.modelId);
+    if (body.variantId != null && body.variantId !== '') body.variantId = Number(body.variantId);
+    else delete body.variantId;
+    if (body.quantity != null) body.quantity = Number(body.quantity);
+
+    const response = await axios.post(
+      `${API_URL}/staff/createOrderFromDealer`,
+      body,
+      { headers }
+    );
+
+    if (response.data && response.data.status === 'success') {
+      return {
+        success: true,
+        message: response.data.message || 'Custom order submitted successfully',
+        data: response.data.data
+      };
+    }
+
+    return {
+      success: false,
+      message: response.data?.message || 'Failed to create custom order'
+    };
+  } catch (error) {
+    console.error('Error creating custom dealer order:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Failed to create custom order'
+    };
+  }
+};
+
+/**
  * View orders by customer ID
  * Backend endpoint: POST /api/staff/viewOrdersByCustomerId
  * Gets orders for a specific customer, filtered by the logged-in staff's dealer

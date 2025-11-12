@@ -8,6 +8,16 @@ const Approvals = () => {
   const [items, setItems] = useState([]);
   const [query, setQuery] = useState('');
   const [onlyPending, setOnlyPending] = useState(false);
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [customApprovalModal, setCustomApprovalModal] = useState({
+    open: false,
+    row: null,
+    versionName: '',
+    color: '',
+    unitPrice: '',
+    error: '',
+    availableColors: [],
+  });
   const [confirmModal, setConfirmModal] = useState({
     open: false,
     type: '', // 'approve' | 'reject'
@@ -24,6 +34,41 @@ const Approvals = () => {
     orderId: null,
     row: null,
   });
+
+  const getCustomerId = useCallback((entry) => {
+    if (!entry) return null;
+    const raw = entry.firstItem || entry;
+    const value =
+      raw?.customerId ??
+      raw?.customer_id ??
+      entry.customerId ??
+      entry.customer_id ??
+      null;
+    if (value === null || value === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }, []);
+
+  const isStaffCustomOrder = useCallback(
+    (entry) => {
+      const customerId = getCustomerId(entry);
+      return customerId != null && customerId > 0;
+    },
+    [getCustomerId]
+  );
+
+  const isManufacturerRequest = useCallback(
+    (entry) => {
+      const customerId = getCustomerId(entry);
+      return customerId == null || customerId === 0;
+    },
+    [getCustomerId]
+  );
+
+  const resolveIsCustom = useCallback(
+    (entry) => isStaffCustomOrder(entry),
+    [isStaffCustomOrder]
+  );
 
   const disallowedAgreements = useMemo(
     () => new Set(['reject', 'rejected', 'disagree', 'disagreed', 'disapprove', 'disapproved']),
@@ -82,6 +127,12 @@ const Approvals = () => {
         return !['agree', 'approved'].includes(agreement);
       });
     }
+    if (typeFilter !== 'all') {
+      data = data.filter((i) => {
+        const isCustom = resolveIsCustom(i);
+        return typeFilter === 'custom' ? isCustom : !isCustom;
+      });
+    }
     if (query) {
       const q = query.toLowerCase();
       data = data.filter((i) =>
@@ -91,7 +142,7 @@ const Approvals = () => {
       );
     }
     return data;
-  }, [items, query, onlyPending, isRowRejected]);
+  }, [items, query, onlyPending, typeFilter, isRowRejected, resolveIsCustom]);
 
   const handleDecision = async (row, decision, extra = {}) => {
     const resolvedOrderId = row?.orderId || row?.order_id || null;
@@ -154,6 +205,41 @@ const Approvals = () => {
     await handleDecision(row, decision);
   };
 
+  const closeCustomApprovalModal = () => {
+    setCustomApprovalModal({
+      open: false,
+      row: null,
+      versionName: '',
+      color: '',
+      unitPrice: '',
+      error: '',
+      availableColors: [],
+    });
+  };
+
+  const submitCustomApproval = async () => {
+    if (!customApprovalModal.row) return;
+    const versionName = customApprovalModal.versionName.trim();
+    const color = customApprovalModal.color.trim();
+    const unitPriceValue = Number(customApprovalModal.unitPrice);
+
+    if (!versionName || !color || !Number.isFinite(unitPriceValue) || unitPriceValue <= 0) {
+      setCustomApprovalModal((prev) => ({
+        ...prev,
+        error: 'Please provide version name, color, and a valid unit price greater than 0.',
+      }));
+      return;
+    }
+
+    setCustomApprovalModal((prev) => ({ ...prev, error: '' }));
+    await handleDecision(customApprovalModal.row, 'Agree', {
+      versionName,
+      color,
+      unitPrice: unitPriceValue,
+    });
+    closeCustomApprovalModal();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -186,6 +272,18 @@ const Approvals = () => {
           <input type="checkbox" checked={onlyPending} onChange={(e) => setOnlyPending(e.target.checked)} />
           Show only pending
         </label>
+        <div className="flex items-center gap-2 text-sm text-gray-700">
+          <span>Type:</span>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          >
+            <option value="all">All</option>
+            <option value="custom">Custom</option>
+            <option value="standard">Standard</option>
+          </select>
+        </div>
       </div>
 
       {error && (
@@ -198,6 +296,7 @@ const Approvals = () => {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Model</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Color</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
@@ -221,6 +320,7 @@ const Approvals = () => {
               const agreementLower = agreementRaw ? agreementRaw.toString().toLowerCase().trim() : '';
                 const isApproved = row.isApproved ?? (agreementLower === 'agree' || agreementLower === 'approved');
               const isRejected = row.isRejected ?? (agreementLower === 'reject' || agreementLower === 'rejected' || agreementLower === 'disagree' || agreementLower === 'disagreed');
+                const isCustomOrder = isStaffCustomOrder(row);
 
               if (isRejected) {
                 return null;
@@ -229,6 +329,17 @@ const Approvals = () => {
                 return (
                   <tr key={`${orderId}-${idx}`} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">#{orderId}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1 ${
+                          isCustomOrder
+                            ? 'bg-purple-100 text-purple-800'
+                            : 'bg-sky-100 text-sky-800'
+                        }`}
+                      >
+                        {isCustomOrder ? 'Custom' : 'Standard'}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{model}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{color}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{quantity}</td>
@@ -257,7 +368,25 @@ const Approvals = () => {
                       <div className="flex items-center gap-2">
                         <button
                           disabled={!isPending || loading}
-                          onClick={() => openConfirmModal(row.firstItem || row, 'approve')}
+                          onClick={() => {
+                            const baseRow = row.firstItem || row;
+                            if (isStaffCustomOrder(baseRow)) {
+                              setCustomApprovalModal({
+                                open: true,
+                                row: baseRow,
+                                versionName: '',
+                                color: '',
+                                unitPrice: '',
+                                error: '',
+                                availableColors:
+                                  (row.availableColors && row.availableColors.length > 0
+                                    ? row.availableColors
+                                    : baseRow.availableColors) || [],
+                              });
+                            } else {
+                              openConfirmModal(baseRow, 'approve');
+                            }
+                          }}
                           className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium ${
                             isPending ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-200 text-gray-500 cursor-not-allowed'
                           }`}
@@ -323,6 +452,105 @@ const Approvals = () => {
                 } disabled:opacity-60`}
               >
                 {confirmModal.type === 'approve' ? 'Confirm Approve' : 'Confirm Reject'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {customApprovalModal.open && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-5">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Approve Custom Order</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Provide the final variant details before approving order #
+                {customApprovalModal.row?.orderId || customApprovalModal.row?.order_id}.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Version Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={customApprovalModal.versionName}
+                  onChange={(e) =>
+                    setCustomApprovalModal((prev) => ({ ...prev, versionName: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., Falcon AWD Signature"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Color <span className="text-red-500">*</span>
+                </label>
+                {customApprovalModal.availableColors?.length ? (
+                  <select
+                    value={customApprovalModal.color}
+                    onChange={(e) =>
+                      setCustomApprovalModal((prev) => ({ ...prev, color: e.target.value }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select a color...</option>
+                    {customApprovalModal.availableColors.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={customApprovalModal.color}
+                    onChange={(e) =>
+                      setCustomApprovalModal((prev) => ({ ...prev, color: e.target.value }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter color"
+                  />
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Unit Price (₫) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={customApprovalModal.unitPrice}
+                  onChange={(e) =>
+                    setCustomApprovalModal((prev) => ({ ...prev, unitPrice: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter unit price"
+                />
+              </div>
+              {customApprovalModal.error && (
+                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-2">
+                  {customApprovalModal.error}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={closeCustomApprovalModal}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitCustomApproval}
+                disabled={loading}
+                className="px-4 py-2 text-sm rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-60"
+              >
+                Approve Custom Order
               </button>
             </div>
           </div>
