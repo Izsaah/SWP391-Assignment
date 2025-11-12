@@ -136,25 +136,38 @@ export const getTestDrivesByCustomerId = async (customerId) => {
     );
 
     if (response.data && response.data.status === 'success') {
-      // Backend returns a single test drive object, convert to array
-      const testDrive = response.data.data;
-      
-      if (testDrive) {
+      const payload = response.data.data;
+
+      if (Array.isArray(payload)) {
         return {
           success: true,
-          data: [testDrive] // Return as array for consistency
+          data: payload
         };
       }
-    }
-    
-    // If backend returns error with "not found" message, return empty array (not an error)
-    if (response.data?.message?.includes('not found') || response.data?.message?.includes('No test drive')) {
+
+      if (payload) {
+        return {
+          success: true,
+          data: [payload]
+        };
+      }
+
       return {
         success: true,
         data: []
       };
     }
-    
+
+    // If backend returns error with "not found" message, return empty array (not an error)
+    const message = response.data?.message;
+    const normalizedMessage = typeof message === 'string' ? message.toLowerCase() : '';
+    if (normalizedMessage.includes('not found') || normalizedMessage.includes('no test drive')) {
+      return {
+        success: true,
+        data: []
+      };
+    }
+
     return {
       success: true,
       data: []

@@ -34,6 +34,8 @@ import PromotionDetail from './app/manager/promotions/PromotionDetail';
 import DebtReport from './app/manager/reports/DebtReport';
 import SalesPerformance from './app/manager/reports/SalesPerformance';
 import ProtectedRoute from './app/login/ProtectedRoute';
+import FeedbackComplaints from './app/manager/feedback/FeedbackComplaints';
+
 
 // EVM area imports
 import EVMLayout from './EVM/layout/EVMLayout';
