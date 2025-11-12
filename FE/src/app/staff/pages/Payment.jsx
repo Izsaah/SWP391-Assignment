@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '../layout/Layout';
-import { CreditCard, DollarSign, Edit2, TrendingDown, AlertCircle, Loader2, Info, Minus } from 'lucide-react';
+import { CreditCard, DollarSign, Edit2, TrendingDown, AlertCircle, Loader2, Info, Minus, Receipt } from 'lucide-react';
 import { getCustomersWithActiveInstallments, getCompletedPayments, updateInstallmentPlan } from '../services/paymentService';
 import { viewOrdersByCustomerId } from '../services/orderService';
 
@@ -17,6 +17,12 @@ const Payment = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [updating, setUpdating] = useState(false);
+  const [invoiceModal, setInvoiceModal] = useState({
+    open: false,
+    loading: false,
+    error: '',
+    data: null,
+  });
 
   // Format currency helper function (defined early for use in fetchActiveInstallments)
   const formatCurrency = (amount) => {
@@ -111,6 +117,15 @@ const Payment = () => {
             customerEmail: customer.email || 'N/A',
             customerPhone: customer.phoneNumber || 'N/A',
             customerAddress: customer.address || 'N/A',
+            
+            // Vehicle info (from backend) ✅
+            modelId: customer.modelId || null,
+            modelName: customer.modelName || 'N/A',
+            variantId: customer.variantId || null,
+            variantName: customer.variantName || 'N/A',
+            color: customer.color || 'N/A',
+            serialId: customer.serialId || 'N/A',
+            quantity: customer.quantity || '1',
             
             // Payment info (from backend - calculated values) ✅
             paymentId: paymentId || null,
@@ -438,7 +453,15 @@ const Payment = () => {
              // Additional fields from backend response
              phone: payment.phoneNumber || payment.phone || payment.customerPhone || 'N/A',
              email: payment.email || payment.customerEmail || 'N/A',
-             vehicle: vehicleName // Vehicle name from backend
+             vehicle: vehicleName, // Vehicle name from backend
+             // Vehicle info (from backend) ✅
+             modelId: payment.modelId || null,
+             modelName: payment.modelName || vehicleName || 'N/A',
+             variantId: payment.variantId || null,
+             variantName: payment.variantName || 'N/A',
+             color: payment.color || 'N/A',
+             serialId: payment.serialId || 'N/A',
+             quantity: payment.quantity || '1'
            };
          });
          setCompletedPayments(transformedData);
@@ -476,6 +499,73 @@ const Payment = () => {
   const handleViewDetails = (payment) => {
     setSelectedPayment(payment);
     setIsDetailsModalOpen(true);
+  };
+
+  const handleViewInvoice = async (payment, paymentType = 'installment') => {
+    setInvoiceModal({ open: true, loading: true, error: '', data: null });
+    try {
+      // ✅ Get all information directly from payment object (from backend API)
+      const vehicleInfo = {
+        model: payment.modelName || payment.vehicle || 'N/A',
+        variant: payment.variantName || 'N/A',
+        color: payment.color || 'N/A',
+        serial: payment.serialId || 'N/A',
+        quantity: payment.quantity || '1',
+        unitPrice: payment.unitPrice || (payment.totalAmount ? payment.totalAmount / parseFloat(payment.quantity || '1') : 0),
+      };
+
+      const invoiceData = {
+        paymentType,
+        customer: {
+          name: payment.customerName || payment.name || 'N/A',
+          email: payment.customerEmail || payment.email || 'N/A',
+          phone: payment.customerPhone || payment.phone || payment.phoneNumber || 'N/A',
+          address: payment.customerAddress || payment.address || 'N/A',
+        },
+        order: {
+          orderId: payment.orderId || 'N/A',
+          orderDate: payment.paymentDate || null,
+          salesperson: 'N/A',
+        },
+        payment: {
+          total: payment.totalAmount ?? payment.amount ?? 0,
+          paid: payment.paidAmount ?? payment.amount ?? 0,
+          outstanding: payment.outstandingAmount ?? 0,
+          monthlyPay: payment.monthlyPay ?? null,
+          remainingMonths: payment.currentTermMonth ?? null,
+          interestRate: payment.interestRate ?? null,
+          status: payment.status || 'ACTIVE',
+          paymentDate: payment.paymentDate || null,
+          method: payment.method || (paymentType === 'installment' ? 'TG' : 'TT'),
+          planId: payment.planId ?? null,
+        },
+        vehicle: vehicleInfo,
+      };
+
+      setInvoiceModal({
+        open: true,
+        loading: false,
+        error: '',
+        data: invoiceData,
+      });
+    } catch (err) {
+      console.error('❌ Failed to load invoice details', err);
+      setInvoiceModal({
+        open: true,
+        loading: false,
+        error: err.message || 'Failed to load invoice details',
+        data: null,
+      });
+    }
+  };
+
+  const closeInvoiceModal = () => {
+    setInvoiceModal({
+      open: false,
+      loading: false,
+      error: '',
+      data: null,
+    });
   };
 
   // Handle edit payment (deduct months)
@@ -1056,6 +1146,16 @@ const Payment = () => {
                               >
                                 <Edit2 className="w-4 h-4" />
                               </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewInvoice(payment, 'installment');
+                              }}
+                              className="text-purple-600 hover:text-purple-900 flex items-center space-x-1"
+                              title="View invoice"
+                            >
+                              <Receipt className="w-4 h-4" />
+                            </button>
                             </div>
                           </td>
                         </tr>
@@ -1111,6 +1211,9 @@ const Payment = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Method
                         </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -1145,6 +1248,16 @@ const Payment = () => {
                             <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                               {payment.method || 'TT'}
                             </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button
+                              onClick={() => handleViewInvoice(payment, 'completed')}
+                              className="text-purple-600 hover:text-purple-900 flex items-center space-x-1"
+                              title="View invoice"
+                            >
+                              <Receipt className="w-4 h-4" />
+                              <span>Invoice</span>
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -1510,6 +1623,200 @@ const Payment = () => {
                     <span>Record Payment</span>
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Invoice Modal */}
+        {invoiceModal.open && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-300">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                    <Receipt className="w-6 h-6 text-purple-600" />
+                    Payment Invoice
+                  </h2>
+                  {invoiceModal.data?.order?.orderId && (
+                    <p className="text-sm text-gray-500 mt-1">
+                      Order ID: #{invoiceModal.data.order.orderId}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={closeInvoiceModal}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {invoiceModal.loading ? (
+                <div className="py-16 flex flex-col items-center justify-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+                  <p className="text-sm text-gray-500 mt-3">Loading invoice details...</p>
+                </div>
+              ) : invoiceModal.error ? (
+                <div className="py-16 px-6 flex flex-col items-center justify-center space-y-3">
+                  <AlertCircle className="w-10 h-10 text-red-500" />
+                  <p className="text-sm text-red-600 text-center max-w-sm">{invoiceModal.error}</p>
+                  <button
+                    onClick={closeInvoiceModal}
+                    className="px-4 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition-colors text-sm font-medium"
+                  >
+                    Close
+                  </button>
+                </div>
+              ) : (
+                <div className="px-6 py-6 space-y-6">
+                  {/* Customer & Order Info */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                      <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-2">
+                        Customer Information
+                      </h3>
+                      <div className="space-y-2 text-sm text-gray-700">
+                        <div>
+                          <span className="font-medium text-gray-900">Name:</span>{' '}
+                          {invoiceModal.data?.customer?.name || 'N/A'}
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-900">Email:</span>{' '}
+                          {invoiceModal.data?.customer?.email || 'N/A'}
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-900">Phone:</span>{' '}
+                          {invoiceModal.data?.customer?.phone || 'N/A'}
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-900">Address:</span>{' '}
+                          {invoiceModal.data?.customer?.address || 'N/A'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-4">
+                      <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-2">
+                        Vehicle Information
+                      </h3>
+                      <div className="space-y-2 text-sm text-gray-700">
+                        <div>
+                          <span className="font-medium text-gray-900">Vehicle:</span>{' '}
+                          {invoiceModal.data?.vehicle?.model || 'N/A'}
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-900">Variant:</span>{' '}
+                          {invoiceModal.data?.vehicle?.variant || 'N/A'}
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-900">Serial / VIN:</span>{' '}
+                          {invoiceModal.data?.vehicle?.serial || 'N/A'}
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-900">Quantity:</span>{' '}
+                          {invoiceModal.data?.vehicle?.quantity || '1'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment Summary */}
+                  <div className="bg-white border border-gray-200 rounded-lg">
+                    <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                        Payment Summary
+                      </h3>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        (invoiceModal.data?.payment?.status || '').toUpperCase() === 'ACTIVE'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-green-100 text-green-800'
+                      }`}>
+                        {invoiceModal.data?.payment?.status || 'ACTIVE'}
+                      </span>
+                    </div>
+                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+                      <div>
+                        <div className="flex justify-between py-2 border-b border-dashed border-gray-200">
+                          <span className="font-medium text-gray-900">Total Amount</span>
+                          <span className="font-semibold text-gray-900">
+                            {formatCurrency(invoiceModal.data?.payment?.total || 0)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-dashed border-gray-200">
+                          <span>Paid Amount</span>
+                          <span className="font-semibold text-green-600">
+                            {formatCurrency(invoiceModal.data?.payment?.paid || 0)}
+                          </span>
+                        </div>
+                        {invoiceModal.data?.payment?.outstanding !== undefined && (
+                          <div className="flex justify-between py-2">
+                            <span>Outstanding</span>
+                            <span className="font-semibold text-red-600">
+                              {formatCurrency(invoiceModal.data?.payment?.outstanding || 0)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <div>
+                          <span className="font-medium text-gray-900">Payment Method:</span>{' '}
+                          {invoiceModal.data?.payment?.method || (invoiceModal.data?.paymentType === 'installment' ? 'TG' : 'TT')}
+                        </div>
+                        {invoiceModal.data?.payment?.planId && (
+                          <div>
+                            <span className="font-medium text-gray-900">Plan ID:</span>{' '}
+                            {invoiceModal.data?.payment?.planId}
+                          </div>
+                        )}
+                        {invoiceModal.data?.payment?.monthlyPay != null && (
+                          <div>
+                            <span className="font-medium text-gray-900">Monthly Pay:</span>{' '}
+                            {formatCurrency(invoiceModal.data?.payment?.monthlyPay)}
+                          </div>
+                        )}
+                        {invoiceModal.data?.payment?.remainingMonths != null && (
+                          <div>
+                            <span className="font-medium text-gray-900">Remaining Months:</span>{' '}
+                            {invoiceModal.data?.payment?.remainingMonths} tháng
+                          </div>
+                        )}
+                        {invoiceModal.data?.payment?.interestRate != null && (
+                          <div>
+                            <span className="font-medium text-gray-900">Interest Rate:</span>{' '}
+                            {invoiceModal.data?.payment?.interestRate}%
+                          </div>
+                        )}
+                        <div>
+                          <span className="font-medium text-gray-900">Payment Date:</span>{' '}
+                          {invoiceModal.data?.payment?.paymentDate
+                            ? new Date(invoiceModal.data.payment.paymentDate).toLocaleDateString('vi-VN')
+                            : 'N/A'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-600">
+                    <p>
+                      This invoice summarises the customer payment details and vehicle information.
+                      Please keep a copy for dealership and customer records. For any discrepancies,
+                      contact the finance department.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3 bg-gray-50">
+                <button
+                  onClick={closeInvoiceModal}
+                  className="px-5 py-2 rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors text-sm font-medium"
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>

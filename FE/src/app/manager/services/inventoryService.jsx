@@ -690,7 +690,12 @@ export const fetchManufacturerRequests = async () => {
         const d = order.detail;
         const q = d?.quantity != null ? parseInt(d.quantity) : 0;
         if (!isNaN(q)) itemQuantity = q;
-        if (d?.unitPrice != null) itemUnitPrice = parseFloat(d.unitPrice);
+        if (d?.unitPrice != null && itemUnitPrice === null) {
+          const parsedPrice = parseFloat(d.unitPrice);
+          if (!isNaN(parsedPrice) && parsedPrice > 0) {
+            itemUnitPrice = parsedPrice;
+          }
+        }
         // Try to get variantId from detail first
         itemVariantId = normalizeId(d?.variantId ?? d?.variant_id);
         itemModelId = normalizeId(d?.modelId ?? d?.model_id);
@@ -739,8 +744,14 @@ export const fetchManufacturerRequests = async () => {
           details.forEach((d) => {
             const q = d?.quantity != null ? parseInt(d.quantity) : 0;
             if (!isNaN(q)) itemQuantity += q;
-            if (itemUnitPrice === null && d?.unitPrice != null) {
-              itemUnitPrice = parseFloat(d.unitPrice);
+            if (d?.unitPrice != null) {
+              const parsedPrice = parseFloat(d.unitPrice);
+              if (!isNaN(parsedPrice) && parsedPrice > 0) {
+                // Keep highest positive price (represent latest approval)
+                if (itemUnitPrice == null || parsedPrice > itemUnitPrice) {
+                  itemUnitPrice = parsedPrice;
+                }
+              }
             }
             if (!itemVariantId) {
               itemVariantId = normalizeId(d?.variantId ?? d?.variant_id);
@@ -760,7 +771,12 @@ export const fetchManufacturerRequests = async () => {
           // When no details, try flattened fields on order object
           const q = order.quantity != null ? parseInt(order.quantity) : 0;
           if (!isNaN(q)) itemQuantity = q;
-          itemUnitPrice = order.unitPrice != null ? parseFloat(order.unitPrice) : null;
+          if (order.unitPrice != null) {
+            const parsedPrice = parseFloat(order.unitPrice);
+            if (!isNaN(parsedPrice) && parsedPrice > 0) {
+              itemUnitPrice = parsedPrice;
+            }
+          }
           itemVariantId = normalizeId(order.variantId ?? order.variant_id);
           itemModelId = normalizeId(order.modelId ?? order.model_id);
         }

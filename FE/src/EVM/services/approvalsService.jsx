@@ -97,6 +97,7 @@ export const getAllConfirmations = async () => {
         dealerStaffId: raw.dealer_staff_id ?? raw.dealerStaffId ?? null,
         customerId: raw.customer_id ?? raw.customerId ?? null,
         modelId: raw.model_id ?? raw.modelId ?? null,
+        isCustom: raw.is_custom ?? raw.isCustom ?? null,
       };
       detailMap.set(orderDetailId, detail);
     });
@@ -136,6 +137,26 @@ export const getAllConfirmations = async () => {
       const orderDetailId = raw.order_detail_id ?? raw.orderDetailId ?? null;
       const detail = orderDetailId != null ? detailMap.get(orderDetailId) : null;
       const agreement = raw.agreement ?? raw.status ?? '';
+      const customerIdRaw =
+        detail?.customerId ??
+        raw.customer_id ??
+        raw.customerId ??
+        raw.customer_id_fk ??
+        null;
+      const customerIdNum =
+        customerIdRaw !== null && customerIdRaw !== undefined
+          ? Number(customerIdRaw)
+          : NaN;
+      let isCustom =
+        raw.is_custom ?? raw.isCustom ?? detail?.isCustom ?? null;
+      if (typeof isCustom === 'string') {
+        isCustom = isCustom.toLowerCase() === 'true' || isCustom === '1';
+      } else if (isCustom != null) {
+        isCustom = Boolean(isCustom);
+      }
+      if (isCustom == null) {
+        isCustom = Number.isFinite(customerIdNum) && customerIdNum > 0;
+      }
       return {
         confirmationId: raw.confirmation_id ?? raw.confirmationId ?? null,
         staffAdminId: raw.staff_admin_id ?? raw.staffAdminId ?? null,
@@ -150,6 +171,7 @@ export const getAllConfirmations = async () => {
         dealerStaffId: detail?.dealerStaffId ?? null,
         customerId: detail?.customerId ?? null,
         modelId: detail?.modelId ?? null,
+        isCustom: Boolean(isCustom),
       };
     });
 
@@ -207,6 +229,20 @@ export const getAllConfirmations = async () => {
       }
     });
 
+    const colorsByModelId = new Map();
+    if (Array.isArray(modelsForLookup)) {
+      modelsForLookup.forEach((m) => {
+        const mid = normalizeId(m?.modelId ?? m?.model_id);
+        if (!mid) return;
+        const colorSet = new Set();
+        (m?.lists || []).forEach((v) => {
+          const color = v?.color;
+          if (color) colorSet.add(color);
+        });
+        colorsByModelId.set(mid, Array.from(colorSet));
+      });
+    }
+
     // Enrich combined data with variant info
     const enriched = combined.map((item) => {
       let variantId = null;
@@ -219,27 +255,21 @@ export const getAllConfirmations = async () => {
       const modelName = variantId 
         ? (variantIdToModelName.get(variantId) || '')
         : (modelId ? (modelIdToModelName.get(modelId) || '') : '');
+      const availableColors = modelId ? (colorsByModelId.get(modelId) || []) : [];
       
       return {
         ...item,
         variantId,
         color,
         modelName,
+        availableColors,
+        modelId: item.modelId ?? null,
+        isCustom: item.isCustom ?? false,
       };
     });
 
-    // Group by orderId first, then by model+color+date for same-day requests
+    // Group by orderId only - each orderId gets its own row
     const grouped = new Map();
-    const getDateKey = (dateStr) => {
-      if (!dateStr) return null;
-      try {
-        const d = new Date(dateStr);
-        if (isNaN(d.getTime())) return null;
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      } catch {
-        return null;
-      }
-    };
 
     enriched.forEach((item) => {
       const rawOrderId = item.orderId ?? item.order_id ?? item.firstItem?.orderId ?? item.firstItem?.order_id;
@@ -253,46 +283,16 @@ export const getAllConfirmations = async () => {
       const unitPriceValue = Number(item.unitPrice ?? item.price ?? NaN);
       const safeUnitPrice = Number.isNaN(unitPriceValue) ? null : unitPriceValue;
 
-      // Try to find existing group by orderId first
+      // Group by orderId only - do NOT merge different orderIds
       let existing = grouped.get(orderKey);
-      let mergeTargetKey = orderKey;
-      
-      // If not found and we have model+color+date, try to find a similar group
-      if (!existing) {
-        const modelName = (item.modelName || '').trim().toLowerCase();
-        const color = (item.color || '').trim().toLowerCase();
-        const dateKey = getDateKey(item.date);
-        const agreement = (item.agreement || '').toString().toLowerCase();
-        
-        if (modelName && color && dateKey) {
-          // Look for existing group with same model+color+date+status
-          for (const [key, group] of grouped.entries()) {
-            const groupModel = (group._models.size === 1 ? Array.from(group._models)[0] : '').trim().toLowerCase();
-            const groupColor = (group._colors.size === 1 ? Array.from(group._colors)[0] : '').trim().toLowerCase();
-            const groupDateKey = getDateKey(group.date);
-            const groupAgreement = (group.firstItem?.agreement || '').toString().toLowerCase();
-            
-            if (
-              groupModel === modelName &&
-              groupColor === color &&
-              groupDateKey === dateKey &&
-              groupAgreement === agreement &&
-              // Only merge if they're both approved or both pending
-              (agreement === 'agree' || agreement === 'approved' || agreement === 'pending' || agreement === '')
-            ) {
-              existing = group;
-              mergeTargetKey = key; // Use the existing key, don't change it
-              break;
-            }
-          }
-        }
-      }
 
       if (existing) {
+        // Same orderId - aggregate order details within this order
         existing.quantity += safeQuantity;
         if (item.color) existing._colors.add(item.color);
         if (item.modelName) existing._models.add(item.modelName);
         if (safeUnitPrice != null) existing._prices.add(safeUnitPrice);
+        if (item.isCustom) existing.isCustom = true;
         // Keep earliest date
         const itemDate = item.date;
         if (itemDate && (!existing.date || itemDate < existing.date)) {
@@ -302,19 +302,13 @@ export const getAllConfirmations = async () => {
         if (item.orderDetailId != null) {
           existing.orderDetailIds.add(item.orderDetailId);
         }
-        // Collect all order IDs that were merged
-        if (rawOrderId && !existing._mergedOrderIds) {
-          existing._mergedOrderIds = new Set();
-        }
-        if (rawOrderId && existing._mergedOrderIds) {
-          existing._mergedOrderIds.add(String(rawOrderId));
-        }
         // Keep pending status if any detail is pending
         const agreement = (item.agreement || '').toString().toLowerCase();
         if (agreement === '' || agreement === 'pending' || agreement === 'null') {
           existing.isPending = true;
         }
       } else {
+        // New orderId - create new group
         const agreement = (item.agreement || '').toString().toLowerCase();
         const isPending = agreement === '' || agreement === 'pending' || agreement === 'null';
         grouped.set(orderKey, {
@@ -327,7 +321,7 @@ export const getAllConfirmations = async () => {
           date: item.date,
           isPending,
           orderDetailIds: item.orderDetailId != null ? new Set([item.orderDetailId]) : new Set(),
-          _mergedOrderIds: rawOrderId ? new Set([String(rawOrderId)]) : new Set(),
+          isCustom: Boolean(item.isCustom),
           // Keep first item's metadata for reference
           firstItem: item,
         });
@@ -360,16 +354,17 @@ export const getAllConfirmations = async () => {
         displayPrice = Array.from(g._prices)[0];
       }
       
-      // Determine display orderId: show first one, or range if multiple merged
-      let displayOrderId = g.displayOrderId ?? g.key;
-      if (g._mergedOrderIds && g._mergedOrderIds.size > 1) {
-        const sortedIds = Array.from(g._mergedOrderIds).map(id => parseInt(id, 10)).filter(id => !isNaN(id)).sort((a, b) => a - b);
-        if (sortedIds.length > 1) {
-          displayOrderId = `${sortedIds[0]}-${sortedIds[sortedIds.length - 1]}`;
-        } else {
-          displayOrderId = g.displayOrderId ?? g.key;
-        }
-      }
+      // Display single orderId (no ranges)
+      const displayOrderId = g.displayOrderId ?? g.key;
+
+      const mergedCustomerId =
+        g.firstItem?.customerId ??
+        g.firstItem?.customer_id ??
+        null;
+      const mergedIsCustomRaw =
+        g.isCustom ??
+        g.firstItem?.isCustom ??
+        (mergedCustomerId != null ? Number(mergedCustomerId) > 0 : false);
 
       return {
         orderId: displayOrderId,
@@ -381,10 +376,12 @@ export const getAllConfirmations = async () => {
         isPending: g.isPending,
         agreement: g.isPending ? 'Pending' : (g.firstItem?.agreement || ''),
         orderDetailIds: Array.from(g.orderDetailIds),
+        modelId: g.firstItem?.modelId ?? null,
+        availableColors: g.firstItem?.availableColors || [],
+        customerId: g.firstItem?.customerId ?? g.firstItem?.customer_id ?? null,
+        isCustom: Boolean(mergedIsCustomRaw),
         // Keep first item for actions (use first orderId for API calls)
         firstItem: g.firstItem,
-        // Store all merged order IDs for reference
-        _allOrderIds: g._mergedOrderIds ? Array.from(g._mergedOrderIds) : [g.displayOrderId ?? g.key],
       };
     });
 
@@ -409,6 +406,17 @@ export const getAllConfirmations = async () => {
         const agreementLower = agreement ? agreement.toString().toLowerCase() : '';
         const isRejected = disallowedAgreements.has(agreementLower);
 
+        const normalizedCustomerId =
+          item.customerId ??
+          item.customer_id ??
+          item.firstItem?.customerId ??
+          item.firstItem?.customer_id ??
+          null;
+        const normalizedIsCustom =
+          item.isCustom ??
+          item.firstItem?.isCustom ??
+          (normalizedCustomerId != null ? Number(normalizedCustomerId) > 0 : false);
+
         return {
           ...item,
           date,
@@ -416,6 +424,7 @@ export const getAllConfirmations = async () => {
           agreement: agreement || (isPending ? 'Pending' : ''),
           isApproved: Boolean(approvedInfo),
           isRejected,
+          isCustom: Boolean(normalizedIsCustom),
         };
       })
       .filter((item) => !item.isRejected);
