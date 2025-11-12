@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Layout from '../layout/Layout';
-import { useNavigate } from 'react-router';
 import {
   Tag,
   Search,
@@ -10,20 +9,24 @@ import {
   TrendingUp,
   CheckCircle,
   XCircle,
+  Loader2,
 } from 'lucide-react';
 import { fetchDealerPromotions } from '../services/promotionsService';
 
+const PromotionDetailModal = React.lazy(() => import('./PromotionDetail'));
+
 const Promotions = () => {
-  const navigate = useNavigate();
   const [modelFilter, setModelFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(false);
 
   // Promotions data - to be fetched from API
   const [promotions, setPromotions] = useState([]);
+
+  const [selectedPromotionId, setSelectedPromotionId] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -116,18 +119,10 @@ const Promotions = () => {
   }), [promotions, modelFilter, statusFilter, dateFrom, dateTo, searchQuery]);
 
   // Handle toggle status
-  const handleToggleStatus = (promotionId, currentStatus) => {
-    if (window.confirm(`Are you sure you want to ${currentStatus === 'Active' ? 'deactivate' : 'activate'} this promotion?`)) {
-      // In real app, would make API call to toggle status
-      console.log(`Toggling promotion ${promotionId} to ${currentStatus === 'Active' ? 'Inactive' : 'Active'}`);
-      alert(`Promotion ${currentStatus === 'Active' ? 'deactivated' : 'activated'} successfully!`);
-      // Refresh data would happen here
-    }
-  };
 
   // Handle view detail
   const handleViewDetail = (promotionId) => {
-    navigate(`/manager/promotions/${promotionId}`);
+    setSelectedPromotionId(promotionId);
   };
 
   return (
@@ -146,6 +141,12 @@ const Promotions = () => {
             <h1 className="text-2xl font-bold text-gray-900">Promotions</h1>
             <p className="text-sm text-gray-600 mt-1">Receive and configure promotions from manufacturer</p>
           </div>
+          {loading && (
+            <div className="flex items-center space-x-2 text-sm text-gray-600">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Loading...</span>
+            </div>
+          )}
         </div>
 
         {/* Statistics Cards */}
@@ -337,6 +338,24 @@ const Promotions = () => {
             </table>
           </div>
         </div>
+
+        {selectedPromotionId && (
+          <React.Suspense
+            fallback={
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                <div className="bg-white rounded-xl shadow-lg px-6 py-4 flex items-center space-x-3 text-gray-600">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Loading promotion...</span>
+                </div>
+              </div>
+            }
+          >
+            <PromotionDetailModal
+              promotionId={selectedPromotionId}
+              onClose={() => setSelectedPromotionId(null)}
+            />
+          </React.Suspense>
+        )}
       </div>
     </Layout>
   );

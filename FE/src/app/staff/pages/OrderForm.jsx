@@ -7,6 +7,7 @@ import { createPayment } from '../services/paymentService';
 import { fetchInventory } from '../services/inventoryService';
 import { getUserIdFromStoredToken } from '../../utils/jwtUtils';
 import { createCustomer, getAllCustomers } from '../services/customerService';
+import { fetchDealerPromotions } from '../services/promotionService';
 
 const OrderForm = () => {
   const location = useLocation();
@@ -40,6 +41,10 @@ const OrderForm = () => {
     address: ''
   });
   const [allCustomersCache, setAllCustomersCache] = useState([]); // Cache all customers for client-side filtering
+  const [promotions, setPromotions] = useState([]);
+  const [loadingPromotions, setLoadingPromotions] = useState(false);
+  const [promotionError, setPromotionError] = useState(null);
+  const [selectedPromotion, setSelectedPromotion] = useState(null);
   
   // Form state for creating order form
   const [formData, setFormData] = useState({
@@ -281,32 +286,8 @@ const OrderForm = () => {
     });
   }, []);
 
-  // Handle discount code selection
-  const handleDiscountCodeSelect = (code) => {
-    setFormData(prev => {
-      const newFormData = {
-        ...prev,
-        discountCode: code.id,
-        discountAmount: code.amount.toString(),
-      };
-      
-      // Calculate total price (without VAT)
-      const baseNum = parseFloat(prev.basePrice) || 0;
-      const discountNum = code.amount || 0;
-      const qty = parseFloat(prev.quantity) || 1;
-      
-      const afterDiscount = (baseNum - discountNum) * qty;
-      // No VAT calculation
-      
-      return {
-        ...newFormData,
-        totalPrice: afterDiscount.toString(),
-      };
-    });
-  };
-
   // Calculate total price (without VAT)
-  const calculateTotalPrice = (base, discount, quantity = 1) => {
+  const calculateTotalPrice = useCallback((base, discount, quantity = 1) => {
     const baseNum = parseFloat(base) || 0;
     const discountNum = parseFloat(discount) || 0;
     const qty = parseFloat(quantity) || 1;
@@ -318,7 +299,106 @@ const OrderForm = () => {
       ...prev,
       totalPrice: afterDiscount.toString(),
     }));
+  }, []);
+
+  const computePromotionDiscount = useCallback((promotion, baseValue, quantityValue) => {
+    if (!promotion) {
+      return { perUnitDiscount: 0, totalDiscount: 0 };
+    }
+
+    const baseNum = parseFloat(baseValue) || 0;
+    const qtyNum = Math.max(parseFloat(quantityValue) || 0, 1);
+
+    let perUnitDiscount = 0;
+
+    if (promotion.type === 'PERCENTAGE') {
+      const rate = typeof promotion.rate === 'number' ? promotion.rate : 0;
+      perUnitDiscount = baseNum * rate;
+    } else if (promotion.type === 'FIXED') {
+      const amount = typeof promotion.amount === 'number' ? promotion.amount : 0;
+      perUnitDiscount = qtyNum > 0 ? amount / qtyNum : amount;
+    }
+
+    if (!Number.isFinite(perUnitDiscount) || perUnitDiscount < 0) {
+      perUnitDiscount = 0;
+    }
+
+    if (perUnitDiscount > baseNum) {
+      perUnitDiscount = baseNum;
+    }
+
+    const totalDiscount = perUnitDiscount * qtyNum;
+
+    return {
+      perUnitDiscount,
+      totalDiscount,
+    };
+  }, []);
+
+  const clearPromotionSelection = useCallback(() => {
+    let baseValue = formData.basePrice;
+    let quantityValue = formData.quantity;
+
+    setSelectedPromotion(null);
+    setFormData(prev => {
+      baseValue = prev.basePrice;
+      quantityValue = prev.quantity;
+
+      if (!prev.discountCode && (!prev.discountAmount || parseFloat(prev.discountAmount) === 0)) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        discountCode: '',
+        discountAmount: '0',
+      };
+    });
+
+    calculateTotalPrice(baseValue, 0, quantityValue);
+  }, [calculateTotalPrice, formData.basePrice, formData.quantity]);
+
+  const applyPromotionToForm = useCallback(
+    (promotion, baseValue = formData.basePrice, quantityValue = formData.quantity) => {
+      if (!promotion) {
+        clearPromotionSelection();
+        return;
+      }
+
+      const { perUnitDiscount } = computePromotionDiscount(promotion, baseValue, quantityValue);
+      const discountStr = perUnitDiscount ? perUnitDiscount.toString() : '0';
+      const promotionId = promotion?.id ? String(promotion.id) : '';
+
+      setFormData(prev => {
+        if (prev.discountCode === promotionId && prev.discountAmount === discountStr) {
+          return prev;
+        }
+        return {
+          ...prev,
+          discountCode: promotionId,
+          discountAmount: discountStr,
+        };
+      });
+
+      calculateTotalPrice(baseValue, perUnitDiscount, quantityValue);
+    },
+    [calculateTotalPrice, clearPromotionSelection, computePromotionDiscount, formData.basePrice, formData.quantity]
+  );
+
+  const handlePromotionChange = (promotion) => {
+    if (!promotion) {
+      clearPromotionSelection();
+      return;
+    }
+    setSelectedPromotion(promotion);
+    applyPromotionToForm(promotion, formData.basePrice, formData.quantity);
   };
+
+  useEffect(() => {
+    if (selectedPromotion) {
+      applyPromotionToForm(selectedPromotion, formData.basePrice, formData.quantity);
+    }
+  }, [selectedPromotion, formData.basePrice, formData.quantity, applyPromotionToForm]);
 
   // Calculate installment details (remaining amount and monthly payment)
   useEffect(() => {
@@ -932,49 +1012,107 @@ const OrderForm = () => {
     fetchVehicles();
   }, []);
 
+  useEffect(() => {
+    const loadPromotions = async () => {
+      setLoadingPromotions(true);
+      setPromotionError(null);
+
+      try {
+        const result = await fetchDealerPromotions();
+        if (result.success) {
+          const now = new Date();
+          const currencyFormatter = new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+          });
+
+          const normalized = (result.data || [])
+            .map((promotion) => {
+              const idRaw = promotion?.promoId ?? promotion?.id;
+              if (idRaw === undefined || idRaw === null) return null;
+              const id = String(idRaw);
+
+              const typeRaw = (promotion?.type || '').toUpperCase();
+              let type = 'PERCENTAGE';
+              let rate = Number(promotion?.discountRate ?? 0);
+              let amount = 0;
+
+              if (typeRaw === 'FIXED') {
+                type = 'FIXED';
+                amount = rate;
+              } else if (typeRaw === 'PERCENTAGE') {
+                type = 'PERCENTAGE';
+              } else {
+                type = 'PERCENTAGE';
+              }
+
+              if (type === 'PERCENTAGE') {
+                if (rate > 1) rate = rate / 100;
+                if (rate < 0) rate = 0;
+                if (rate > 1) {
+                  rate = 1;
+                }
+              } else {
+                if (amount < 0) amount = 0;
+              }
+
+              const start = promotion?.startDate ? new Date(promotion.startDate) : null;
+              const end = promotion?.endDate ? new Date(promotion.endDate) : null;
+              const isActive = (!start || start <= now) && (!end || end >= now);
+              if (!isActive) return null;
+
+              const displayValue =
+                type === 'PERCENTAGE'
+                  ? `${(rate * 100).toFixed(rate * 100 % 1 === 0 ? 0 : 2)}%`
+                  : currencyFormatter.format(amount);
+
+              return {
+                id,
+                description: promotion?.description || `Promotion ${id}`,
+                type,
+                rate: type === 'PERCENTAGE' ? rate : null,
+                amount: type === 'FIXED' ? amount : null,
+                startDate: promotion?.startDate || null,
+                endDate: promotion?.endDate || null,
+                displayValue,
+              };
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.description.localeCompare(b.description));
+
+          setPromotions(normalized);
+
+          if (
+            normalized.length === 0 &&
+            (formData.discountCode || parseFloat(formData.discountAmount || '0') > 0)
+          ) {
+            clearPromotionSelection();
+          }
+        } else {
+          setPromotions([]);
+          setPromotionError(result.message || 'Failed to load promotions');
+          clearPromotionSelection();
+        }
+      } catch (error) {
+        console.error('Failed to load promotions:', error);
+        setPromotions([]);
+        setPromotionError(error?.message || 'Failed to load promotions');
+        clearPromotionSelection();
+      } finally {
+        setLoadingPromotions(false);
+      }
+    };
+
+    loadPromotions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Load all orders on mount
   useEffect(() => {
     reloadAllOrders();
   }, [reloadAllOrders]);
-
-  // Sample discount codes for selection
-  const sampleDiscountCodes = [
-    { 
-      id: 'NO-DISCOUNT', 
-      code: 'None', 
-      amount: 0,
-      description: 'No discount applied',
-      type: 'none'
-    },
-    { 
-      id: 'SPRING2025', 
-      code: 'SPRING2025', 
-      amount: 50000000,
-      description: 'Spring Sale - 50M off',
-      type: 'promotion'
-    },
-    { 
-      id: 'FIRST-CUSTOMER', 
-      code: 'FIRST-CUSTOMER', 
-      amount: 100000000,
-      description: 'First Time Buyer - 100M off',
-      type: 'customer'
-    },
-    { 
-      id: 'VIP-DISCOUNT', 
-      code: 'VIP-DISCOUNT', 
-      amount: 150000000,
-      description: 'VIP Member - 150M off',
-      type: 'vip'
-    },
-    { 
-      id: 'BULK-50', 
-      code: 'BULK-50', 
-      amount: 300000000,
-      description: 'Bulk Order - 300M off',
-      type: 'bulk'
-    },
-  ];
 
   // Auto-open create modal and pre-fill vehicle data when coming from Inventory
   useEffect(() => {
@@ -1575,28 +1713,61 @@ const OrderForm = () => {
                   {/* Discount Code Selection */}
                   <div className="mt-4">
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Discount Code
+                      Promotion
                     </label>
                     <select
-                      name="discountCode"
+                      name="promotion"
                       value={formData.discountCode}
                       onChange={(e) => {
-                        const code = sampleDiscountCodes.find(c => c.id === e.target.value);
-                        if (code) handleDiscountCodeSelect(code);
+                        const value = e.target.value;
+                        if (!value) {
+                          handlePromotionChange(null);
+                          return;
+                        }
+                        const promotion = promotions.find((item) => item.id === value);
+                        handlePromotionChange(promotion || null);
                       }}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                      disabled={loadingPromotions || promotions.length === 0}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base disabled:bg-gray-100 disabled:text-gray-500"
                     >
-                      <option value="">Select Discount Code...</option>
-                      {sampleDiscountCodes.map((discountCode) => (
-                        <option key={discountCode.id} value={discountCode.id}>
-                          {discountCode.code}
+                      <option value="">
+                        {loadingPromotions
+                          ? 'Loading promotions...'
+                          : promotions.length === 0
+                          ? 'No promotions available'
+                          : 'Select promotion...'}
+                      </option>
+                      {promotions.map((promotion) => (
+                        <option key={promotion.id} value={promotion.id}>
+                          {promotion.description} ({promotion.displayValue})
                         </option>
                       ))}
                     </select>
-                    {formData.discountCode && formData.discountAmount > 0 && (
-                      <p className="text-xs text-green-600 mt-1 font-medium">
-                        Discount Applied: {formatCurrency(formData.discountAmount)}
-                      </p>
+                    {promotionError && (
+                      <p className="text-xs text-red-500 mt-1">{promotionError}</p>
+                    )}
+                    {selectedPromotion && (
+                      <div className="mt-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg p-3 space-y-1">
+                        <p className="font-semibold text-green-800">{selectedPromotion.description}</p>
+                        <p>
+                          Value: <span className="font-medium">{selectedPromotion.displayValue}</span>
+                        </p>
+                        {selectedPromotion.startDate && selectedPromotion.endDate && (
+                          <p className="text-[11px] text-green-600">
+                            Valid: {selectedPromotion.startDate} → {selectedPromotion.endDate}
+                          </p>
+                        )}
+                        <p className="text-[11px] text-green-600">
+                          Applied discount:{' '}
+                          <span className="font-medium">
+                            {formatCurrency(
+                              (parseFloat(formData.discountAmount || '0') || 0) *
+                                (parseFloat(formData.quantity || '1') || 1)
+                            )}
+                          </span>{' '}
+                          total
+                        </p>
+                      </div>
                     )}
                   </div>
 
