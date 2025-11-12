@@ -112,30 +112,21 @@ export const getFeedbackByCustomerId = async (customerId) => {
 
 /**
  * Get test drive schedules by customer ID
- * Uses the searchCustomerForSchedule endpoint which returns customers with their test drive schedule
+ * Uses the existing getTestDriveScheduleByCustomer endpoint
+ * Note: Backend returns only ONE test drive per customer (filtered by dealer)
  * @param {number} customerId - Customer ID
- * @returns {Promise} - Promise containing test drive data
+ * @returns {Promise} - Promise containing test drive data (array with 0 or 1 item)
  */
 export const getTestDrivesByCustomerId = async (customerId) => {
   try {
     const token = localStorage.getItem('token');
     
-    // First get customer to know their name
-    const customerResult = await getCustomerById(customerId);
-    
-    if (!customerResult.success || !customerResult.data) {
-      return {
-        success: true,
-        data: []
-      };
-    }
-    
-    const customerName = customerResult.data.name;
-    
-    // Use searchCustomerForSchedule to get customer with test drive schedule
+    // Use existing endpoint that returns ONE test drive for the customer (filtered by dealer)
+    // Backend endpoint: /api/staff/getTestDriveScheduleByCustomer
+    // Backend now uses RequestUtils.extractParams which supports JSON bodies
     const response = await axios.post(
-      `${API_URL}/staff/searchCustomerForSchedule`,
-      { name: customerName },
+      `${API_URL}/staff/getTestDriveScheduleByCustomer`,
+      { customer_id: String(customerId) },
       {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -144,16 +135,11 @@ export const getTestDrivesByCustomerId = async (customerId) => {
       }
     );
 
-    if (response.data && response.data.status === 'success' && response.data.data) {
-      // Find customer by ID (in case multiple customers have same name)
-      const customer = response.data.data.find(c => {
-        const id = c.customerId || c.customer_id || c.id;
-        return id === customerId || String(id) === String(customerId);
-      });
+    if (response.data && response.data.status === 'success') {
+      // Backend returns a single test drive object, convert to array
+      const testDrive = response.data.data;
       
-      if (customer && customer.testDriveSchedule) {
-        // Backend returns one test drive schedule, but we'll wrap it in an array
-        const testDrive = customer.testDriveSchedule;
+      if (testDrive) {
         return {
           success: true,
           data: [testDrive] // Return as array for consistency
@@ -161,16 +147,45 @@ export const getTestDrivesByCustomerId = async (customerId) => {
       }
     }
     
+    // If backend returns error with "not found" message, return empty array (not an error)
+    if (response.data?.message?.includes('not found') || response.data?.message?.includes('No test drive')) {
+      return {
+        success: true,
+        data: []
+      };
+    }
+    
     return {
       success: true,
       data: []
     };
   } catch (error) {
-    console.error('Error getting test drives by customer ID:', error);
+    // Handle 400/404 or error gracefully - customer may not have test drives
+    // Backend returns 400 when no test drive is found (this is expected for many customers)
+    const errorMessage = error.response?.data?.message || '';
+    const isNotFound = error.response?.status === 404 || 
+        error.response?.status === 400 ||
+        errorMessage.includes('not found') ||
+        errorMessage.includes('No test drive') ||
+        errorMessage.includes('Customer ID is required') ||
+        errorMessage.includes('Invalid customer ID');
+    
+    if (isNotFound) {
+      // Return empty array - this is expected if customer has no test drives or orders
+      // Backend requires: test drive + order + order from same dealer
+      return {
+        success: true,
+        data: []
+      };
+    }
+    
+    // For other errors, log but don't show to user
+    console.debug('Error getting test drives by customer ID:', customerId, error.response?.status);
+    
     return {
-      success: false,
-      message: error.response?.data?.message || 'Failed to get test drives',
-      data: []
+      success: true, // Return success with empty data so UI doesn't break
+      data: [],
+      message: errorMessage || 'Test drives not available'
     };
   }
 };

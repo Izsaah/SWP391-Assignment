@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '../layout/Layout';
-import { Plus, Eye, Edit2, Trash2, FileText, CheckCircle, Loader2, RefreshCw, AlertTriangle } from 'lucide-react';
-import { useLocation } from 'react-router';
-import { createOrder, viewOrdersByCustomerId, viewOrdersByStaffId } from '../services/orderService';
+import { Plus, Eye, Edit2, Trash2, FileText, CheckCircle, Loader2, RefreshCw, AlertTriangle, X, Search } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router';
+import { createOrder, viewOrdersByStaffId } from '../services/orderService';
 import { createPayment } from '../services/paymentService';
 import { fetchInventory } from '../services/inventoryService';
 import { getUserIdFromStoredToken } from '../../utils/jwtUtils';
+import { createCustomer, getAllCustomers } from '../services/customerService';
 
 const OrderForm = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const vehicleData = location.state?.vehicleData;
+  const redirectToDelivery = location.state?.redirectToDelivery;
   
   const [selectedOrderForm, setSelectedOrderForm] = useState(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -22,8 +25,21 @@ const OrderForm = () => {
   const [vehicles, setVehicles] = useState([]);
   const [loadingVehicles, setLoadingVehicles] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState(null);
-  const [allCustomers, setAllCustomers] = useState([]);
-  const [loadingCustomers, setLoadingCustomers] = useState(false);
+  
+  // Customer search states
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchingCustomers, setSearchingCustomers] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
+  const [newCustomerData, setNewCustomerData] = useState({
+    name: '',
+    email: '',
+    phoneNumber: '',
+    address: ''
+  });
+  const [allCustomersCache, setAllCustomersCache] = useState([]); // Cache all customers for client-side filtering
   
   // Form state for creating order form
   const [formData, setFormData] = useState({
@@ -55,7 +71,6 @@ const OrderForm = () => {
     bankName: '',
     loanTerm: '',
     interestRate: '',
-    prepaymentAmount: '',
     installmentMonths: '12',
     remainingAmount: '',
     monthlyPayment: '',
@@ -126,6 +141,8 @@ const OrderForm = () => {
       maximumFractionDigits: 0
     }).format(amount);
   };
+
+  // (removed) contract helper previously used for contract section
 
   // Handle view order form
   const handleView = (orderForm) => {
@@ -307,14 +324,13 @@ const OrderForm = () => {
   useEffect(() => {
     if (formData.paymentMethod === 'Installment' && formData.totalPrice) {
       const totalPriceNum = parseFloat(formData.totalPrice) || 0;
-      const prepaymentNum = parseFloat(formData.prepaymentAmount) || 0;
       const months = parseInt(formData.installmentMonths) || 12;
       
-      // Calculate remaining amount
-      const remaining = Math.max(0, totalPriceNum - prepaymentNum);
+      // For installment, remaining amount equals total price (no prepayment)
+      const remaining = totalPriceNum;
       const remainingStr = remaining.toFixed(0);
       
-      // Calculate monthly payment (divide remaining by months)
+      // Calculate monthly payment (divide total by months)
       const monthly = months > 0 ? remaining / months : 0;
       const monthlyStr = monthly.toFixed(0);
       
@@ -328,21 +344,37 @@ const OrderForm = () => {
       }
     } else if (formData.paymentMethod === 'Full Payment') {
       // Clear installment fields when Full Payment is selected (only if not already cleared)
-      if (formData.prepaymentAmount || formData.remainingAmount || formData.monthlyPayment || formData.installmentMonths !== '12') {
+      if (formData.remainingAmount || formData.monthlyPayment || formData.installmentMonths !== '12') {
         setFormData(prev => ({
           ...prev,
-          prepaymentAmount: '',
           remainingAmount: '',
           monthlyPayment: '',
           installmentMonths: '12',
         }));
       }
     }
-  }, [formData.paymentMethod, formData.totalPrice, formData.prepaymentAmount, formData.installmentMonths, formData.remainingAmount, formData.monthlyPayment]);
+  }, [formData.paymentMethod, formData.totalPrice, formData.installmentMonths, formData.remainingAmount, formData.monthlyPayment]);
 
   // Handle confirm and create order
   const handleConfirmAndCreate = async () => {
-    if (!formData.customerId || !formData.modelId || !formData.basePrice) {
+    // Validate customer is selected
+    if (!formData.customerId || !formData.customer) {
+      alert('Please search and select a customer before creating an order.');
+      setShowSearchResults(true); // Show search to help user
+      return;
+    }
+    
+    // Validate customerId is a valid number
+    const customerIdNum = parseInt(formData.customerId);
+    if (isNaN(customerIdNum) || customerIdNum <= 0) {
+      alert('Invalid customer selected. Please search and select a customer again.');
+      setFormData(prev => ({ ...prev, customer: '', customerId: '', phone: '', email: '' }));
+      setCustomerSearchTerm('');
+      return;
+    }
+    
+    // Validate other required fields
+    if (!formData.modelId || !formData.basePrice) {
       alert('Please fill in all required fields: Customer, Vehicle Model, and Price.');
       return;
     }
@@ -356,12 +388,21 @@ const OrderForm = () => {
       }
       console.log('✅ Extracted dealerStaffId from JWT token:', dealerStaffId);
 
+      // Calculate unit price from total price and quantity
+      const totalPrice = parseFloat(formData.totalPrice || formData.basePrice || 0);
+      const quantity = parseInt(formData.quantity || '1');
+      const unitPrice = quantity > 0 ? totalPrice / quantity : totalPrice;
+
+      // Use the already validated customerIdNum
       const orderData = {
-        customerId: parseInt(formData.customerId),
+        customerId: customerIdNum,
         dealerstaffId: dealerStaffId,
         modelId: parseInt(formData.modelId),
         variantId: formData.variantId ? parseInt(formData.variantId) : null,
-        quantity: parseInt(formData.quantity || '1'),
+        quantity: quantity,
+        unitPrice: unitPrice, // Send unit price to backend
+        basePrice: formData.basePrice || totalPrice.toString(), // Also send basePrice as fallback
+        totalPrice: totalPrice.toString(), // Also send totalPrice as fallback
         status: 'Pending',
         isCustom: false
       };
@@ -404,10 +445,6 @@ const OrderForm = () => {
           paymentData.termMonth = formData.installmentMonths || formData.loanTerm || '12';
           paymentData.monthlyPay = formData.monthlyPayment || formData.monthlyPay || '0';
           paymentData.status = 'Active';
-          // Include prepayment amount if provided
-          if (formData.prepaymentAmount) {
-            paymentData.prepaymentAmount = formData.prepaymentAmount;
-          }
         }
 
         console.log('📤 Creating payment with data:', paymentData);
@@ -478,48 +515,32 @@ const OrderForm = () => {
       // Refresh vehicles list
       fetchVehicles();
       
-      // Refresh order list - always refresh to show newly created order
-      const customerId = parseInt(formData.customerId);
-      if (customerId && !isNaN(customerId)) {
-        // If we know the customer ID, fetch their orders directly
-        try {
-          const ordersResult = await viewOrdersByCustomerId(customerId);
-          if (ordersResult.success && ordersResult.data && ordersResult.data.length > 0) {
-            // Find customer name if available
-            let customerName = formData.customer || `Customer ${customerId}`;
-            try {
-              const { searchCustomersByName } = await import('../services/customerService');
-              const customerResult = await searchCustomersByName(customerName);
-              if (customerResult.success && customerResult.data && customerResult.data.length > 0) {
-                const foundCustomer = customerResult.data.find(c => 
-                  (c.customerId || c.id) === customerId
-                );
-                if (foundCustomer) {
-                  customerName = foundCustomer.name || customerName;
-                }
-              }
-            } catch {
-              // Keep original customer name if search fails
-            }
-            
-            // Transform and update orders
-            const transformedOrders = ordersResult.data.map(order => 
-              transformOrderToOrderForm(order, customerName)
-            );
-            setOrderForms(transformedOrders);
-            console.log(`✅ Refreshed order list with ${transformedOrders.length} orders for customer ${customerId}`);
-          } else {
-            // If no orders found for this customer, reload all orders
-            await reloadAllOrders();
-          }
-        } catch (err) {
-          console.warn('⚠️ Could not fetch orders for customer, reloading all orders:', err);
-          await reloadAllOrders();
-        }
-      } else {
-        // If no customer ID, reload all orders
-        await reloadAllOrders();
+      // Check if we should return to CustomerDetail page
+      const returnUrl = location.state?.returnUrl;
+      const fromCustomerDetail = location.state?.fromCustomerDetail;
+      
+      if (fromCustomerDetail && returnUrl) {
+        // Navigate back to customer detail page after order creation
+        setTimeout(() => {
+          console.log('🔄 Navigating back to CustomerDetail:', returnUrl);
+          navigate(returnUrl);
+        }, 1500); // Small delay to show success message and ensure order is saved
+        return; // Exit early to prevent other redirects
       }
+      
+      // Redirect to delivery page if flag is set (from "Pick and Deliver")
+      if (redirectToDelivery) {
+        setTimeout(() => {
+          navigate('/staff/sales/delivery');
+        }, 1000); // Small delay to ensure order is saved
+      }
+      
+      // Always refresh all orders to show the newly created order
+      // Wait a bit longer to ensure the order is fully committed to the database
+      setTimeout(async () => {
+        console.log('🔄 Refreshing all orders to show newly created order...');
+        await reloadAllOrders();
+      }, 800); // Slightly longer delay to ensure database commit
       
     } catch (error) {
       console.error('❌ Error creating order:', error);
@@ -553,7 +574,6 @@ const OrderForm = () => {
       bankName: '',
       loanTerm: '',
       interestRate: '',
-      prepaymentAmount: '',
       installmentMonths: '12',
       remainingAmount: '',
       monthlyPayment: '',
@@ -562,6 +582,9 @@ const OrderForm = () => {
       attachments: [],
     });
     setSelectedVariant(null);
+    setCustomerSearchTerm('');
+    setSearchResults([]);
+    setShowSearchResults(false);
   };
 
   // Fetch vehicles from backend
@@ -602,13 +625,12 @@ const OrderForm = () => {
   };
 
 
-  // Reload all orders from database - try staff ID endpoint first, then fall back to customer-by-customer
+  // Reload all orders from database - ONLY orders for the logged-in staff member
   const reloadAllOrders = useCallback(async () => {
     try {
       setLoadingOrderForms(true);
       setOrderFormsError(null);
       const allOrders = [];
-      const processedOrderIds = new Set();
       
       // Get all customers to get their IDs and names (needed for customer name mapping)
       const { getAllCustomers } = await import('../services/customerService');
@@ -628,16 +650,16 @@ const OrderForm = () => {
         }
       }
       
-      // Method 1: Try to get all orders by staff ID (faster, gets all orders for logged-in staff)
-      console.log('🔄 Attempting to fetch orders by staff ID...');
+      // Fetch orders ONLY for the logged-in staff member
+      console.log('🔄 Fetching orders for logged-in staff member...');
       try {
         const staffOrdersResult = await viewOrdersByStaffId();
         if (staffOrdersResult.success && staffOrdersResult.data && staffOrdersResult.data.length > 0) {
-          console.log(`✅ Found ${staffOrdersResult.data.length} orders via staff ID endpoint`);
+          console.log(`✅ Found ${staffOrdersResult.data.length} orders for this staff member`);
           
           for (const order of staffOrdersResult.data) {
             const orderId = order.orderId || order.order_id;
-            if (orderId && !processedOrderIds.has(orderId)) {
+            if (orderId) {
               const customerId = order.customerId || order.customer_id;
               const customerName = customerMap.get(customerId) || `Customer ${customerId || 'Unknown'}`;
               
@@ -647,103 +669,25 @@ const OrderForm = () => {
                 customerId: customerId,
                 customerName: customerName,
                 orderDate: order.orderDate,
+                dealerStaffId: order.dealerStaffId || order.dealer_staff_id,
                 hasDetail: !!order.detail,
-                isCustom: order.isCustom,
                 quantity: order.detail?.quantity,
                 unitPrice: order.detail?.unitPrice
               });
               
               const transformed = transformOrderToOrderForm(order, customerName);
               allOrders.push(transformed);
-              processedOrderIds.add(orderId);
             }
           }
           
-          // If we got orders from staff ID endpoint, use those and skip customer-by-customer
-          if (allOrders.length > 0) {
-            console.log(`✅ Using ${allOrders.length} orders from staff ID endpoint`);
-          }
+          console.log(`✅ Loaded ${allOrders.length} orders for this staff member`);
         } else {
-          console.log(`ℹ️ Staff ID endpoint returned no orders or failed: ${staffOrdersResult.message || 'No data'}`);
+          console.log(`ℹ️ No orders found for this staff member: ${staffOrdersResult.message || 'No data'}`);
+          setOrderFormsError('No orders found for your account.');
         }
       } catch (err) {
-        console.warn('⚠️ Error fetching orders by staff ID, falling back to customer-by-customer method:', err.message);
-      }
-      
-      // Method 2: Fallback - Fetch orders for each customer (if staff ID method didn't work or returned few orders)
-      if (allOrders.length === 0) {
-        console.log('🔄 Falling back to customer-by-customer method...');
-        
-        if (!customersResult.success || !customersResult.data || customersResult.data.length === 0) {
-          setOrderFormsError('No customers found in database.');
-          setOrderForms([]);
-          setLoadingOrderForms(false);
-          return;
-        }
-        
-        const customerIds = [];
-        for (const customer of customersResult.data) {
-          const customerId = customer.customerId || customer.customer_id || customer.id;
-          if (customerId) {
-            const id = parseInt(customerId);
-            if (!isNaN(id)) {
-              customerIds.push(id);
-            }
-          }
-        }
-        
-        console.log(`✅ Found ${customerIds.length} customers. Fetching orders...`);
-        
-        // Fetch orders for each customer
-        for (const customerId of customerIds) {
-          try {
-            const ordersResult = await viewOrdersByCustomerId(customerId);
-            if (ordersResult.success && ordersResult.data && ordersResult.data.length > 0) {
-              const customerName = customerMap.get(customerId);
-              console.log(`📦 Found ${ordersResult.data.length} orders for customer ${customerId} (${customerName})`);
-              
-              for (const order of ordersResult.data) {
-                const orderId = order.orderId || order.order_id;
-                if (orderId && !processedOrderIds.has(orderId)) {
-                  const transformed = transformOrderToOrderForm(order, customerName);
-                  allOrders.push(transformed);
-                  processedOrderIds.add(orderId);
-                }
-              }
-            } else {
-              // Log when no orders found (but API call succeeded)
-              if (ordersResult.success) {
-                console.log(`ℹ️ No orders found for customer ${customerId} (${customerMap.get(customerId)})`);
-              } else {
-                console.warn(`⚠️ Failed to fetch orders for customer ${customerId} (${customerMap.get(customerId)}): ${ordersResult.message || 'Unknown error'}`);
-              }
-            }
-          } catch (err) {
-            // Log ALL errors with full details
-            const errorDetails = {
-              customerId: customerId,
-              customerName: customerMap.get(customerId) || 'Unknown',
-              status: err.response?.status,
-              statusText: err.response?.statusText,
-              message: err.response?.data?.message || err.message,
-              error: err.response?.data?.error || err.response?.data?.errorMessage,
-              fullError: err
-            };
-            
-            console.error(`❌ Error fetching orders for customer ${customerId} (${customerMap.get(customerId)}):`, errorDetails);
-            
-            // Still continue with other customers, but now we can see what went wrong
-            if (err.response?.status === 404) {
-              console.log(`  → Customer ${customerId} not found (404)`);
-            } else if (err.response?.status === 400) {
-              console.log(`  → Bad request for customer ${customerId} (400): ${err.response?.data?.message || 'Invalid request'}`);
-            } else if (err.response?.status === 401 || err.response?.status === 403) {
-              console.log(`  → Authentication/Authorization error for customer ${customerId} (${err.response?.status})`);
-            } else {
-              console.warn(`  → Unexpected error for customer ${customerId}: ${err.message}`);
-            }
-          }
-        }
+        console.error('❌ Error fetching orders by staff ID:', err);
+        setOrderFormsError(`Failed to load orders: ${err.message || 'Unknown error'}`);
       }
       
       // Sort by order ID (newest first)
@@ -754,7 +698,7 @@ const OrderForm = () => {
       });
       
       setOrderForms(allOrders);
-      console.log(`✅ Loaded ${allOrders.length} orders from database`);
+      console.log(`✅ Total orders displayed: ${allOrders.length}`);
     } catch (err) {
       console.error('❌ Error loading orders:', err);
       setOrderForms([]);
@@ -764,28 +708,224 @@ const OrderForm = () => {
     }
   }, []);
 
-  // Fetch all customers on mount
+  // Load all customers once on mount for client-side filtering
   useEffect(() => {
     const loadAllCustomers = async () => {
-      setLoadingCustomers(true);
       try {
-        const { getAllCustomers } = await import('../services/customerService');
+        setSearchingCustomers(true);
         const result = await getAllCustomers();
-        if (result.success && result.data) {
-          setAllCustomers(result.data);
-          console.log(`✅ Loaded ${result.data.length} customers for dropdown`);
-        } else {
-          setAllCustomers([]);
+        if (result.success && result.data && Array.isArray(result.data)) {
+          setAllCustomersCache(result.data);
+          console.log(`✅ Loaded ${result.data.length} customers for search`);
         }
       } catch (err) {
         console.error('Error loading customers:', err);
-        setAllCustomers([]);
       } finally {
-        setLoadingCustomers(false);
+        setSearchingCustomers(false);
       }
     };
     loadAllCustomers();
   }, []);
+
+  // Handle customer search input change with client-side filtering
+  useEffect(() => {
+    const filterCustomers = (searchTerm) => {
+      if (!searchTerm || searchTerm.trim().length < 2) {
+        setSearchResults([]);
+        setShowSearchResults(false);
+        return;
+      }
+
+      const searchLower = searchTerm.trim().toLowerCase();
+      
+      // Filter customers client-side - match if name contains the search term (case-insensitive)
+      const filtered = allCustomersCache.filter(customer => {
+        const customerName = (customer.name || '').toLowerCase();
+        // Check if customer name contains the search term (partial match)
+        return customerName.includes(searchLower);
+      });
+
+      if (filtered.length > 0) {
+        setSearchResults(filtered);
+        setShowSearchResults(true);
+      } else {
+        setSearchResults([]);
+        setShowSearchResults(true); // Still show "no results" message with create button
+      }
+    };
+
+    // Debounce the filtering
+    const timeoutId = setTimeout(() => {
+      filterCustomers(customerSearchTerm);
+    }, 200); // Reduced debounce time since it's client-side filtering
+
+    return () => clearTimeout(timeoutId);
+  }, [customerSearchTerm, allCustomersCache]);
+
+  // Select a customer from search results
+  const handleSelectCustomer = (customer) => {
+    const customerId = customer.customerId || customer.customer_id || customer.id;
+    setFormData(prev => ({
+      ...prev,
+      customer: customer.name || '',
+      customerId: customerId.toString(),
+      phone: customer.phoneNumber || customer.phone || '',
+      email: customer.email || ''
+    }));
+    setCustomerSearchTerm(customer.name || '');
+    setShowSearchResults(false);
+    setSearchResults([]);
+  };
+
+  // Handle create customer
+  const handleCreateCustomer = async () => {
+    if (!newCustomerData.name.trim() || !newCustomerData.email.trim()) {
+      alert('Name and Email are required');
+      return;
+    }
+
+    setCreatingCustomer(true);
+    try {
+      const result = await createCustomer({
+        name: newCustomerData.name.trim(),
+        email: newCustomerData.email.trim(),
+        phoneNumber: newCustomerData.phoneNumber || '',
+        address: newCustomerData.address || ''
+      });
+
+      if (result.success) {
+        // Extract customer ID from the response message (format: "Customer ID: X")
+        let newCustomerId = null;
+        if (result.data) {
+          const idMatch = String(result.data).match(/Customer ID: (\d+)/);
+          if (idMatch) {
+            newCustomerId = parseInt(idMatch[1]);
+          }
+        }
+
+        // Wait a moment for database to be updated
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Refresh customer cache to include the newly created customer
+        try {
+          const refreshResult = await getAllCustomers();
+          if (refreshResult.success && refreshResult.data && Array.isArray(refreshResult.data)) {
+            setAllCustomersCache(refreshResult.data);
+            
+            // Try to find the newly created customer in the refreshed cache
+            let newCustomer = null;
+            if (newCustomerId) {
+              newCustomer = refreshResult.data.find(c => {
+                const id = c.customerId || c.customer_id || c.id;
+                return id && parseInt(id) === newCustomerId;
+              });
+            }
+            // Fallback: match by email if ID match fails
+            if (!newCustomer) {
+              newCustomer = refreshResult.data.find(c => 
+                c.email && c.email.trim() === newCustomerData.email.trim()
+              );
+            }
+            // Fallback: match by exact name
+            if (!newCustomer) {
+              newCustomer = refreshResult.data.find(c => 
+                c.name && c.name.trim() === newCustomerData.name.trim()
+              );
+            }
+            
+            if (newCustomer) {
+              // Auto-select the newly created customer
+              handleSelectCustomer(newCustomer);
+              alert('✅ Customer created successfully and selected!');
+            } else if (newCustomerId) {
+              // Create a temporary customer object if we have the ID but can't find it in cache
+              const tempCustomer = {
+                customerId: newCustomerId,
+                customer_id: newCustomerId,
+                id: newCustomerId,
+                name: newCustomerData.name.trim(),
+                email: newCustomerData.email.trim(),
+                phoneNumber: newCustomerData.phoneNumber || '',
+                phone: newCustomerData.phoneNumber || ''
+              };
+              handleSelectCustomer(tempCustomer);
+              alert('✅ Customer created successfully and selected!');
+            } else {
+              setCustomerSearchTerm(newCustomerData.name.trim());
+              alert('✅ Customer created successfully! Please wait a moment and search for the customer name to select them.');
+            }
+          }
+        } catch (refreshErr) {
+          console.error('Error refreshing customer cache:', refreshErr);
+          // Fallback: use the customer data we have if cache refresh fails
+          if (newCustomerId) {
+            const tempCustomer = {
+              customerId: newCustomerId,
+              customer_id: newCustomerId,
+              id: newCustomerId,
+              name: newCustomerData.name.trim(),
+              email: newCustomerData.email.trim(),
+              phoneNumber: newCustomerData.phoneNumber || '',
+              phone: newCustomerData.phoneNumber || ''
+            };
+            handleSelectCustomer(tempCustomer);
+            alert('✅ Customer created successfully and selected!');
+          }
+        }
+
+        // Reset form and close modal
+        setNewCustomerData({ name: '', email: '', phoneNumber: '', address: '' });
+        setShowCreateCustomerModal(false);
+      } else {
+        alert(`❌ Failed to create customer: ${result.message || 'Unknown error'}`);
+        // Close modal after alert is dismissed
+        setNewCustomerData({ name: '', email: '', phoneNumber: '', address: '' });
+        setShowCreateCustomerModal(false);
+      }
+    } catch (err) {
+      console.error('Error creating customer:', err);
+      alert('❌ An error occurred while creating customer');
+      // Close modal after alert is dismissed
+      setNewCustomerData({ name: '', email: '', phoneNumber: '', address: '' });
+      setShowCreateCustomerModal(false);
+    } finally {
+      setCreatingCustomer(false);
+    }
+  };
+
+  // Pre-fill customer when coming from CustomerDetail page
+  useEffect(() => {
+    const customerData = location.state?.customer;
+    const fromCustomerDetail = location.state?.fromCustomerDetail;
+    
+    if (fromCustomerDetail && customerData) {
+      console.log('✅ Pre-filling customer from CustomerDetail:', customerData);
+      // Pre-fill customer information
+      setFormData(prev => ({
+        ...prev,
+        customer: customerData.name || '',
+        customerId: customerData.customerId?.toString() || customerData.id?.toString() || '',
+        phone: customerData.phone || customerData.phoneNumber || '',
+        email: customerData.email || ''
+      }));
+      
+      // Set search term to show selected customer
+      setCustomerSearchTerm(customerData.name || '');
+      
+      // Open create modal automatically after a short delay to ensure form is ready
+      setTimeout(() => {
+        setIsCreateModalOpen(true);
+      }, 100);
+    }
+  }, [location.state]);
+
+  // Initialize customer search term when form opens with existing customer
+  useEffect(() => {
+    if (isCreateModalOpen && formData.customer && !customerSearchTerm) {
+      setCustomerSearchTerm(formData.customer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCreateModalOpen, formData.customer]); // customerSearchTerm excluded to prevent infinite loop
 
   // Fetch vehicles on mount
   useEffect(() => {
@@ -845,7 +985,7 @@ const OrderForm = () => {
         setFormData(prev => ({
           ...prev,
           modelId: vehicleData.modelId,
-          model: vehicleData.modelName || vehicleData.title,
+          model: vehicleData.modelName || vehicleData.title || vehicleData.model,
         }));
       }
       if (vehicleData.variantId) {
@@ -854,6 +994,21 @@ const OrderForm = () => {
           variantId: vehicleData.variantId,
           basePrice: vehicleData.price || vehicleData.dealerPrice || '',
           color: vehicleData.color || 'White',
+        }));
+      }
+      // Also set VIN if available
+      if (vehicleData.vin || vehicleData.serialId) {
+        setFormData(prev => ({
+          ...prev,
+          vin: vehicleData.vin || vehicleData.serialId || 'Pending',
+        }));
+      }
+      // Set total price if base price is set
+      if (vehicleData.price || vehicleData.dealerPrice) {
+        const price = vehicleData.price || vehicleData.dealerPrice;
+        setFormData(prev => ({
+          ...prev,
+          totalPrice: price.toString(),
         }));
       }
     }
@@ -986,15 +1141,9 @@ const OrderForm = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{orderForm.customer}</div>
-                      {orderForm.customerId && (
-                        <div className="text-xs text-gray-500">ID: {orderForm.customerId}</div>
-                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{orderForm.vehicle}</div>
-                      {orderForm.modelId && (
-                        <div className="text-xs text-gray-500">Model ID: {orderForm.modelId}</div>
-                      )}
                       {orderForm.quantity > 1 && (
                         <div className="text-xs text-orange-700 font-semibold mt-1">
                           Qty: {orderForm.quantity} units
@@ -1095,6 +1244,24 @@ const OrderForm = () => {
               </div>
 
               <div className="p-6 space-y-6 max-h-[calc(90vh-200px)] overflow-y-auto">
+                {/* Delivery Banner (shown when coming from "Pick and Deliver") */}
+                {redirectToDelivery && (
+                  <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-lg">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-green-800">
+                          Pick and Deliver: After creating this order, you'll be redirected to the Delivery section to manage the delivery.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 {/* Customer Information */}
                 <div className="border-2 border-gray-200 rounded-lg p-5 bg-gradient-to-br from-blue-50 to-white">
                   <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center space-x-2">
@@ -1103,65 +1270,122 @@ const OrderForm = () => {
                   </h3>
                   
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-1">
+                    <div className="col-span-2 relative">
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Customer Name <span className="text-red-500">*</span>
+                        Search Customer by Name <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        value={formData.customerId || ''}
-                        onChange={(e) => {
-                          const selectedCustomerId = e.target.value;
-                          if (selectedCustomerId) {
-                            const selectedCustomer = allCustomers.find(c => 
-                              (c.customerId || c.customer_id || c.id).toString() === selectedCustomerId
-                            );
-                            if (selectedCustomer) {
-                              setFormData(prev => ({
-                                ...prev,
-                                customer: selectedCustomer.name || '',
-                                customerId: selectedCustomerId,
-                                phone: selectedCustomer.phoneNumber || selectedCustomer.phone || '',
-                                email: selectedCustomer.email || ''
-                              }));
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={customerSearchTerm}
+                          onChange={(e) => {
+                            setCustomerSearchTerm(e.target.value);
+                            if (!e.target.value) {
+                              setFormData(prev => ({ ...prev, customer: '', customerId: '', phone: '', email: '' }));
                             }
-                          } else {
-                            setFormData(prev => ({ ...prev, customer: '', customerId: '', phone: '', email: '' }));
-                          }
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                        required
-                      >
-                        <option value="">Select a customer...</option>
-                        {loadingCustomers ? (
-                          <option disabled>Loading customers...</option>
-                        ) : (
-                          allCustomers.map((customer) => (
-                            <option key={customer.customerId || customer.customer_id || customer.id} 
-                                    value={customer.customerId || customer.customer_id || customer.id}>
-                              {customer.name} {customer.email ? `(${customer.email})` : ''}
-                            </option>
-                          ))
+                          }}
+                          onFocus={() => {
+                            // Show results if we have a search term (at least 2 characters)
+                            // This will show either matching results or the "no results" message with create button
+                            if (customerSearchTerm.trim().length >= 2) {
+                              setShowSearchResults(true);
+                            }
+                          }}
+                          onBlur={() => {
+                            // Delay hiding to allow click on results
+                            // Use a longer delay to ensure clicks are registered
+                            setTimeout(() => setShowSearchResults(false), 300);
+                          }}
+                          onKeyDown={(e) => {
+                            // Allow Escape to close results
+                            if (e.key === 'Escape') {
+                              setShowSearchResults(false);
+                            }
+                            // Allow Enter to select first result
+                            if (e.key === 'Enter' && searchResults.length > 0) {
+                              e.preventDefault();
+                              handleSelectCustomer(searchResults[0]);
+                            }
+                          }}
+                          placeholder="Type customer name to search (min 2 characters)..."
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white pr-10"
+                          required
+                        />
+                        {searchingCustomers && (
+                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                            <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                          </div>
                         )}
-                      </select>
-                      {formData.customer && (
+                        
+                        {/* Search Results Dropdown */}
+                        {showSearchResults && searchResults.length > 0 && (
+                          <div 
+                            className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                            onMouseDown={(e) => e.preventDefault()} // Prevent input blur when clicking results
+                          >
+                            {searchResults.map((customer) => {
+                              const customerId = customer.customerId || customer.customer_id || customer.id;
+                              return (
+                                <div
+                                  key={customerId}
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    handleSelectCustomer(customer);
+                                  }}
+                                  className="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                                >
+                                  <div className="font-medium text-gray-900">{customer.name}</div>
+                                  {customer.email && (
+                                    <div className="text-xs text-gray-500">📧 {customer.email}</div>
+                                  )}
+                                  {customer.phoneNumber && (
+                                    <div className="text-xs text-gray-500">📞 {customer.phoneNumber}</div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        
+                        {/* No results found - show create option */}
+                        {showSearchResults && !searchingCustomers && customerSearchTerm.trim().length >= 2 && searchResults.length === 0 && (
+                          <div 
+                            className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4"
+                            onMouseDown={(e) => e.preventDefault()} // Prevent input blur when clicking button
+                          >
+                            <div className="text-sm text-gray-600 mb-3">
+                              No customer found with name "{customerSearchTerm}"
+                            </div>
+                            <button
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setNewCustomerData({
+                                  name: customerSearchTerm.trim(),
+                                  email: '',
+                                  phoneNumber: '',
+                                  address: ''
+                                });
+                                setShowCreateCustomerModal(true);
+                                setShowSearchResults(false);
+                              }}
+                              className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center justify-center space-x-2 transition-colors"
+                            >
+                              <Plus className="w-4 h-4" />
+                              <span>Create New Customer "{customerSearchTerm}"</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Selected Customer Info */}
+                      {formData.customer && formData.customerId && (
                         <div className="mt-2 text-sm text-gray-600 bg-blue-50 p-2 rounded">
-                          Selected: <span className="font-semibold">{formData.customer}</span>
+                          <div className="font-semibold text-blue-900">Selected: {formData.customer}</div>
+                          {formData.email && <div className="text-xs mt-1">📧 {formData.email}</div>}
+                          {formData.phone && <div className="text-xs">📞 {formData.phone}</div>}
                         </div>
                       )}
-                    </div>
-
-                    <div className="col-span-1">
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Customer ID <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.customerId}
-                        disabled
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
-                        placeholder="Auto-filled"
-                        required
-                      />
                     </div>
 
                     <div className="col-span-1">
@@ -1169,9 +1393,9 @@ const OrderForm = () => {
                       <input
                         type="text"
                         value={formData.phone}
-                        disabled
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
-                        placeholder="Auto-filled"
+                        readOnly
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700"
+                        placeholder="Auto-filled from customer"
                       />
                     </div>
 
@@ -1180,9 +1404,9 @@ const OrderForm = () => {
                       <input
                         type="email"
                         value={formData.email}
-                        disabled
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
-                        placeholder="Auto-filled"
+                        readOnly
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700"
+                        placeholder="Auto-filled from customer"
                       />
                     </div>
                   </div>
@@ -1432,7 +1656,7 @@ const OrderForm = () => {
                       ))}
                     </div>
                     
-                    {/* Prepayment Section for Installment */}
+                    {/* Installment Payment Details */}
                     {formData.paymentMethod === 'Installment' && (
                       <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg space-y-4">
                         <div className="flex items-start space-x-3 mb-4">
@@ -1440,47 +1664,9 @@ const OrderForm = () => {
                           <div>
                             <h4 className="font-semibold text-blue-900 mb-1">Installment Payment Details</h4>
                             <p className="text-sm text-blue-800">
-                              Enter prepayment amount and select payment period. All remaining payments will be paid in full within the selected period.
+                              Select payment period. The total amount will be divided into monthly payments over the selected period.
                             </p>
                           </div>
-                        </div>
-                        
-                        {/* Prepayment Amount Input */}
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Prepayment Amount (₫) <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="number"
-                            name="prepaymentAmount"
-                            value={formData.prepaymentAmount}
-                            onChange={(e) => {
-                              const prepaymentValue = e.target.value;
-                              const totalPriceNum = parseFloat(formData.totalPrice) || 0;
-                              
-                              // Validate: prepayment cannot exceed total price
-                              if (prepaymentValue && parseFloat(prepaymentValue) > totalPriceNum) {
-                                alert(`⚠️ Prepayment amount cannot exceed total price of ${formatCurrency(totalPriceNum)}`);
-                                return;
-                              }
-                              
-                              setFormData(prev => ({
-                                ...prev,
-                                prepaymentAmount: prepaymentValue
-                              }));
-                            }}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                            placeholder="Enter prepayment amount (e.g., 50000000)"
-                            min="0"
-                            max={formData.totalPrice || undefined}
-                            step="1000"
-                          />
-                          {formData.totalPrice && (
-                            <p className="text-xs text-gray-500 mt-1">
-                              Total Price: {formatCurrency(parseFloat(formData.totalPrice) || 0)} • 
-                              Maximum: {formatCurrency(parseFloat(formData.totalPrice) || 0)}
-                            </p>
-                          )}
                         </div>
                         
                         {/* Installment Period Selection */}
@@ -1534,14 +1720,6 @@ const OrderForm = () => {
                               </div>
                             )}
                             
-                            {formData.prepaymentAmount && (
-                              <div className="flex justify-between items-center pt-2 border-t border-gray-200 mt-2">
-                                <span className="text-sm font-medium text-gray-600">Prepayment:</span>
-                                <span className="text-base font-semibold text-green-600">
-                                  {formatCurrency(parseFloat(formData.prepaymentAmount) || 0)}
-                                </span>
-                              </div>
-                            )}
                           </div>
                         )}
                       </div>
@@ -1751,6 +1929,129 @@ const OrderForm = () => {
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Create Customer Modal */}
+        {showCreateCustomerModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 border-b border-blue-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold flex items-center space-x-2">
+                      <Plus className="w-6 h-6" />
+                      <span>Create New Customer</span>
+                    </h2>
+                    <p className="text-white/90 text-sm mt-1">
+                      Quickly create a new customer for this order
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowCreateCustomerModal(false);
+                      setNewCustomerData({ name: '', email: '', phoneNumber: '', address: '' });
+                    }}
+                    className="p-2 hover:bg-white/10 rounded-full transition-all duration-200"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-4 max-h-[calc(90vh-200px)] overflow-y-auto">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newCustomerData.name}
+                    onChange={(e) => setNewCustomerData(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Customer name"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Email <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={newCustomerData.email}
+                    onChange={(e) => setNewCustomerData(prev => ({ ...prev, email: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="customer@example.com"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={newCustomerData.phoneNumber}
+                    onChange={(e) => setNewCustomerData(prev => ({ ...prev, phoneNumber: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Phone number (optional)"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Address
+                  </label>
+                  <textarea
+                    value={newCustomerData.address}
+                    onChange={(e) => setNewCustomerData(prev => ({ ...prev, address: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Address (optional)"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs text-blue-800">
+                    💡 <strong>Note:</strong> This customer will be created and automatically selected for the order. 
+                    The customer will appear in the customer list and will be associated with this order.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 border-t border-gray-200 p-4 flex items-center justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setShowCreateCustomerModal(false);
+                    setNewCustomerData({ name: '', email: '', phoneNumber: '', address: '' });
+                  }}
+                  disabled={creatingCustomer}
+                  className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateCustomer}
+                  disabled={creatingCustomer || !newCustomerData.name.trim() || !newCustomerData.email.trim()}
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                >
+                  {creatingCustomer ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      <span>Create Customer</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>

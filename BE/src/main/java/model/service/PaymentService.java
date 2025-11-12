@@ -1,5 +1,6 @@
 package model.service;
 
+import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -18,26 +19,51 @@ public class PaymentService {
     private final DealerDAO dealerDAO = new DealerDAO();
     private final DealerPromotionDAO dealerPromoDAO = new DealerPromotionDAO();
     private final CustomerDAO customerDAO = new CustomerDAO();
+    private final VehicleModelDAO modelDAO = new VehicleModelDAO();
+    private final VehicleVariantDAO variantDAO = new VehicleVariantDAO();
+    private final VehicleSerialDAO serialDAO = new VehicleSerialDAO();
 
     public PaymentDTO processPayment(int orderId, String method, InstallmentPlanDTO plan) throws ClassNotFoundException, SQLException {
+        System.out.println("DEBUG: Starting payment processing for order_id = " + orderId);
+
         OrderDTO order = orderDAO.getById(orderId);
         if (order == null) {
-            return null;
+            System.err.println("ERROR: Order not found for order_id = " + orderId);
+            throw new IllegalArgumentException("Order not found for order_id = " + orderId);
+        }
+        System.out.println("DEBUG: Order found - customer_id = " + order.getCustomerId());
+
+        // Check if customer ID is valid (not 0)
+        if (order.getCustomerId() <= 0) {
+            System.err.println("ERROR: Invalid customer ID (" + order.getCustomerId() + ") for order: " + orderId);
+            throw new IllegalArgumentException("Invalid customer ID for order: " + orderId);
         }
 
-        OrderDetailDTO detail = orderDetailDAO.getOrderDetailByOrderId(orderId);
+        // Check if payment already exists
+        System.out.println("DEBUG: Checking for existing payment...");
+        PaymentDTO existingPayment = paymentDAO.findPaymentByOrderId(orderId);
+        if (existingPayment != null) {
+            System.err.println("ERROR: Payment already exists for Order ID: " + orderId + ", Payment ID: " + existingPayment.getPaymentId());
+            throw new IllegalStateException("Payment already exists for Order ID: " + orderId);
+        }
+        System.out.println("DEBUG: No existing payment found");
+
+        List<OrderDetailDTO> detail = orderDetailDAO.getOrderDetailListByOrderId(orderId);
         if (detail == null) {
             return null;
         }
-        order.setDetail(detail);
+        order.setDetails(detail);
 
         double totalAmount = 0.0;
-        try {
-            int quantity = Integer.parseInt(detail.getQuantity());
-            double unitPrice = detail.getUnitPrice();
-            totalAmount = quantity * unitPrice;
-        } catch (NumberFormatException e) {
-            return null;
+        for (OrderDetailDTO d : detail) {
+            try {
+                int quantity = Integer.parseInt(d.getQuantity());
+                double unitPrice = d.getUnitPrice();
+                totalAmount += quantity * unitPrice;
+            } catch (NumberFormatException e) {
+                e.printStackTrace();
+                return null;
+            }
         }
 
         // Apply promotions
@@ -144,138 +170,417 @@ public class PaymentService {
         }
     }
 
-    public List<Map<String, Object>> getCustomersWithActiveInstallments() {
+    public List<Map<String, Object>> getCustomersWithActiveInstallmentsByDealer(int dealerId) {
         List<Map<String, Object>> responseList = new ArrayList<>();
         try {
             List<InstallmentPlanDTO> plans = installDAO.getActiveOrOverduePlans();
-            if (plans != null && !plans.isEmpty()) {
-                Set<Integer> addedCustomerIds = new HashSet<>();
-                for (InstallmentPlanDTO plan : plans) {
-                    PaymentDTO payment = paymentDAO.findPaymentById(plan.getPaymentId());
-                    if (payment == null) {
-                        continue;
-                    }
-
-                    OrderDTO order = orderDAO.getById(payment.getOrderId());
-                    if (order == null) {
-                        continue;
-                    }
-
-                    int customerId = order.getCustomerId();
-                    if (customerId <= 0 || addedCustomerIds.contains(customerId)) {
-                        continue;
-                    }
-
-                    List<CustomerDTO> customerList = customerDAO.findById(customerId);
-                    if (customerList == null || customerList.isEmpty()) {
-                        continue;
-                    }
-
-                    CustomerDTO customer = customerList.get(0);
-                    double monthlyPay = 0.0;
-                    int termMonth = 0;
-                    try {
-                        monthlyPay = Double.parseDouble(plan.getMonthlyPay());
-                    } catch (NumberFormatException e) {
-                    }
-                    try {
-                        termMonth = Integer.parseInt(plan.getTermMonth());
-                    } catch (NumberFormatException e) {
-                    }
-
-                    double outstanding = Math.max(0, monthlyPay * termMonth);
-
-                    Map<String, Object> map = new LinkedHashMap<>();
-
-                    map.put("customerId", customer.getCustomerId());
-                    map.put("name", customer.getName());
-                    map.put("address", customer.getAddress());
-                    map.put("email", customer.getEmail());
-                    map.put("phoneNumber", customer.getPhoneNumber());
-
-                    map.put("planId", plan.getPlanId());
-                    map.put("interestRate", plan.getInterestRate());
-                    map.put("termMonth", plan.getTermMonth());
-                    map.put("monthlyPay", plan.getMonthlyPay());
-                    map.put("status", plan.getStatus());
-
-                    map.put("paymentId", payment.getPaymentId());
-                    map.put("orderId", payment.getOrderId());
-                    map.put("totalAmount", payment.getAmount());
-                    map.put("paymentDate", payment.getPaymentDate());
-                    map.put("method", payment.getMethod());
-
-                    map.put("outstandingAmount", outstanding);
-                    map.put("paidAmount", payment.getAmount() - outstanding);
-                    
-                    responseList.add(map);
-                    addedCustomerIds.add(customerId);
-                }
+            if (plans == null || plans.isEmpty()) {
+                return responseList;
             }
+
+            for (InstallmentPlanDTO plan : plans) {
+                PaymentDTO payment = paymentDAO.findPaymentById(plan.getPaymentId());
+                if (payment == null) {
+                    continue;
+                }
+
+                OrderDTO order = orderDAO.getById(payment.getOrderId());
+                if (order == null) {
+                    continue;
+                }
+
+                // Check if order belongs to the dealer
+                // Get dealer staff who processed this order
+                UserAccountDTO dealerStaff = userAccountDAO.getUserById(order.getDealerStaffId());
+                if (dealerStaff == null || dealerStaff.getDealerId() != dealerId) {
+                    continue; // Skip orders not from this dealer
+                }
+
+                // Get dealer name
+                String dealerName = "Unknown";
+                DealerDTO dealer = dealerDAO.GetDealerById(dealerId);
+                if (dealer != null) {
+                    dealerName = dealer.getDealerName();
+                }
+
+                int customerId = order.getCustomerId();
+                if (customerId <= 0) {
+                    continue;
+                }
+
+                List<CustomerDTO> customerList = customerDAO.findById(customerId);
+                if (customerList == null || customerList.isEmpty()) {
+                    continue;
+                }
+                CustomerDTO customer = customerList.get(0);
+
+                // Get model information
+                int modelId = order.getModelId();
+                String modelName = "Unknown";
+                List<VehicleModelDTO> modelList = modelDAO.viewVehicleModelById(modelId);
+                if (modelList != null && !modelList.isEmpty()) {
+                    modelName = modelList.get(0).getModelName();
+                }
+
+                // Get order detail for serial_id
+                OrderDetailDTO detail = orderDetailDAO.getOrderDetailByOrderId(order.getOrderId());
+                String serialId = null;
+                Integer variantId = null;
+                String variantName = null;
+
+                if (detail != null) {
+                    serialId = detail.getSerialId();
+
+                    // Get variant info from serial_id
+                    if (serialId != null && !serialId.trim().isEmpty()) {
+                        VehicleSerialDTO vehicleSerial = serialDAO.getSerialBySerialId(serialId);
+                        if (vehicleSerial != null && vehicleSerial.getVariantId() > 0) {
+                            variantId = vehicleSerial.getVariantId();
+                            VehicleVariantDTO variant = variantDAO.getVariantById(variantId);
+                            if (variant != null) {
+                                variantName = variant.getVersionName();
+                            }
+                        }
+                    }
+                }
+
+                // Parse values
+                double monthlyPay = 0.0;
+                int remainingTermMonth = 0;
+
+                try {
+                    monthlyPay = Double.parseDouble(plan.getMonthlyPay());
+                } catch (NumberFormatException e) {
+                    System.err.println("Invalid monthlyPay for plan " + plan.getPlanId());
+                }
+
+                try {
+                    remainingTermMonth = Integer.parseInt(plan.getTermMonth());
+                } catch (NumberFormatException e) {
+                    System.err.println("Invalid termMonth for plan " + plan.getPlanId());
+                }
+
+                // Get the original payment amount (this is the principal)
+                double originalPrincipal = payment.getAmount();
+
+                // Calculate original term months from principal and monthly payment
+                int originalTermMonth = 0;
+                if (monthlyPay > 0) {
+                    originalTermMonth = (int) Math.round(originalPrincipal / monthlyPay);
+                } else {
+                    originalTermMonth = remainingTermMonth; // Fallback
+                }
+
+                // Ensure originalTermMonth is at least remainingTermMonth
+                if (originalTermMonth < remainingTermMonth) {
+                    originalTermMonth = remainingTermMonth;
+                }
+
+                // Calculate total amount (total commitment)
+                double totalAmountWithInterest = monthlyPay * originalTermMonth;
+
+                // Calculate outstanding (what's left to pay)
+                double outstanding = monthlyPay * remainingTermMonth;
+
+                // Calculate paid amount (what's been paid so far)
+                int paidMonths = originalTermMonth - remainingTermMonth;
+                double paidAmount = monthlyPay * paidMonths;
+
+                // Ensure non-negative values
+                outstanding = Math.max(0, outstanding);
+                paidAmount = Math.max(0, paidAmount);
+
+                // If remaining term is 0, plan is fully paid
+                if (remainingTermMonth <= 0) {
+                    outstanding = 0.0;
+                    paidAmount = totalAmountWithInterest;
+                }
+
+                Map<String, Object> map = new LinkedHashMap<>();
+                // Customer info
+                map.put("customerId", customer.getCustomerId());
+                map.put("name", customer.getName());
+                map.put("address", customer.getAddress());
+                map.put("email", customer.getEmail());
+                map.put("phoneNumber", customer.getPhoneNumber());
+
+                // Vehicle info
+                map.put("modelId", modelId);
+                map.put("modelName", modelName);
+                map.put("variantId", variantId);
+                map.put("variantName", variantName);
+                map.put("serialId", serialId);
+
+                // Dealer info
+                map.put("dealerId", dealerId);
+                map.put("dealerName", dealerName);
+
+                // Installment plan info
+                map.put("planId", plan.getPlanId());
+                map.put("interestRate", plan.getInterestRate());
+                map.put("termMonth", plan.getTermMonth());
+                map.put("monthlyPay", plan.getMonthlyPay());
+                map.put("status", plan.getStatus());
+
+                // Payment info
+                map.put("paymentId", payment.getPaymentId());
+                map.put("orderId", payment.getOrderId());
+                map.put("totalAmount", totalAmountWithInterest);
+                map.put("paymentDate", payment.getPaymentDate());
+                map.put("method", payment.getMethod());
+                map.put("outstandingAmount", outstanding);
+                map.put("paidAmount", paidAmount);
+
+                responseList.add(map);
+            }
+
         } catch (Exception e) {
+            System.err.println("ERROR in getCustomersWithActiveInstallmentsByDealer: " + e.getMessage());
             e.printStackTrace();
         }
         return responseList;
     }
 
-    public List<Map<String, Object>> getAllCustomersWithTTStatus() {
+    public List<Map<String, Object>> getCustomersWithTTStatusByDealer(int dealerId) {
         List<Map<String, Object>> responseList = new ArrayList<>();
         try {
-            // Get all payments with TT (direct payment) method
             List<PaymentDTO> allPayments = paymentDAO.getAllPayment();
-
-            if (allPayments != null && !allPayments.isEmpty()) {
-                Set<Integer> addedCustomerIds = new HashSet<>();
-
-                for (PaymentDTO payment : allPayments) {
-                    // Only process TT (direct payment) methods
-                    if (!"TT".equalsIgnoreCase(payment.getMethod())) {
-                        continue;
-                    }
-
-                    // Get the order associated with this payment
-                    OrderDTO order = orderDAO.getById(payment.getOrderId());
-                    if (order == null) {
-                        continue;
-                    }
-
-                    int customerId = order.getCustomerId();
-
-                    // Skip if customer already added or invalid ID
-                    if (customerId <= 0 || addedCustomerIds.contains(customerId)) {
-                        continue;
-                    }
-
-                    // Get customer details
-                    List<CustomerDTO> customerList = customerDAO.findById(customerId);
-                    if (customerList == null || customerList.isEmpty()) {
-                        continue;
-                    }
-
-                    CustomerDTO customer = customerList.get(0);
-
-                    // Build response map
-                    Map<String, Object> map = new LinkedHashMap<>();
-
-                    map.put("customerId", customer.getCustomerId());
-                    map.put("name", customer.getName());
-                    map.put("address", customer.getAddress());
-                    map.put("email", customer.getEmail());
-                    map.put("phoneNumber", customer.getPhoneNumber());
-
-                    map.put("paymentId", payment.getPaymentId());
-                    map.put("orderId", payment.getOrderId());
-                    map.put("amount", payment.getAmount());
-                    map.put("paymentDate", payment.getPaymentDate());
-                    map.put("method", payment.getMethod());
-
-                    responseList.add(map);
-                    addedCustomerIds.add(customerId);
-                }
+            if (allPayments == null || allPayments.isEmpty()) {
+                return responseList;
             }
+
+            // Get dealer name once (optimization)
+            String dealerName = "Unknown";
+            DealerDTO dealer = dealerDAO.GetDealerById(dealerId);
+            if (dealer != null) {
+                dealerName = dealer.getDealerName();
+            }
+
+            for (PaymentDTO payment : allPayments) {
+                if (!"TT".equalsIgnoreCase(payment.getMethod())) {
+                    continue;
+                }
+
+                OrderDTO order = orderDAO.getById(payment.getOrderId());
+                if (order == null) {
+                    continue;
+                }
+
+                // 🔍 Check dealer ownership (same logic as installment)
+                UserAccountDTO dealerStaff = userAccountDAO.getUserById(order.getDealerStaffId());
+                if (dealerStaff == null || dealerStaff.getDealerId() != dealerId) {
+                    continue; // skip if not from this dealer
+                }
+
+                int customerId = order.getCustomerId();
+                if (customerId <= 0) {
+                    continue;
+                }
+
+                List<CustomerDTO> customerList = customerDAO.findById(customerId);
+                if (customerList == null || customerList.isEmpty()) {
+                    continue;
+                }
+
+                CustomerDTO customer = customerList.get(0);
+
+                // Get model information
+                int modelId = order.getModelId();
+                String modelName = "Unknown";
+                List<VehicleModelDTO> modelList = modelDAO.viewVehicleModelById(modelId);
+                if (modelList != null && !modelList.isEmpty()) {
+                    modelName = modelList.get(0).getModelName();
+                }
+
+                // Get order detail for serial_id and variant info
+                OrderDetailDTO detail = orderDetailDAO.getOrderDetailByOrderId(order.getOrderId());
+                String serialId = null;
+                Integer variantId = null;
+                String variantName = null;
+
+                if (detail != null) {
+                    serialId = detail.getSerialId();
+
+                    // Get variant info from serial_id
+                    if (serialId != null && !serialId.trim().isEmpty()) {
+                        VehicleSerialDTO vehicleSerial = serialDAO.getSerialBySerialId(serialId);
+                        if (vehicleSerial != null && vehicleSerial.getVariantId() > 0) {
+                            variantId = vehicleSerial.getVariantId();
+                            VehicleVariantDTO variant = variantDAO.getVariantById(variantId);
+                            if (variant != null) {
+                                variantName = variant.getVersionName();
+                            }
+                        }
+                    }
+                }
+
+                // Get order details for calculated total
+                List<OrderDetailDTO> orderDetails = orderDetailDAO.getOrderDetailListByOrderId(payment.getOrderId());
+                double calculatedTotal = 0.0;
+                if (orderDetails != null && !orderDetails.isEmpty()) {
+                    for (OrderDetailDTO od : orderDetails) {
+                        try {
+                            int quantity = Integer.parseInt(od.getQuantity());
+                            double unitPrice = od.getUnitPrice();
+                            calculatedTotal += quantity * unitPrice;
+                        } catch (NumberFormatException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+
+                double totalAmount = payment.getAmount();
+
+                Map<String, Object> map = new LinkedHashMap<>();
+                // Customer info
+                map.put("customerId", customer.getCustomerId());
+                map.put("name", customer.getName());
+                map.put("address", customer.getAddress());
+                map.put("email", customer.getEmail());
+                map.put("phoneNumber", customer.getPhoneNumber());
+
+                // Vehicle info
+                map.put("modelId", modelId);
+                map.put("modelName", modelName);
+                map.put("variantId", variantId);
+                map.put("variantName", variantName);
+                map.put("serialId", serialId);
+
+                // Dealer info
+                map.put("dealerId", dealerId);
+                map.put("dealerName", dealerName);
+
+                // Payment info
+                map.put("paymentId", payment.getPaymentId());
+                map.put("orderId", payment.getOrderId());
+                map.put("totalAmount", totalAmount);
+                map.put("calculatedTotal", calculatedTotal);
+                map.put("paymentDate", payment.getPaymentDate());
+                map.put("method", payment.getMethod());
+                map.put("paidAmount", totalAmount);
+
+                responseList.add(map);
+            }
+
         } catch (Exception e) {
+            System.err.println("ERROR in getCustomersWithTTStatusByDealer: " + e.getMessage());
             e.printStackTrace();
         }
         return responseList;
     }
+
+    public List<Map<String, Object>> getCustomerDebtSummaryByDealer(int dealerId) {
+        List<Map<String, Object>> responseList = new ArrayList<>();
+
+        try {
+            Map<Integer, Map<String, Object>> customerDebtMap = new LinkedHashMap<>();
+
+            List<InstallmentPlanDTO> plans = installDAO.getActiveOrOverduePlans();
+            if (plans == null || plans.isEmpty()) {
+                return responseList;
+            }
+
+            for (InstallmentPlanDTO plan : plans) {
+
+                PaymentDTO payment = paymentDAO.findPaymentById(plan.getPaymentId());
+                if (payment == null) {
+                    continue;
+                }
+
+                OrderDTO order = orderDAO.getById(payment.getOrderId());
+                if (order == null) {
+                    continue;
+                }
+
+                // Check dealer ownership
+                UserAccountDTO dealerStaff = userAccountDAO.getUserById(order.getDealerStaffId());
+                if (dealerStaff == null || dealerStaff.getDealerId() != dealerId) {
+                    continue;
+                }
+
+                int customerId = order.getCustomerId();
+                if (customerId <= 0) {
+                    continue;
+                }
+
+                List<CustomerDTO> customerList = customerDAO.findById(customerId);
+                if (customerList == null || customerList.isEmpty()) {
+                    continue;
+                }
+
+                CustomerDTO customer = customerList.get(0);
+
+                // Safe parsing
+                BigDecimal monthlyPay = new BigDecimal(plan.getMonthlyPay() == null ? "0" : plan.getMonthlyPay());
+                int remainingTerm = parseIntSafe(plan.getTermMonth());
+                BigDecimal principal = BigDecimal.valueOf(payment.getAmount());
+
+                // Compute original term
+                int originalTerm = (monthlyPay.compareTo(BigDecimal.ZERO) > 0)
+                        ? principal.divide(monthlyPay, 0, BigDecimal.ROUND_HALF_UP).intValue()
+                        : remainingTerm;
+
+                if (originalTerm < remainingTerm) {
+                    originalTerm = remainingTerm;
+                }
+
+                // Compute totals
+                BigDecimal totalAmount = monthlyPay.multiply(BigDecimal.valueOf(originalTerm));
+                int paidMonths = Math.max(0, originalTerm - remainingTerm);
+                BigDecimal paidAmount = monthlyPay.multiply(BigDecimal.valueOf(paidMonths));
+                BigDecimal outstanding = monthlyPay.multiply(BigDecimal.valueOf(remainingTerm));
+
+                if (remainingTerm <= 0) {
+                    outstanding = BigDecimal.ZERO;
+                    paidAmount = totalAmount;
+                }
+
+                // Add or accumulate per customer
+                Map<String, Object> summary = customerDebtMap.get(customerId);
+                if (summary == null) {
+                    summary = new LinkedHashMap<>();
+                    summary.put("customerId", customer.getCustomerId());
+                    summary.put("name", customer.getName());
+                    summary.put("email", customer.getEmail());
+                    summary.put("phoneNumber", customer.getPhoneNumber());
+                    summary.put("dealerId", dealerId);
+
+                    summary.put("totalOutstandingDebt", outstanding.toPlainString());
+                    summary.put("totalPaidAmount", paidAmount.toPlainString());
+                    summary.put("totalPlans", 1);
+
+                    customerDebtMap.put(customerId, summary);
+
+                } else {
+                    BigDecimal currentDebt = new BigDecimal(summary.get("totalOutstandingDebt").toString());
+                    BigDecimal currentPaid = new BigDecimal(summary.get("totalPaidAmount").toString());
+                    int plansCount = (int) summary.get("totalPlans");
+
+                    BigDecimal updatedDebt = currentDebt.add(outstanding);
+                    BigDecimal updatedPaid = currentPaid.add(paidAmount);
+
+                    summary.put("totalOutstandingDebt", updatedDebt.toPlainString());
+                    summary.put("totalPaidAmount", updatedPaid.toPlainString());
+                    summary.put("totalPlans", plansCount + 1);
+                }
+            }
+
+            responseList.addAll(customerDebtMap.values());
+
+        } catch (Exception e) {
+            System.err.println("ERROR in getCustomerDebtSummaryByDealer: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        return responseList;
+    }
+
+    private int parseIntSafe(String value) {
+        try {
+            return Integer.parseInt(value);
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
 }

@@ -39,7 +39,7 @@ const fixImageUrl = (imageUrl) => {
  * @param {number} modelId - The model ID
  * @returns {Promise} - Promise containing variants data
  */
-const fetchVariantsForModel = async (modelId) => {
+export const fetchVariantsForModel = async (modelId) => {
   try {
     const token = localStorage.getItem('token');
     
@@ -59,7 +59,73 @@ const fetchVariantsForModel = async (modelId) => {
     }
     return [];
   } catch (error) {
-    console.error(`Error fetching variants for model ${modelId}:`, error);
+    // Handle errors gracefully - don't log as error if it's a 400 (bad request)
+    // This might happen if the endpoint doesn't accept the parameter format or model doesn't exist
+    if (error.response?.status === 400) {
+      // 400 Bad Request - model might not have variants or endpoint format issue
+      // Silently return empty array - this is expected for some models
+      return [];
+    }
+    // For other errors, log as warning instead of error
+    if (error.response?.status !== 404) {
+      console.warn(`Warning: Could not fetch variants for model ${modelId}:`, error.response?.status, error.response?.statusText);
+    }
+    return [];
+  }
+};
+
+/**
+ * Fetch all active variants (backend supports model_id=0 to return all)
+ * @returns {Promise<Array>} List of variants
+ */
+export const fetchAllVariants = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.post(
+      `${API_URL}/staff/viewVehicleVariant`,
+      { model_id: 0 },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    if (response.data && response.data.status === 'success') {
+      return Array.isArray(response.data.data) ? response.data.data : [];
+    }
+    return [];
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Fetch available (unordered) serials for a variant at the staff's dealer
+ * Backend: /api/staff/getUnorderedSerials
+ * Body: { variant_id }
+ * Returns: Array of serial DTOs; each should contain serialId/serial_id
+ */
+export const fetchAvailableSerialsByVariant = async (variantId) => {
+  try {
+    if (!variantId) return [];
+    const token = localStorage.getItem('token');
+    const response = await axios.post(
+      `${API_URL}/staff/getUnorderedSerials`,
+      { variant_id: variantId },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    if (response.data?.status === 'success') {
+      const list = Array.isArray(response.data.data) ? response.data.data : [];
+      return list;
+    }
+    return [];
+  } catch {
     return [];
   }
 };
@@ -91,13 +157,20 @@ export const fetchInventory = async () => {
       console.log('📦 Number of models:', models?.length);
       
       // Fetch variants cho mỗi model (nếu chưa có)
+      // Note: Some models may not have variants or the endpoint may fail - handle gracefully
       for (const model of models) {
         // Nếu model chưa có lists (variants), fetch thêm
         if (!model.lists || !Array.isArray(model.lists) || model.lists.length === 0) {
-          console.log(`🔍 Fetching variants for model ${model.modelId}...`);
-          const variants = await fetchVariantsForModel(model.modelId);
-          model.lists = variants; // Set variants vào model
-          console.log(`✅ Found ${variants?.length || 0} variants for model ${model.modelId}`);
+          try {
+            console.log(`🔍 Fetching variants for model ${model.modelId}...`);
+            const variants = await fetchVariantsForModel(model.modelId);
+            model.lists = variants || []; // Set variants vào model (default to empty array)
+            console.log(`✅ Found ${variants?.length || 0} variants for model ${model.modelId}`);
+          } catch {
+            // If variant fetch fails, set empty array and continue
+            console.warn(`⚠️ Could not fetch variants for model ${model.modelId}, using empty array`);
+            model.lists = [];
+          }
         }
       }
       

@@ -111,4 +111,93 @@ public class JwtUtil {
         }
         return authHeader.substring(7);
     }
+   public static int extractDealerIdFromDate(String encodedDate) {
+        if (encodedDate == null || !encodedDate.contains("_")) {
+            return -1;
+        }
+        
+        try {
+            String[] parts = encodedDate.split("_");
+            return Integer.parseInt(parts[parts.length - 1]);
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+    
+
+    
+    // ========================================================================
+    // STATUS ENCODING/DECODING UTILITIES
+    // ========================================================================
+    
+    /**
+     * Extract dealer ID from encoded status
+     * Format: STATUS_dealerId (e.g., "PENDING_3", "CONFIRMED_5")
+     * 
+     * @param encodedStatus The encoded status string
+     * @return The dealer ID, or -1 if parsing fails
+     */
+    public static int extractDealerIdFromStatus(String encodedStatus) {
+        if (encodedStatus == null || !encodedStatus.contains("_")) {
+            return -1;
+        }
+        
+        try {
+            String[] parts = encodedStatus.split("_");
+            return Integer.parseInt(parts[parts.length - 1]);
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+    
+    /**
+     * Extract base status from encoded status
+     * Format: STATUS_dealerId (e.g., "PENDING_3" -> "PENDING")
+     * 
+     * @param encodedStatus The encoded status string
+     * @return The base status, or null if parsing fails
+     */
+    public static String extractBaseStatus(String encodedStatus) {
+        if (encodedStatus == null || !encodedStatus.contains("_")) {
+            return encodedStatus; // Return as-is if no encoding
+        }
+        
+        try {
+            int lastUnderscoreIndex = encodedStatus.lastIndexOf("_");
+            return encodedStatus.substring(0, lastUnderscoreIndex);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+    
+    /**
+     * Encode status with dealer ID
+     * Format: STATUS_dealerId (e.g., "PENDING" + 3 -> "PENDING_3")
+     * 
+     * @param baseStatus The base status (e.g., "PENDING", "CONFIRMED", "CANCELLED")
+     * @param dealerId The dealer ID
+     * @return The encoded status string
+     */
+    public static String encodeStatus(String baseStatus, int dealerId) {
+        if (baseStatus == null || baseStatus.trim().isEmpty()) {
+            return null;
+        }
+        return baseStatus + "_" + dealerId;
+    }
+    
+    /**
+     * Update status while preserving dealer ID
+     * Example: "PENDING_3" with newStatus "CONFIRMED" -> "CONFIRMED_3"
+     * 
+     * @param currentEncodedStatus Current encoded status
+     * @param newBaseStatus New base status to apply
+     * @return New encoded status with same dealer ID
+     */
+    public static String updateStatus(String currentEncodedStatus, String newBaseStatus) {
+        int dealerId = extractDealerIdFromStatus(currentEncodedStatus);
+        if (dealerId == -1) {
+            return newBaseStatus; // No dealer ID found, return base status
+        }
+        return encodeStatus(newBaseStatus, dealerId);
+    }
 }

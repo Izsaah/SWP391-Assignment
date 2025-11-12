@@ -1,146 +1,70 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Layout from '../layout/Layout';
 import {
   Calendar,
   Search,
   Filter,
-  Eye,
-  UserCheck,
   X,
-  Save,
   XCircle,
   CheckCircle,
   ChevronRight,
   Users,
   Car,
-  MapPin,
-  Phone,
-  Clock,
-  FileText,
-  Sparkles
+  Plus
 } from 'lucide-react';
+import axios from 'axios';
+import { createTestDrive, updateTestDriveStatus, getDealerTestDrives } from '../../staff/services/testDriveService';
+import { getAllCustomers } from '../../staff/services/customerService';
+import { fetchInventory, fetchVariantsForModel, fetchAvailableSerialsByVariant } from '../../staff/services/inventoryService';
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 const TestDriveSchedule = () => {
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [staffFilter, setStaffFilter] = useState('all');
-  const [vehicleModelFilter, setVehicleModelFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState([]); // customers with optional testDriveSchedule
+  const [statusFilter, setStatusFilter] = useState('all');
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  
-  // Form state for drawer
-  const [drawerForm, setDrawerForm] = useState({
-    assignedStaff: '',
-    status: '',
-    notes: ''
-  });
 
-  // Sample test drive appointments data
-  const appointments = [
-    {
-      id: 'TD-2025-001',
-      date: '2025-11-15',
-      time: '09:00',
-      customerName: 'Nguyen Van A',
-      customerPhone: '0987654321',
-      vehicleModel: 'VF e34',
-      vehicleVariant: 'Standard',
-      serial: 'S/N 121312ADS',
-      assignedStaff: 'Duy',
-      assignedStaffId: 'S-005',
-      status: 'Pending',
-      location: 'Showroom A - District 1',
-      notes: 'Customer prefers morning appointment'
-    },
-    {
-      id: 'TD-2025-002',
-      date: '2025-11-15',
-      time: '14:30',
-      customerName: 'Tran Thi B',
-      customerPhone: '0912345678',
-      vehicleModel: 'VF 8',
-      vehicleVariant: 'Premium',
-      serial: 'S/N 87XC234FDS',
-      assignedStaff: 'An',
-      assignedStaffId: 'S-006',
-      status: 'Confirmed',
-      location: 'Showroom B - District 7',
-      notes: 'Follow-up after inquiry'
-    },
-    {
-      id: 'TD-2025-003',
-      date: '2025-11-16',
-      time: '10:15',
-      customerName: 'Le Van C',
-      customerPhone: '0909876543',
-      vehicleModel: 'VF e34',
-      vehicleVariant: 'Luxury',
-      serial: 'S/N 456XYZ789',
-      assignedStaff: null,
-      assignedStaffId: null,
-      status: 'Pending',
-      location: 'Showroom A - District 1',
-      notes: ''
-    },
-    {
-      id: 'TD-2025-004',
-      date: '2025-11-14',
-      time: '15:00',
-      customerName: 'Pham Thi D',
-      customerPhone: '0976543210',
-      vehicleModel: 'VF 8',
-      vehicleVariant: 'Standard',
-      serial: 'S/N 789ABC123',
-      assignedStaff: 'Duy',
-      assignedStaffId: 'S-005',
-      status: 'Completed',
-      location: 'Showroom A - District 1',
-      notes: 'Customer satisfied, considering purchase'
-    },
-    {
-      id: 'TD-2025-005',
-      date: '2025-11-13',
-      time: '11:30',
-      customerName: 'Hoang Van E',
-      customerPhone: '0938765432',
-      vehicleModel: 'VF e34',
-      vehicleVariant: 'Premium',
-      serial: 'S/N 321DEF456',
-      assignedStaff: 'An',
-      assignedStaffId: 'S-006',
-      status: 'Cancelled',
-      location: 'Showroom B - District 7',
-      notes: 'Customer cancelled due to schedule conflict'
-    }
-  ];
+  // Create modal
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [customers, setCustomers] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [availableSerials, setAvailableSerials] = useState([]);
+  const [selectedModelId, setSelectedModelId] = useState('');
+  const [availableVariants, setAvailableVariants] = useState([]);
+  const [selectedVariantId, setSelectedVariantId] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [formData, setFormData] = useState({ customerId: '', serialId: '', date: '' });
 
-  // Get unique lists for filters
-  const staffList = [...new Set(appointments.map(a => a.assignedStaff).filter(Boolean))];
-  const vehicleModels = [...new Set(appointments.map(a => a.vehicleModel))];
-
-  // Get all available staff for assignment
-  const allStaff = [
-    { id: 'S-005', name: 'Duy' },
-    { id: 'S-006', name: 'An' },
-    { id: 'S-007', name: 'Minh' },
-    { id: 'S-008', name: 'Lan' }
-  ];
+  useEffect(() => {
+    (async () => {
+      try {
+        const [cust, inv] = await Promise.all([getAllCustomers(), fetchInventory()]);
+        if (cust.success) setCustomers(cust.data || []);
+        if (inv.success) setVehicles(inv.data || []);
+        // Initial load: fetch all dealer schedules
+        const dealer = await getDealerTestDrives();
+        if (dealer.success) setResults(dealer.data || []);
+      } catch (e) {
+        console.warn('Manager preload failed', e);
+      }
+    })();
+  }, []);
 
   // Helper functions
-  const formatDateTime = (date, time) => {
-    const dateObj = new Date(date);
-    const day = String(dateObj.getDate()).padStart(2, '0');
-    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const year = dateObj.getFullYear();
-    return `${day}/${month}/${year} ${time}`;
+  const formatDate = (date) => {
+    try {
+      return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    } catch {
+      return date;
+    }
   };
 
   const getStatusBadge = (status) => {
     const configs = {
       'Pending': { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', label: 'Pending' },
-      'Confirmed': { color: 'bg-blue-100 text-blue-800 border-blue-200', label: 'Confirmed' },
       'Completed': { color: 'bg-green-100 text-green-800 border-green-200', label: 'Completed' },
       'Cancelled': { color: 'bg-gray-100 text-gray-800 border-gray-200', label: 'Cancelled' }
     };
@@ -153,103 +77,74 @@ const TestDriveSchedule = () => {
     );
   };
 
-  // Filter appointments
-  const filteredAppointments = appointments.filter(appointment => {
-    // Date range filter
-    if (dateFrom && appointment.date < dateFrom) return false;
-    if (dateTo && appointment.date > dateTo) return false;
-
-    // Status filter
-    if (statusFilter !== 'all' && appointment.status !== statusFilter) return false;
-
-    // Staff filter
-    if (staffFilter !== 'all' && appointment.assignedStaff !== staffFilter) return false;
-
-    // Vehicle model filter
-    if (vehicleModelFilter !== 'all' && appointment.vehicleModel !== vehicleModelFilter) return false;
-
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      const matches = 
-        appointment.customerName.toLowerCase().includes(query) ||
-        appointment.customerPhone.includes(query) ||
-        appointment.serial.toLowerCase().includes(query);
-      if (!matches) return false;
-    }
-
-    return true;
-  });
-
-  // Handle view appointment
-  const handleView = (appointment) => {
-    setSelectedAppointment(appointment);
-    setDrawerForm({
-      assignedStaff: appointment.assignedStaffId || '',
-      status: appointment.status,
-      notes: appointment.notes || ''
-    });
-    setIsDrawerOpen(true);
-  };
-
-  // Handle save changes
-  const handleSaveChanges = () => {
-    // In real app, would make API call to update appointment
-    console.log('Saving changes:', drawerForm);
-    alert('Changes saved successfully!');
-    setIsDrawerOpen(false);
-    // Refresh data would happen here
-  };
+  const filteredRows = results
+    .map((c) => {
+      const schedule = c.testDriveSchedule || c.test_drive_schedule || c.schedule || null;
+      return schedule
+        ? {
+            appointmentId: schedule.appointmentId || schedule.appointment_id || schedule.id,
+            customerId: c.customerId || c.customer_id || c.id,
+            customerName: c.name || `Customer ${c.customerId}`,
+            serialId: schedule.serialId || schedule.serial_id,
+            date: schedule.date || schedule.scheduleDate || schedule.schedule_at,
+            status: schedule.status || 'PENDING',
+          }
+        : null;
+    })
+    .filter(Boolean)
+    .filter((row) => (statusFilter === 'all' ? true : (row.status || '').toLowerCase() === statusFilter.toLowerCase()));
 
   // Handle cancel appointment
   const handleCancelAppointment = () => {
     if (window.confirm('Are you sure you want to cancel this appointment?')) {
-      // In real app, would make API call to cancel
-      console.log('Cancelling appointment:', selectedAppointment.id);
-      alert('Appointment cancelled successfully!');
-      setIsDrawerOpen(false);
-      // Refresh data would happen here
+      updateTestDriveStatus(selectedAppointment.appointmentId, 'Cancelled').then(() => {
+        setIsDrawerOpen(false);
+        handleSearch();
+      });
     }
   };
 
   // Handle mark as completed
   const handleMarkCompleted = () => {
-    // In real app, would make API call to mark as completed
-    console.log('Marking appointment as completed:', selectedAppointment.id);
-    alert('Appointment marked as completed!');
-    setIsDrawerOpen(false);
-    // Refresh data would happen here
-  };
-
-  // Handle auto assign
-  const handleAutoAssign = () => {
-    if (window.confirm('Auto-assign all pending appointments evenly to staff?')) {
-      // In real app, would make API call to auto-assign
-      console.log('Auto-assigning pending appointments');
-      alert('Pending appointments assigned successfully!');
-      // Refresh data would happen here
-    }
-  };
-
-  // Handle assign/update staff for specific appointment
-  const handleAssign = (appointment) => {
-    setSelectedAppointment(appointment);
-    setDrawerForm({
-      assignedStaff: appointment.assignedStaffId || '',
-      status: appointment.status,
-      notes: appointment.notes || ''
+    updateTestDriveStatus(selectedAppointment.appointmentId, 'Completed').then(() => {
+      setIsDrawerOpen(false);
+      handleSearch();
     });
-    setIsDrawerOpen(true);
   };
 
-  // Handle cancel for specific appointment
-  const handleCancel = (appointment) => {
-    if (window.confirm(`Cancel appointment ${appointment.id}?`)) {
-      // In real app, would make API call to cancel
-      console.log('Cancelling appointment:', appointment.id);
-      alert('Appointment cancelled successfully!');
-      // Refresh data would happen here
+  // Search customers and schedules by name
+  const handleSearch = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.post(
+        `${API_URL}/staff/searchCustomerForSchedule`,
+        { name: String(searchQuery || '').trim() },
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+      );
+      if (res.data?.status === 'success') {
+        setResults(Array.isArray(res.data.data) ? res.data.data : []);
+      } else {
+        setResults([]);
+      }
+    } catch {
+      setResults([]);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const getAvailableSerialIds = () => {
+    const serials = [];
+    vehicles.forEach(model => {
+      if (Array.isArray(model.lists)) {
+        model.lists.forEach(v => {
+          const s = v.serialId || v.serial_id;
+          if (s) serials.push(s);
+        });
+      }
+    });
+    return [...new Set(serials)].sort();
   };
 
   return (
@@ -266,51 +161,41 @@ const TestDriveSchedule = () => {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Test Drive Schedule</h1>
-            <p className="text-sm text-gray-600 mt-1">Manage test drive appointments and assignments</p>
+            <p className="text-sm text-gray-600 mt-1">Search and manage customer test drive schedules</p>
           </div>
           <button
-            onClick={handleAutoAssign}
-            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-lg flex items-center space-x-2 shadow-sm transition-colors"
+            onClick={async () => {
+              // Preload serials for dropdown
+              const fromInventory = getAvailableSerialIds();
+              setAvailableSerials(fromInventory);
+              setSelectedModelId('');
+              setSelectedVariantId('');
+              setAvailableVariants([]);
+              setShowCreateModal(true);
+            }}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg flex items-center space-x-2 shadow-sm transition-colors"
           >
-            <Sparkles className="w-4 h-4" />
-            <span>Auto Assign Pending Appointments</span>
+            <Plus className="w-4 h-4" />
+            <span>Create Test Drive</span>
           </button>
         </div>
 
-        {/* Filters */}
+        {/* Search */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-2">
-              <Filter className="w-4 h-4 text-gray-600" />
-              <h3 className="text-sm font-semibold text-gray-900">Filters</h3>
-              <span className="text-xs text-gray-500">({filteredAppointments.length} results)</span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Search by Customer Name</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Enter customer name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {/* Date Range - From */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Date From</label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Date Range - To */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Date To</label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Status Filter */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
               <select
@@ -320,56 +205,30 @@ const TestDriveSchedule = () => {
               >
                 <option value="all">All</option>
                 <option value="Pending">Pending</option>
-                <option value="Confirmed">Confirmed</option>
                 <option value="Completed">Completed</option>
                 <option value="Cancelled">Cancelled</option>
               </select>
             </div>
-
-            {/* Staff Filter */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Staff</label>
-              <select
-                value={staffFilter}
-                onChange={(e) => setStaffFilter(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All</option>
-                {staffList.map(staff => (
-                  <option key={staff} value={staff}>{staff}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Vehicle Model Filter */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Vehicle Model</label>
-              <select
-                value={vehicleModelFilter}
-                onChange={(e) => setVehicleModelFilter(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All</option>
-                {vehicleModels.map(model => (
-                  <option key={model} value={model}>{model}</option>
-                ))}
-              </select>
-            </div>
           </div>
-
-          {/* Search */}
-          <div className="mt-4">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Search</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Search by Customer Name / Phone / Serial"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
+          <div className="mt-4 flex justify-end space-x-2">
+            <button
+              onClick={async () => {
+                setLoading(true);
+                const dealer = await getDealerTestDrives();
+                setResults(dealer.success ? dealer.data || [] : []);
+                setLoading(false);
+              }}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Refresh All
+            </button>
+            <button
+              onClick={handleSearch}
+              disabled={loading || !searchQuery.trim()}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+            >
+              {loading ? 'Searching...' : 'Search'}
+            </button>
           </div>
         </div>
 
@@ -380,19 +239,13 @@ const TestDriveSchedule = () => {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                    Date/Time
+                    Date
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                     Customer
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                    Vehicle (Variant)
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                     Serial
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                    Assigned Staff
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                     Status
@@ -403,69 +256,50 @@ const TestDriveSchedule = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredAppointments.map((appointment) => (
-                  <tr key={appointment.id} className="hover:bg-gray-50">
+                {filteredRows.map((row) => (
+                  <tr key={row.appointmentId} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {formatDateTime(appointment.date, appointment.time)}
-                      </div>
+                      <div className="text-sm font-medium text-gray-900">{formatDate(row.date)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{appointment.customerName}</div>
-                        <div className="text-xs text-gray-500">{appointment.customerPhone}</div>
+                        <div className="text-sm font-medium text-gray-900">{row.customerName}</div>
+                        <div className="text-xs text-gray-500">ID: {row.customerId}</div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{appointment.vehicleModel}</div>
-                        <div className="text-xs text-gray-500">{appointment.vehicleVariant}</div>
-                      </div>
+                      <span className="text-sm text-gray-700">{row.serialId || '-'}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-700">{appointment.serial}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-700">
-                        {appointment.assignedStaff || <span className="text-gray-400 italic">Unassigned</span>}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(appointment.status)}
+                      {getStatusBadge(row.status)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() => handleView(appointment)}
+                          onClick={() => {
+                            setSelectedAppointment(row);
+                            setIsDrawerOpen(true);
+                          }}
                           className="text-blue-600 hover:text-blue-900 text-xs font-medium"
                         >
                           View
                         </button>
-                        {appointment.status !== 'Completed' && appointment.status !== 'Cancelled' && (
-                          <>
-                            {!appointment.assignedStaff && (
-                              <button
-                                onClick={() => handleAssign(appointment)}
-                                className="text-green-600 hover:text-green-900 text-xs font-medium"
-                              >
-                                Assign
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleCancel(appointment)}
-                              className="text-red-600 hover:text-red-900 text-xs font-medium"
-                            >
-                              Cancel
-                            </button>
-                          </>
-                        )}
-                        {appointment.status === 'Confirmed' && (
+                        {row.status && row.status.toLowerCase() !== 'completed' && row.status.toLowerCase() !== 'cancelled' && (
                           <button
                             onClick={() => {
-                              if (window.confirm('Mark this appointment as completed?')) {
-                                // Handle mark as completed
-                                alert('Appointment marked as completed!');
-                              }
+                              setSelectedAppointment(row);
+                              handleCancelAppointment();
+                            }}
+                            className="text-red-600 hover:text-red-900 text-xs font-medium"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                        {row.status && row.status.toLowerCase() === 'confirmed' && (
+                          <button
+                            onClick={() => {
+                              setSelectedAppointment(row);
+                              handleMarkCompleted();
                             }}
                             className="text-green-600 hover:text-green-900 text-xs font-medium"
                           >
@@ -497,124 +331,57 @@ const TestDriveSchedule = () => {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="text-sm text-gray-600">Appointment ID: {selectedAppointment.id}</div>
+              <div className="text-xs text-gray-500 uppercase tracking-wide">Appointment ID: {selectedAppointment.appointmentId}</div>
             </div>
 
             {/* Drawer Content */}
-            <div className="p-6 space-y-6">
-              {/* Appointment Info */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Appointment Information
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs text-gray-600">Date & Time</label>
-                    <p className="text-sm font-medium text-gray-900 mt-1">
-                      {formatDateTime(selectedAppointment.date, selectedAppointment.time)}
-                    </p>
+            <div className="p-4 md:p-6 text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  {/* Appointment Info */}
+                  <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center text-xs font-semibold text-gray-700 uppercase space-x-2">
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>Appointment</span>
+                    </div>
+                    <div className="text-sm font-medium text-gray-900">{formatDate(selectedAppointment.date)}</div>
                   </div>
-                  <div>
-                    <label className="text-xs text-gray-600 flex items-center">
-                      <MapPin className="w-3 h-3 mr-1" />
-                      Location
-                    </label>
-                    <p className="text-sm font-medium text-gray-900 mt-1">{selectedAppointment.location}</p>
+
+                  {/* Customer Info */}
+                  <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                    <div className="flex items-center text-xs font-semibold text-gray-700 uppercase space-x-2">
+                      <Users className="w-3.5 h-3.5" />
+                      <span>Customer</span>
+                    </div>
+                    <div className="text-sm font-medium text-gray-900">{selectedAppointment.customerName}</div>
+                    <div className="text-xs text-gray-500">ID: {selectedAppointment.customerId}</div>
                   </div>
                 </div>
-              </div>
 
-              {/* Customer Info */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
-                  <Users className="w-4 h-4 mr-2" />
-                  Customer Information
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs text-gray-600">Name</label>
-                    <p className="text-sm font-medium text-gray-900 mt-1">{selectedAppointment.customerName}</p>
+                <div className="space-y-4">
+                  {/* Vehicle Info */}
+                  <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                    <div className="flex items-center text-xs font-semibold text-gray-700 uppercase space-x-2">
+                      <Car className="w-3.5 h-3.5" />
+                      <span>Vehicle Serial</span>
+                    </div>
+                    <div className="text-sm font-medium text-gray-900">{selectedAppointment.serialId || '—'}</div>
                   </div>
-                  <div>
-                    <label className="text-xs text-gray-600 flex items-center">
-                      <Phone className="w-3 h-3 mr-1" />
-                      Phone
-                    </label>
-                    <p className="text-sm font-medium text-gray-900 mt-1">{selectedAppointment.customerPhone}</p>
-                  </div>
-                </div>
-              </div>
 
-              {/* Vehicle Info */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
-                  <Car className="w-4 h-4 mr-2" />
-                  Vehicle Information
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs text-gray-600">Model</label>
-                    <p className="text-sm font-medium text-gray-900 mt-1">{selectedAppointment.vehicleModel}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-600">Variant</label>
-                    <p className="text-sm font-medium text-gray-900 mt-1">{selectedAppointment.vehicleVariant}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <label className="text-xs text-gray-600">Serial</label>
-                    <p className="text-sm font-medium text-gray-900 mt-1">{selectedAppointment.serial}</p>
+                  {/* Status */}
+                  <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                    <label className="block text-xs font-semibold text-gray-700 uppercase">Status</label>
+                    <select
+                      value={selectedAppointment.status}
+                      onChange={(e) => setSelectedAppointment({ ...selectedAppointment, status: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
                   </div>
                 </div>
-              </div>
-
-              {/* Assigned Staff */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Assigned Staff
-                </label>
-                <select
-                  value={drawerForm.assignedStaff}
-                  onChange={(e) => setDrawerForm({ ...drawerForm, assignedStaff: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Select Staff</option>
-                  {allStaff.map(staff => (
-                    <option key={staff.id} value={staff.id}>{staff.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Status */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Status
-                </label>
-                <select
-                  value={drawerForm.status}
-                  onChange={(e) => setDrawerForm({ ...drawerForm, status: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="Pending">Pending</option>
-                  <option value="Confirmed">Confirmed</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Cancelled">Cancelled</option>
-                </select>
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                  <FileText className="w-4 h-4 mr-2" />
-                  Notes
-                </label>
-                <textarea
-                  value={drawerForm.notes}
-                  onChange={(e) => setDrawerForm({ ...drawerForm, notes: e.target.value })}
-                  rows={4}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Add notes about this test drive appointment..."
-                />
               </div>
             </div>
 
@@ -630,13 +397,13 @@ const TestDriveSchedule = () => {
                     <span>Cancel Appointment</span>
                   </button>
                 )}
-                {selectedAppointment.status === 'Confirmed' && (
+                {selectedAppointment.status === 'Pending' && (
                   <button
                     onClick={handleMarkCompleted}
                     className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center space-x-2"
                   >
                     <CheckCircle className="w-4 h-4" />
-                    <span>Mark as Completed</span>
+                    <span>Mark Completed</span>
                   </button>
                 )}
               </div>
@@ -645,17 +412,211 @@ const TestDriveSchedule = () => {
                   onClick={() => setIsDrawerOpen(false)}
                   className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
-                  Cancel
+                  Close
                 </button>
                 <button
-                  onClick={handleSaveChanges}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center space-x-2"
+                  onClick={async () => {
+                    await updateTestDriveStatus(selectedAppointment.appointmentId, selectedAppointment.status);
+                    setIsDrawerOpen(false);
+                    handleSearch();
+                  }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                 >
-                  <Save className="w-4 h-4" />
-                  <span>Save Changes</span>
+                  Update Status
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-gradient-to-r from-green-600 to-emerald-700 text-white p-6 border-b border-green-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">Create Test Drive</h2>
+                  <p className="text-green-100 text-sm mt-1">Manager can create schedules</p>
+                </div>
+                <button onClick={() => setShowCreateModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-all duration-200">
+                  <span className="text-2xl">&times;</span>
+                </button>
+              </div>
+            </div>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!formData.customerId || !formData.serialId || !formData.date) return;
+                setCreating(true);
+                const res = await createTestDrive({
+                  customer_id: parseInt(formData.customerId),
+                  serial_id: formData.serialId,
+                  date: formData.date,
+                  status: 'Pending'
+                });
+                setCreating(false);
+                if (res.success) {
+                  setShowCreateModal(false);
+                  setFormData({ customerId: '', serialId: '', date: '' });
+                  await handleSearch();
+                } else {
+                  alert(res.message || 'Failed to create schedule');
+                }
+              }}
+              className="p-6 space-y-6"
+            >
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Customer</label>
+                <select
+                  value={formData.customerId}
+                  onChange={(e) => setFormData({ ...formData, customerId: e.target.value })}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                >
+                  <option value="">Select a customer...</option>
+                  {customers.map((c) => {
+                    const id = c.customerId || c.customer_id || c.id;
+                    return (
+                      <option key={id} value={id}>
+                        {c.name || `Customer ${id}`} {c.email ? `(${c.email})` : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {/* Model */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle Model</label>
+                <select
+                  value={selectedModelId}
+                  onChange={async (e) => {
+                    const id = e.target.value;
+                    setSelectedModelId(id);
+                    setSelectedVariantId('');
+                    setAvailableVariants([]);
+                    setAvailableSerials([]);
+                    if (!id) return;
+                    let variants = [];
+                    const model = vehicles.find(m => String(m.modelId) === String(id));
+                    if (model && Array.isArray(model.lists) && model.lists.length > 0) {
+                      variants = model.lists;
+                    } else {
+                      variants = await fetchVariantsForModel(parseInt(id));
+                    }
+                    setAvailableVariants(variants || []);
+                    let serials = [];
+                    if (model && Array.isArray(model.lists) && model.lists.length > 0) {
+                      serials = [...new Set(model.lists.map(v => v.serialId || v.serial_id).filter(Boolean))];
+                    }
+                    if (serials.length === 0) {
+                      serials = [...new Set((variants || []).map(v => v.serialId || v.serial_id).filter(Boolean))];
+                    }
+                    setAvailableSerials(serials.sort());
+                    setFormData(prev => ({ ...prev, serialId: '' }));
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  required
+                >
+                  <option value="">{vehicles.length ? 'Select model...' : 'Loading models...'}</option>
+                  {vehicles.map(m => (
+                    <option key={m.modelId} value={m.modelId}>
+                      {m.modelName || m.name || `Model ${m.modelId}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Variant */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Variant</label>
+                <select
+                  value={selectedVariantId}
+                  onChange={async (e) => {
+                    const vid = e.target.value;
+                    setSelectedVariantId(vid);
+
+                    // Ask BE for unordered serials for this variant at dealer
+                    let serials = await fetchAvailableSerialsByVariant(parseInt(vid));
+                    serials = (serials || []).map(s => s.serialId || s.serial_id || s.serial).filter(Boolean);
+
+                    // Fallbacks if BE returns none
+                    if (serials.length === 0) {
+                      const model = vehicles.find(m => String(m.modelId) === String(selectedModelId));
+                      if (model && Array.isArray(model.lists)) {
+                        serials = [...new Set(model.lists.map(v => v.serialId || v.serial_id).filter(Boolean))];
+                      }
+                      if (serials.length === 0) {
+                        serials = [...new Set(availableVariants.map(v => v.serialId || v.serial_id).filter(Boolean))];
+                      }
+                    }
+
+                    setAvailableSerials(serials.sort());
+                    setFormData(prev => ({ ...prev, serialId: '' }));
+                  }}
+                  disabled={!selectedModelId}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-100"
+                  required
+                >
+                  <option value="">{selectedModelId ? 'Select variant...' : 'Select model first'}</option>
+                  {availableVariants.map(v => (
+                    <option key={v.variantId} value={v.variantId}>
+                      {v.versionName || v.variantName || 'Standard'} {v.color ? `- ${v.color}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Serial */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle Serial ID</label>
+                <select
+                  value={formData.serialId}
+                  onChange={(e) => setFormData({ ...formData, serialId: e.target.value })}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                >
+                  <option value="">Select a vehicle serial ID...</option>
+                  {(availableSerials.length > 0 ? availableSerials : getAvailableSerialIds()).map((s, idx) => (
+                    <option key={idx} value={s}>{s}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Manager sees all serials from inventory/variants.</p>
+              </div>
+
+              {/* Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Test Drive Date</label>
+                <input
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  required
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  disabled={creating}
+                  className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creating}
+                  className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center space-x-2"
+                >
+                  {creating ? 'Creating...' : 'Create'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

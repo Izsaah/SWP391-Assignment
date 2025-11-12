@@ -399,11 +399,9 @@ const Delivery = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-semibold text-gray-900">{customerName}</div>
-                          <div className="text-xs text-gray-500">ID: {delivery.customerId || 'N/A'}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-semibold text-blue-600">{vehicleName}</div>
-                          <div className="text-xs text-gray-500">Model ID: {delivery.modelId || 'N/A'}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">{formatDate(orderDate)}</div>

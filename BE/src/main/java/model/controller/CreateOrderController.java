@@ -14,6 +14,7 @@ import java.util.Map;
 import model.dao.VehicleVariantDAO;
 import model.dto.VehicleVariantDTO;
 import model.service.OrderService;
+import utils.JwtUtil;
 import utils.RequestUtils;
 import utils.ResponseUtils;
 
@@ -31,18 +32,21 @@ public class CreateOrderController extends HttpServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
         try {
+            // Extract dealerstaffId from JWT token
+            String token = JwtUtil.extractToken(req);
+            int dealerstaffId = JwtUtil.extractUserId(token);
+
             Map<String, Object> params = RequestUtils.extractParams(req);
 
-            // Validate required fields
-            if (!params.containsKey("customerId") || !params.containsKey("dealerstaffId")
+            // Validate required fields (removed dealerstaffId from required params)
+            if (!params.containsKey("customerId")
                     || !params.containsKey("modelId") || !params.containsKey("quantity")) {
-                ResponseUtils.error(resp, "Missing required parameters: customerId, dealerstaffId, modelId, quantity");
+                ResponseUtils.error(resp, "Missing required parameters: customerId, modelId, quantity");
                 return;
             }
 
             // Parse required parameters
-            int customerId = Integer.parseInt(params.get("customerId").toString());
-            int dealerstaffId = Integer.parseInt(params.get("dealerstaffId").toString());
+            int customerId = Integer.parseInt(params.get("customerId").toString()) ;
             int modelId = Integer.parseInt(params.get("modelId").toString());
             int quantity = Integer.parseInt(params.get("quantity").toString());
 
@@ -82,15 +86,16 @@ public class CreateOrderController extends HttpServlet {
                     ? Boolean.parseBoolean(params.get("isCustom").toString())
                     : false;
 
-            // Create order via service
+            // Create order via service (using dealerstaffId from token)
             int orderId = service.HandlingCreateOrder(customerId, dealerstaffId, modelId,
                     status, variantId, quantity, unitPrice, isCustom);
 
             // Return response
             if (orderId > 0) {
                 String message = String.format(
-                        "Order ID: %d | Variant: %s | Unit Price: %.2f%s",
+                        "Order ID: %d | Dealer Staff ID: %d | Variant: %s | Unit Price: %.2f%s",
                         orderId,
+                        dealerstaffId,
                         variantId != null && variantId > 0 ? variantId : "Auto-Generated",
                         unitPrice,
                         isCustom ? " | Status: Custom (Pending Confirmation)" : ""
@@ -100,6 +105,8 @@ public class CreateOrderController extends HttpServlet {
                 ResponseUtils.error(resp, "Failed to create order");
             }
 
+        } catch (utils.AuthException e) {
+            ResponseUtils.error(resp, "Authentication failed: " + e.getMessage());
         } catch (NumberFormatException e) {
             ResponseUtils.error(resp, "Invalid number format: " + e.getMessage());
         } catch (Exception e) {

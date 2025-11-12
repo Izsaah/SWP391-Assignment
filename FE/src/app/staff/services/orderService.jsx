@@ -45,6 +45,8 @@ export const createOrder = async (orderData) => {
 
 /**
  * View orders by customer ID
+ * Backend endpoint: POST /api/staff/viewOrdersByCustomerId
+ * Gets orders for a specific customer, filtered by the logged-in staff's dealer
  * @param {number} customerId - Customer ID
  * @returns {Promise} - Promise containing orders data
  */
@@ -53,7 +55,7 @@ export const viewOrdersByCustomerId = async (customerId) => {
     const token = localStorage.getItem('token');
     
     const response = await axios.post(
-      `${API_URL}/staff/viewOrders`,
+      `${API_URL}/staff/viewOrdersByCustomerId`,
       { customerId: customerId },
       {
         headers: {
@@ -76,7 +78,7 @@ export const viewOrdersByCustomerId = async (customerId) => {
       };
     }
   } catch (error) {
-    console.error('Error viewing orders:', error);
+    console.error('Error viewing orders by customer ID:', error);
     return {
       success: false,
       message: error.response?.data?.message || 'Failed to retrieve orders',

@@ -1,31 +1,40 @@
 package model.dto;
 
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
+import java.math.BigDecimal;
 
-/**
- *
- * @author Admin
- */
 public class SaleRecordDTO {
     private int saleId;
     private int dealerStaffId;
+    private String dealername;
     private String saleDate;
-    private double saleAmount;
+    private BigDecimal saleAmount;
 
     public SaleRecordDTO() {
     }
 
-    public SaleRecordDTO(int saleId, int dealerStaffId, String saleDate, double saleAmount) {
+    public SaleRecordDTO(int saleId, int dealerStaffId, String dealername, String saleDate, BigDecimal saleAmount) {
+        this.saleId = saleId;
+        this.dealerStaffId = dealerStaffId;
+        this.dealername = dealername;
+        this.saleDate = saleDate;
+        this.saleAmount = saleAmount;
+    }
+
+    public SaleRecordDTO(int saleId, int dealerStaffId, String saleDate, BigDecimal saleAmount) {
         this.saleId = saleId;
         this.dealerStaffId = dealerStaffId;
         this.saleDate = saleDate;
         this.saleAmount = saleAmount;
     }
 
-   
+    public String getDealername() {
+        return dealername;
+    }
+
+    public void setDealername(String dealername) {
+        this.dealername = dealername;
+    }
+
     public int getSaleId() {
         return saleId;
     }
@@ -50,11 +59,11 @@ public class SaleRecordDTO {
         this.saleDate = saleDate;
     }
 
-    public double getSaleAmount() {
+    public BigDecimal getSaleAmount() {
         return saleAmount;
     }
 
-    public void setSaleAmount(double saleAmount) {
+    public void setSaleAmount(BigDecimal saleAmount) {
         this.saleAmount = saleAmount;
     }
 }

@@ -14,6 +14,7 @@ import Payment from './app/staff/pages/Payment';
 import Delivery from './app/staff/pages/Delivery';
 import Customers from './app/staff/pages/Customers';
 import CustomerDetail from './app/staff/pages/CustomerDetail';
+import TestDrives from './app/staff/pages/TestDrives';
 import Reports from './app/staff/pages/Reports';
 import Settings from './app/staff/pages/Settings';
 
@@ -29,7 +30,6 @@ import ManagerDelivery from './app/manager/sales/Delivery';
 import ManagerCustomers from './app/manager/customers/Customers';
 import ManagerCustomerDetail from './app/manager/customers/CustomerDetail';
 import TestDriveSchedule from './app/manager/testdrive/TestDriveSchedule';
-import FeedbackComplaints from './app/manager/feedback/FeedbackComplaints';
 import Promotions from './app/manager/promotions/Promotions';
 import PromotionDetail from './app/manager/promotions/PromotionDetail';
 import DebtReport from './app/manager/reports/DebtReport';
@@ -136,6 +136,14 @@ function App() {
           } 
         />
         <Route 
+          path="/staff/customers/test-drives" 
+          element={
+            <ProtectedRoute allowRoles={['STAFF']}>
+              <TestDrives />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
           path="/staff/reports" 
           element={
             <ProtectedRoute allowRoles={['STAFF']}>
@@ -238,14 +246,6 @@ function App() {
             element={
               <ProtectedRoute allowRoles={['MANAGER']}>
                 <TestDriveSchedule />
-              </ProtectedRoute>
-            }
-          />
-          <Route 
-            path="/manager/customers/feedback"
-            element={
-              <ProtectedRoute allowRoles={['MANAGER']}>
-                <FeedbackComplaints />
               </ProtectedRoute>
             }
           />

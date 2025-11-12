@@ -4,10 +4,15 @@
  */
 package model.service;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+import model.dao.DealerDAO;
 import model.dao.UserAccountDAO;
+import model.dto.DealerDTO;
 import model.dto.RoleDTO;
 import model.dto.UserAccountDTO;
 
@@ -17,7 +22,8 @@ import model.dto.UserAccountDTO;
  */
 public class UserAccountService {
 
-    private UserAccountDAO UDao = new UserAccountDAO();
+    private final UserAccountDAO UDao = new UserAccountDAO();
+    private final DealerDAO dealerDAO = new DealerDAO();
 
     public UserAccountDTO HandlingLogin(String email, String password) {
         UserAccountDTO user = UDao.login(email, password);
@@ -146,11 +152,45 @@ public class UserAccountService {
         }
     }
 
-    public List<UserAccountDTO> getAllDealerAccounts() {
-        return UDao.getAllDealerAccounts();
+    public List<Map<String, Object>> getAllDealerAccounts() {
+        List<UserAccountDTO> accounts = UDao.getAllDealerAccounts();
+        List<Map<String, Object>> enrichedList = new ArrayList<>();
+
+        if (accounts == null || accounts.isEmpty()) {
+            return enrichedList;
+        }
+
+        for (UserAccountDTO account : accounts) {
+            String dealerName = "Unknown";
+
+            if (account.getDealerId() > 0) {
+                DealerDTO dealer = dealerDAO.GetDealerById(account.getDealerId());
+                if (dealer != null) {
+                    dealerName = dealer.getDealerName();
+                }
+            }
+
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("userId", account.getUserId());
+            map.put("username", account.getUsername());
+            map.put("email", account.getEmail());
+            map.put("phoneNumber", account.getPhoneNumber());
+            map.put("roleId", account.getRoleId());
+            map.put("dealerId", account.getDealerId());
+            map.put("dealerName", dealerName);
+            map.put("isActive", account.isIsActive());
+
+            enrichedList.add(map);
+        }
+
+        return enrichedList;
     }
 
     public List<UserAccountDTO> getDealerStaffByName(String name) {
         return UDao.searchDealerStaffAndManagerByName(name);
+    }
+
+    public UserAccountDTO getDealerStaffById(int id) {
+        return UDao.getUserById(id);
     }
 }

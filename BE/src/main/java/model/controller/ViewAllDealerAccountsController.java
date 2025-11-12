@@ -10,8 +10,9 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
-import model.dto.UserAccountDTO;
+import java.util.Map;
 import model.service.UserAccountService;
 import utils.ResponseUtils;
 
@@ -25,14 +26,24 @@ public class ViewAllDealerAccountsController extends HttpServlet {
     private final UserAccountService userAccountService = new UserAccountService();
 
     @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
         try {
-            List<UserAccountDTO> dealers = userAccountService.getAllDealerAccounts();
-            ResponseUtils.success(response, "All dealer accounts retrieved successfully", dealers);
+            // Get all dealer accounts with dealer name
+            List<Map<String, Object>> dealerAccounts = userAccountService
+                    .getAllDealerAccounts();
+
+            if (dealerAccounts != null && !dealerAccounts.isEmpty()) {
+                ResponseUtils.success(resp,
+                        "Retrieved " + dealerAccounts.size() + " dealer account(s)",
+                        dealerAccounts);
+            } else {
+                ResponseUtils.success(resp, "No dealer accounts found", new ArrayList<>());
+            }
+
         } catch (Exception e) {
             e.printStackTrace();
-            ResponseUtils.error(response, "Internal server error: " + e.getMessage());
+            ResponseUtils.error(resp, "Error retrieving dealer accounts: " + e.getMessage());
         }
     }
 }

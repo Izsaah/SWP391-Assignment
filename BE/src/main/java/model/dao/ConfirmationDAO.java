@@ -28,8 +28,7 @@ public class ConfirmationDAO {
 
     public List<ConfirmationDTO> retrieve(String condition, Object... params) throws SQLException, ClassNotFoundException {
         String sql = "SELECT * FROM " + TABLE_NAME + " WHERE " + condition;
-        try (Connection conn = DbUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
             for (int i = 0; i < params.length; i++) {
                 ps.setObject(i + 1, params[i]);
             }
@@ -41,11 +40,11 @@ public class ConfirmationDAO {
             return list;
         }
     }
-    
+
     public List<ConfirmationDTO> viewConfirmations() throws SQLException, ClassNotFoundException {
         return retrieve("1 = 1");
     }
-    
+
     public List<ConfirmationDTO> viewConfirmationsByOrderDetailId(int orderDetailId) throws SQLException, ClassNotFoundException {
         return retrieve("order_detail_id = ?", orderDetailId);
     }
@@ -115,8 +114,8 @@ public class ConfirmationDAO {
 
             ps.setString(1, agreement);          // Agree / Disagree
             ps.setString(2, currentDate);        // current datetime
-            ps.setInt(3, staffAdminId);          
-            ps.setInt(4, confirmationId);        
+            ps.setInt(3, staffAdminId);
+            ps.setInt(4, confirmationId);
 
             if (ps.executeUpdate() > 0) {
                 // return updated object
@@ -132,4 +131,23 @@ public class ConfirmationDAO {
 
         return null;
     }
+
+    public int batchInsert(Connection conn, List<ConfirmationDTO> confirmations) throws SQLException {
+        if (confirmations == null || confirmations.isEmpty()) {
+            return 0;
+        }
+        String sql = "INSERT INTO Confirmation (staff_admin_id, order_detail_id, agreement, date_time) VALUES (?, ?, ?, ?)";
+        try ( PreparedStatement ps = conn.prepareStatement(sql)) {
+            for (ConfirmationDTO c : confirmations) {
+                ps.setInt(1, c.getUserId());
+                ps.setInt(2, c.getOrderDetailId());
+                ps.setString(3, c.getAgreement());
+                ps.setString(4, c.getDate());
+                ps.addBatch();
+            }
+            int[] results = ps.executeBatch();
+            return results.length;
+        }
+    }
+
 }

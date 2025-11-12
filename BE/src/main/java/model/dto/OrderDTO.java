@@ -19,29 +19,34 @@ public class OrderDTO {
     private String orderDate;
     private String status;
     private OrderDetailDTO detail;
+    private List<OrderDetailDTO> details;
     private ConfirmationDTO confirmation;
     private boolean isCustom;
 
-    public OrderDTO(int orderId, int customerId, int dealerStaffId, int modelId, String orderDate, String status, OrderDetailDTO detail, ConfirmationDTO confirmation, boolean isCustom) {
+    public OrderDTO() {
+        
+    }
+    
+    public OrderDTO(int orderId, int customerId, int dealerStaffId, int modelId, String orderDate, String status, List<OrderDetailDTO> details, ConfirmationDTO confirmation, boolean isCustom) {
         this.orderId = orderId;
         this.customerId = customerId;
         this.dealerStaffId = dealerStaffId;
         this.modelId = modelId;
         this.orderDate = orderDate;
         this.status = status;
-        this.detail = detail;
+        this.details = details;
         this.confirmation = confirmation;
         this.isCustom = isCustom;
     }
     
-    public OrderDTO(int orderId, int customerId, int dealerStaffId, int modelId, String orderDate, String status, OrderDetailDTO detail) {
+    public OrderDTO(int orderId, int customerId, int dealerStaffId, int modelId, String orderDate, String status, List<OrderDetailDTO> details) {
         this.orderId = orderId;
         this.customerId = customerId;
         this.dealerStaffId = dealerStaffId;
         this.modelId = modelId;
         this.orderDate = orderDate;
         this.status = status;
-        this.detail = detail;
+        this.details = details;
     }
 
     public OrderDTO(int orderId, int customerId, int dealerStaffId, int modelId, String orderDate, String status) {
@@ -69,7 +74,6 @@ public class OrderDTO {
         this.dealerStaffId = dealerStaffId;
     }
 
-
     public OrderDetailDTO getDetail() {
         return detail;
     }
@@ -78,10 +82,13 @@ public class OrderDTO {
         this.detail = detail;
     }
 
-    public OrderDTO() {
+    public List<OrderDetailDTO> getDetails() {
+        return details;
     }
 
-   
+    public void setDetails(List<OrderDetailDTO> details) {
+        this.details = details;
+    }
 
     public int getOrderId() {
         return orderId;
@@ -98,8 +105,6 @@ public class OrderDTO {
     public void setCustomerId(int customerId) {
         this.customerId = customerId;
     }
-
-  
 
     public int getModelId() {
         return modelId;

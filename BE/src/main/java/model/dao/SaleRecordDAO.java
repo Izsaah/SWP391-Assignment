@@ -10,13 +10,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.text.SimpleDateFormat;
 import java.text.ParseException;
+import java.math.BigDecimal;
+
 import model.dto.SaleRecordDTO;
 import utils.DbUtils;
 
 public class SaleRecordDAO {
 
     private static final String TABLE_NAME = "SaleRecord";
-
     private static final String DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
 
     private static final String CREATE_SQL
@@ -36,30 +37,31 @@ public class SaleRecordDAO {
                 rs.getInt("sale_id"),
                 rs.getInt("dealer_staff_id"),
                 saleDateString,
-                rs.getDouble("sale_amount")
+                rs.getBigDecimal("sale_amount") // BigDecimal here
         );
     }
 
-    public SaleRecordDTO create(int dealerId, int dealerStaffId, String saleDate, double saleAmount) throws ClassNotFoundException {
+    public SaleRecordDTO create(int dealerId, int dealerStaffId, String saleDate, BigDecimal saleAmount) throws ClassNotFoundException {
         Timestamp saleTimestamp = null;
 
         try {
             java.util.Date utilDate = new SimpleDateFormat(DATE_FORMAT).parse(saleDate);
             saleTimestamp = new Timestamp(utilDate.getTime());
 
-            try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(CREATE_SQL, Statement.RETURN_GENERATED_KEYS)) {
+            try (Connection conn = DbUtils.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(CREATE_SQL, Statement.RETURN_GENERATED_KEYS)) {
+
                 ps.setInt(1, dealerId);
                 ps.setInt(2, dealerStaffId);
                 ps.setTimestamp(3, saleTimestamp);
-                ps.setDouble(4, saleAmount);
+                ps.setBigDecimal(4, saleAmount); // Use setBigDecimal
 
                 int affectedRows = ps.executeUpdate();
 
                 if (affectedRows > 0) {
-                    try ( ResultSet rs = ps.getGeneratedKeys()) {
+                    try (ResultSet rs = ps.getGeneratedKeys()) {
                         if (rs.next()) {
                             int generatedId = rs.getInt(1);
-
                             return new SaleRecordDTO(
                                     generatedId,
                                     dealerStaffId,
@@ -80,13 +82,14 @@ public class SaleRecordDAO {
     public List<SaleRecordDTO> retrieve(String condition, Object... params) {
         String sql = "SELECT * FROM " + TABLE_NAME + " WHERE " + condition;
         List<SaleRecordDTO> list = new ArrayList<>();
-        try ( Connection conn = DbUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = DbUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
 
             for (int i = 0; i < params.length; i++) {
                 ps.setObject(i + 1, params[i]);
             }
 
-            try ( ResultSet rs = ps.executeQuery()) {
+            try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     list.add(mapToSaleRecord(rs));
                 }
@@ -97,8 +100,8 @@ public class SaleRecordDAO {
         }
         return null;
     }
-    
-    public List<SaleRecordDTO> findSaleRecordByDealerStaffId(int dealerStaffId){
+
+    public List<SaleRecordDTO> findSaleRecordByDealerStaffId(int dealerStaffId) {
         return retrieve("dealer_staff_id = ?", dealerStaffId);
     }
 }
