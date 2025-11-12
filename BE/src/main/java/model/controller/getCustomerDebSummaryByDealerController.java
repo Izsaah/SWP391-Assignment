@@ -21,7 +21,7 @@ import utils.ResponseUtils;
  * @author ACER
  */
 @WebServlet("/api/staff/getCustomerDebt")
-public class GetCustomerDebSummaryByDealerController extends HttpServlet {
+public class getCustomerDebSummaryByDealerController extends HttpServlet {
     private final  PaymentService PS = new PaymentService();
     
     @Override
