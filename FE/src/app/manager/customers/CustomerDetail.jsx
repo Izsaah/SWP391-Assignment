@@ -49,13 +49,26 @@ const CustomerDetail = () => {
   const [creatingFeedback, setCreatingFeedback] = useState(false);
   const [feedbackForm, setFeedbackForm] = useState({ orderId: '', type: 'Feedback', status: 'New', content: '' });
 
-<<<<<<< HEAD
-  // Customer data - to be fetched from API
-  const [customer, setCustomer] = useState(null);
-  const [orderHistory, setOrderHistory] = useState([]);
-  const [paymentHistory, setPaymentHistory] = useState([]);
-  const [staffPerformance, setStaffPerformance] = useState(null);
-=======
+  const normalizeTestDriveStatus = (status) => {
+    if (!status) return 'Pending';
+    const base = status.includes('_') ? status.substring(0, status.lastIndexOf('_')) : status;
+    const normalized = base.toLowerCase();
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  };
+
+  const formatTestDriveDate = (value) => {
+    if (!value) return 'N/A';
+    try {
+      return new Date(value).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    } catch {
+      return value;
+    }
+  };
+
   // Helper function to extract numeric customer ID from URL parameter
   // Handles formats like: "1", "C-1", or any string containing numbers
   const extractNumericCustomerId = (customerIdParam) => {
@@ -547,8 +560,10 @@ const CustomerDetail = () => {
               appointmentId: drive.appointmentId || drive.appointment_id || drive.id || 'N/A',
               serialId: serialId || 'N/A',
               vehicleName: vehicleName,
-              date: drive.date || drive.scheduleDate || drive.schedule_at || 'N/A',
-              status: drive.status || 'Pending',
+              date: formatTestDriveDate(
+                drive.date || drive.scheduleDate || drive.schedule_at || drive.test_drive_date || ''
+              ),
+              status: normalizeTestDriveStatus(drive.status || drive.statusName || 'Pending'),
               customerId: drive.customerId || drive.customer_id
             };
           });
@@ -730,7 +745,6 @@ const CustomerDetail = () => {
       customerSegment
     };
   };
->>>>>>> origin/master
 
   const formatCurrency = (amount) => {
     if (!amount || amount === 0) return '₫0';

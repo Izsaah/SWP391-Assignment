@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Layout from '../layout/Layout';
 import {
   Calendar,
@@ -22,7 +22,7 @@ const API_URL = import.meta.env.VITE_API_URL;
 const TestDriveSchedule = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState([]); // customers with optional testDriveSchedule
+  const [rawSchedules, setRawSchedules] = useState([]);
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -46,9 +46,16 @@ const TestDriveSchedule = () => {
         if (inv.success) setVehicles(inv.data || []);
         // Initial load: fetch all dealer schedules
         const dealer = await getDealerTestDrives();
-        if (dealer.success) setResults(dealer.data || []);
+        if (dealer.success && Array.isArray(dealer.data) && dealer.data.length > 0) {
+          setRawSchedules(dealer.data);
+        } else if (cust.success) {
+          setRawSchedules(cust.data || []);
+        } else {
+          setRawSchedules([]);
+        }
       } catch (e) {
         console.warn('Manager preload failed', e);
+        setRawSchedules([]);
       }
     })();
   }, []);
@@ -65,6 +72,7 @@ const TestDriveSchedule = () => {
   const getStatusBadge = (status) => {
     const configs = {
       'Pending': { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', label: 'Pending' },
+      'Confirmed': { color: 'bg-blue-100 text-blue-800 border-blue-200', label: 'Confirmed' },
       'Completed': { color: 'bg-green-100 text-green-800 border-green-200', label: 'Completed' },
       'Cancelled': { color: 'bg-gray-100 text-gray-800 border-gray-200', label: 'Cancelled' }
     };
@@ -77,22 +85,83 @@ const TestDriveSchedule = () => {
     );
   };
 
-  const filteredRows = results
-    .map((c) => {
-      const schedule = c.testDriveSchedule || c.test_drive_schedule || c.schedule || null;
-      return schedule
-        ? {
-            appointmentId: schedule.appointmentId || schedule.appointment_id || schedule.id,
-            customerId: c.customerId || c.customer_id || c.id,
-            customerName: c.name || `Customer ${c.customerId}`,
-            serialId: schedule.serialId || schedule.serial_id,
-            date: schedule.date || schedule.scheduleDate || schedule.schedule_at,
-            status: schedule.status || 'PENDING',
-          }
-        : null;
-    })
-    .filter(Boolean)
-    .filter((row) => (statusFilter === 'all' ? true : (row.status || '').toLowerCase() === statusFilter.toLowerCase()));
+  const customerMap = useMemo(() => {
+    const map = new Map();
+    customers.forEach((customer) => {
+      const id = customer.customerId || customer.customer_id || customer.id;
+      if (id !== undefined && id !== null) {
+        map.set(id, customer);
+        map.set(String(id), customer);
+        const numericId = Number(id);
+        if (!Number.isNaN(numericId)) {
+          map.set(numericId, customer);
+        }
+      }
+    });
+    return map;
+  }, [customers]);
+
+  const normalizeStatus = (status) => {
+    if (!status) return 'Pending';
+    const base = status.includes('_') ? status.substring(0, status.lastIndexOf('_')) : status;
+    const normalized = base.toLowerCase();
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  };
+
+  const scheduleRows = useMemo(() => {
+    const baseEntries =
+      Array.isArray(rawSchedules) && rawSchedules.length > 0
+        ? rawSchedules
+        : Array.isArray(customers)
+        ? customers
+        : [];
+
+    return baseEntries
+      .map((entry) => {
+        const schedule =
+          entry?.testDriveSchedule ||
+          entry?.test_drive_schedule ||
+          entry?.schedule ||
+          (Array.isArray(entry?.testDriveSchedules) ? entry.testDriveSchedules[0] : null) ||
+          (Array.isArray(entry?.schedules) ? entry.schedules[0] : null) ||
+          entry;
+        if (!schedule) return null;
+
+        const appointmentId = schedule.appointmentId || schedule.appointment_id || schedule.id;
+        const customerId =
+          schedule.customerId ||
+          schedule.customer_id ||
+          entry?.customerId ||
+          entry?.customer_id ||
+          entry?.id ||
+          null;
+        const customer =
+          (entry && (entry.name || entry.customerName)) ? entry : customerMap.get(customerId) || customerMap.get(String(customerId));
+        const customerName =
+          customer?.name ||
+          customer?.customerName ||
+          (customerId != null ? `Customer ${customerId}` : 'Unknown Customer');
+
+        return {
+          appointmentId,
+          customerId,
+          customerName,
+          serialId: schedule.serialId || schedule.serial_id || '',
+          date: schedule.date || schedule.scheduleDate || schedule.schedule_at || schedule.test_drive_date || '',
+          status: normalizeStatus(schedule.status || schedule.statusName || 'Pending'),
+          rawStatus: schedule.status,
+        };
+      })
+      .filter(Boolean);
+  }, [customerMap, rawSchedules]);
+
+  const filteredRows = useMemo(() => {
+    return scheduleRows.filter((row) =>
+      statusFilter === 'all'
+        ? true
+        : (row.status || '').toLowerCase() === statusFilter.toLowerCase()
+    );
+  }, [scheduleRows, statusFilter]);
 
   // Handle cancel appointment
   const handleCancelAppointment = () => {
@@ -123,12 +192,13 @@ const TestDriveSchedule = () => {
         { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
       );
       if (res.data?.status === 'success') {
-        setResults(Array.isArray(res.data.data) ? res.data.data : []);
+        const payload = Array.isArray(res.data.data) ? res.data.data : [];
+        setRawSchedules(payload.length > 0 ? payload : customers);
       } else {
-        setResults([]);
+        setRawSchedules(customers);
       }
     } catch {
-      setResults([]);
+      setRawSchedules(customers);
     } finally {
       setLoading(false);
     }
@@ -205,6 +275,7 @@ const TestDriveSchedule = () => {
               >
                 <option value="all">All</option>
                 <option value="Pending">Pending</option>
+                <option value="Confirmed">Confirmed</option>
                 <option value="Completed">Completed</option>
                 <option value="Cancelled">Cancelled</option>
               </select>
@@ -215,7 +286,17 @@ const TestDriveSchedule = () => {
               onClick={async () => {
                 setLoading(true);
                 const dealer = await getDealerTestDrives();
-                setResults(dealer.success ? dealer.data || [] : []);
+                if (dealer.success && Array.isArray(dealer.data) && dealer.data.length > 0) {
+                  setRawSchedules(dealer.data);
+                } else {
+                  const allCustomers = await getAllCustomers();
+                  if (allCustomers.success) {
+                    setCustomers(allCustomers.data || []);
+                    setRawSchedules(allCustomers.data || []);
+                  } else {
+                    setRawSchedules([]);
+                  }
+                }
                 setLoading(false);
               }}
               className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
