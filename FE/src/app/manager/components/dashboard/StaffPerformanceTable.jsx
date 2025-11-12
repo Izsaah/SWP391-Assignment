@@ -5,63 +5,8 @@ import { useNavigate } from 'react-router';
 const StaffPerformanceTable = ({ compact = false }) => {
   const navigate = useNavigate();
 
-  const staffData = [
-    {
-      id: 1,
-      name: 'Nguyen Van Hung',
-      avatar: '👨‍💼',
-      quotes: 25,
-      orders: 12,
-      conversion: 48,
-      revenue: '6.3B',
-      trend: 'up',
-      rank: 1
-    },
-    {
-      id: 2,
-      name: 'Tran Thi Hoa',
-      avatar: '👩‍💼',
-      quotes: 20,
-      orders: 10,
-      conversion: 50,
-      revenue: '4.9B',
-      trend: 'up',
-      rank: 2
-    },
-    {
-      id: 3,
-      name: 'Le Van Minh',
-      avatar: '👨‍💼',
-      quotes: 22,
-      orders: 8,
-      conversion: 36,
-      revenue: '3.8B',
-      trend: 'down',
-      rank: 3
-    },
-    {
-      id: 4,
-      name: 'Pham Thu Ha',
-      avatar: '👩‍💼',
-      quotes: 18,
-      orders: 7,
-      conversion: 39,
-      revenue: '3.2B',
-      trend: 'up',
-      rank: 4
-    },
-    {
-      id: 5,
-      name: 'Hoang Anh Tuan',
-      avatar: '👨‍💼',
-      quotes: 15,
-      orders: 6,
-      conversion: 40,
-      revenue: '2.8B',
-      trend: 'up',
-      rank: 5
-    }
-  ];
+  // Staff performance data - to be fetched from API
+  const staffData = [];
 
   const displayData = compact ? staffData.slice(0, 5) : staffData;
 

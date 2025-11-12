@@ -1,9 +1,73 @@
 import React, { useState, useEffect } from 'react';
 import { X, Send, AlertCircle, DollarSign } from 'lucide-react';
-import { getBrands, getModelsByBrand, getColorsByBrandAndModel, getPriceByModelAndColor, createManufacturerRequest } from '../../services/inventoryService';
+import { getCachedVehicleModels, createManufacturerRequest } from '../../services/inventoryService';
+
+const normalizeBrand = (brandName, modelName) => {
+  if (brandName && typeof brandName === 'string') {
+    return brandName.trim();
+  }
+  if (modelName && typeof modelName === 'string') {
+    const [firstWord] = modelName.trim().split(/\s+/);
+    return firstWord || '';
+  }
+  return '';
+};
+
+const buildBrandList = (models) => {
+  const brandMap = new Map();
+  models.forEach((model) => {
+    const brand = normalizeBrand(model?.brandName, model?.modelName);
+    if (!brand) return;
+    const key = brand.toLowerCase();
+    if (!brandMap.has(key)) {
+      brandMap.set(key, {
+        brandId: brandMap.size + 1,
+        brandName: brand,
+      });
+    }
+  });
+  return Array.from(brandMap.values());
+};
+
+const filterModelsByBrand = (models, brand) => {
+  if (!Array.isArray(models) || models.length === 0) return [];
+  if (!brand) return models;
+  const normalizedBrand = brand.trim().toLowerCase();
+  const filtered = models.filter((model) => {
+    const modelBrand = normalizeBrand(model?.brandName, model?.modelName);
+    return modelBrand.toLowerCase() === normalizedBrand;
+  });
+  return filtered.length > 0 ? filtered : models;
+};
+
+const getColorsForModel = (model) => {
+  if (!model || !Array.isArray(model.lists)) return [];
+  const colors = new Set();
+  model.lists.forEach((variant) => {
+    if (variant?.isActive === false) return;
+    if (variant?.color) {
+      colors.add(variant.color);
+    }
+  });
+  return Array.from(colors);
+};
+
+const getVariantPrice = (model, color) => {
+  if (!model || !Array.isArray(model.lists)) return null;
+  const variant = model.lists.find(
+    (item) =>
+      item?.color === color &&
+      (item?.isActive !== false)
+  );
+  if (!variant) return null;
+  return typeof variant.price === 'number' ? variant.price : Number(variant.price ?? NaN);
+};
 
 const CreateManufacturerRequestModal = ({ isOpen, onClose, onSuccess }) => {
   const [brands, setBrands] = useState([]);
+  const [catalog, setCatalog] = useState([]);
+  const [catalogError, setCatalogError] = useState('');
+  const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [availableModels, setAvailableModels] = useState([]);
   const [availableColors, setAvailableColors] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -20,59 +84,157 @@ const CreateManufacturerRequestModal = ({ isOpen, onClose, onSuccess }) => {
 
   // Load brands on mount
   useEffect(() => {
-    if (isOpen) {
-      const brandsList = getBrands();
-      setBrands(brandsList);
-      // Reset form when modal opens
-      setFormData({
-        brand: '',
-        model: '',
-        color: '',
-        quantity: '',
-        price: '',
-        notes: ''
-      });
+    if (!isOpen) return;
+
+    let cancelled = false;
+
+    const initializeModal = async () => {
       setErrors({});
-      setAvailableModels([]);
+      setCatalogError('');
+      setLoadingCatalog(true);
       setAvailableColors([]);
-    }
+
+      try {
+        const modelsData = await getCachedVehicleModels();
+        if (cancelled) return;
+
+        const rawCatalog = Array.isArray(modelsData) ? modelsData : [];
+        const fallbackCatalog =
+          rawCatalog.length > 0
+            ? rawCatalog
+            : (catalog && catalog.length > 0 ? catalog : []);
+
+        setCatalog(fallbackCatalog);
+
+        if (fallbackCatalog.length === 0) {
+          setCatalogError('Không thể tải danh sách mẫu xe. Vui lòng thử lại sau.');
+          setBrands([]);
+          setFormData({
+            brand: '',
+            model: '',
+            color: '',
+            quantity: '',
+            price: '',
+            notes: ''
+          });
+          return;
+        }
+
+        setCatalogError('');
+
+        const brandOptions = buildBrandList(fallbackCatalog);
+        setBrands(brandOptions);
+
+        const preferredBrand =
+          brandOptions.find((b) => (b.brandName || '').toLowerCase() === 'ev')
+            ?.brandName ||
+          brandOptions[0]?.brandName ||
+          'EV';
+
+        setFormData({
+          brand: preferredBrand || '',
+          model: '',
+          color: '',
+          quantity: '',
+          price: '',
+          notes: ''
+        });
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Error loading vehicle catalog for manufacturer request:', error);
+        setCatalog([]);
+        setBrands([]);
+        setFormData({
+          brand: '',
+          model: '',
+          color: '',
+          quantity: '',
+          price: '',
+          notes: ''
+        });
+        setCatalogError('Không thể tải danh sách mẫu xe. Vui lòng thử lại sau.');
+      } finally {
+        if (!cancelled) {
+          setLoadingCatalog(false);
+        }
+      }
+    };
+
+    initializeModal();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen]);
 
   // Update models when brand changes
   useEffect(() => {
-    if (formData.brand) {
-      const models = getModelsByBrand(formData.brand);
-      setAvailableModels(models);
-      // Reset model and color when brand changes
-      setFormData(prev => ({ ...prev, model: '', color: '', price: '' }));
-      setAvailableColors([]);
-    } else {
+    if (!isOpen) return;
+    const brand = formData.brand;
+
+    if (!brand) {
       setAvailableModels([]);
       setAvailableColors([]);
+      return;
     }
-  }, [formData.brand]);
 
-  // Update colors when model changes
-  useEffect(() => {
-    if (formData.brand && formData.model) {
-      const colors = getColorsByBrandAndModel(formData.brand, formData.model);
-      setAvailableColors(colors);
-      // Reset color and price when model changes
-      setFormData(prev => ({ ...prev, color: '', price: '' }));
-    } else {
-      setAvailableColors([]);
-    }
-  }, [formData.brand, formData.model]);
+    const modelsForBrand = filterModelsByBrand(catalog, brand);
+    setAvailableModels(modelsForBrand);
+    setAvailableColors([]);
 
-  // Auto-fill price when color is selected
-  useEffect(() => {
-    if (formData.brand && formData.model && formData.color) {
-      const price = getPriceByModelAndColor(formData.brand, formData.model, formData.color);
-      if (price !== null) {
-        setFormData(prev => ({ ...prev, price: price.toString() }));
+    setFormData((prev) => {
+      if (prev.model || prev.color || prev.price) {
+        return {
+          ...prev,
+          model: '',
+          color: '',
+          price: ''
+        };
       }
+      return prev;
+    });
+  }, [formData.brand, catalog, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const { brand, model } = formData;
+    if (!brand || !model) {
+      setAvailableColors([]);
+      return;
     }
-  }, [formData.brand, formData.model, formData.color]);
+
+    const modelsForBrand = filterModelsByBrand(catalog, brand);
+    const targetModel = modelsForBrand.find((item) => item?.modelName === model);
+    const colors = targetModel ? getColorsForModel(targetModel) : [];
+    setAvailableColors(colors);
+
+    setFormData((prev) => {
+      if (!colors.includes(prev.color)) {
+        return {
+          ...prev,
+          color: '',
+          price: ''
+        };
+      }
+      return prev;
+    });
+  }, [formData.brand, formData.model, catalog, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const { brand, model, color } = formData;
+    if (!brand || !model || !color) return;
+
+    const modelsForBrand = filterModelsByBrand(catalog, brand);
+    const targetModel = modelsForBrand.find((item) => item?.modelName === model);
+    if (!targetModel) return;
+
+    const price = getVariantPrice(targetModel, color);
+    if (price == null || Number.isNaN(price)) return;
+
+    const formatted = price.toString();
+    setFormData((prev) => (prev.price === formatted ? prev : { ...prev, price: formatted }));
+  }, [formData.brand, formData.model, formData.color, catalog, isOpen]);
 
   // Handle input changes
   const handleChange = (e) => {
@@ -167,7 +329,7 @@ const CreateManufacturerRequestModal = ({ isOpen, onClose, onSuccess }) => {
         notes: formData.notes.trim()
       };
 
-      const result = createManufacturerRequest(requestData);
+      const result = await createManufacturerRequest(requestData);
       
       if (result.success) {
         if (onSuccess) {
@@ -222,20 +384,29 @@ const CreateManufacturerRequestModal = ({ isOpen, onClose, onSuccess }) => {
                 name="brand"
                 value={formData.brand}
                 onChange={handleChange}
+                disabled
                 className={`w-full h-[40px] px-4 border rounded-[10px] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors ${
                   errors.brand ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                }`}
+                } ${'bg-gray-100 cursor-not-allowed'}`}
                 required
               >
-                <option value="">Select Brand</option>
-                {brands.map(brand => (
-                  <option key={brand.brandId} value={brand.brandName}>
-                    {brand.brandName}
+                {brands.length > 0 ? (
+                  brands.map((brand) => (
+                    <option key={brand.brandId} value={brand.brandName}>
+                      {brand.brandName}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">
+                    {loadingCatalog ? 'Loading...' : 'No brand available'}
                   </option>
-                ))}
+                )}
               </select>
               {errors.brand && (
                 <p className="mt-1 text-sm text-red-600">{errors.brand}</p>
+              )}
+              {catalogError && (
+                <p className="mt-1 text-sm text-red-600">{catalogError}</p>
               )}
             </div>
 
@@ -249,15 +420,15 @@ const CreateManufacturerRequestModal = ({ isOpen, onClose, onSuccess }) => {
                 name="model"
                 value={formData.model}
                 onChange={handleChange}
-                disabled={!formData.brand}
+                disabled={!formData.brand || loadingCatalog}
                 className={`w-full h-[40px] px-4 border rounded-[10px] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors ${
                   errors.model ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                } ${!formData.brand ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                } ${!formData.brand || loadingCatalog ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 required
               >
                 <option value="">Select Model</option>
-                {availableModels.map((model, idx) => (
-                  <option key={idx} value={model.modelName}>
+                {availableModels.map((model) => (
+                  <option key={model.modelId ?? model.modelName} value={model.modelName}>
                     {model.modelName}
                   </option>
                 ))}

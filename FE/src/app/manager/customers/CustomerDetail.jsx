@@ -49,6 +49,13 @@ const CustomerDetail = () => {
   const [creatingFeedback, setCreatingFeedback] = useState(false);
   const [feedbackForm, setFeedbackForm] = useState({ orderId: '', type: 'Feedback', status: 'New', content: '' });
 
+<<<<<<< HEAD
+  // Customer data - to be fetched from API
+  const [customer, setCustomer] = useState(null);
+  const [orderHistory, setOrderHistory] = useState([]);
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [staffPerformance, setStaffPerformance] = useState(null);
+=======
   // Helper function to extract numeric customer ID from URL parameter
   // Handles formats like: "1", "C-1", or any string containing numbers
   const extractNumericCustomerId = (customerIdParam) => {
@@ -723,6 +730,7 @@ const CustomerDetail = () => {
       customerSegment
     };
   };
+>>>>>>> origin/master
 
   const formatCurrency = (amount) => {
     if (!amount || amount === 0) return '₫0';

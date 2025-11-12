@@ -76,17 +76,26 @@ const Delivery = () => {
     const result = await viewOrdersByStaffId();
     
     if (result.success && result.data && result.data.length > 0) {
-      // Filter orders by delivery status and enrich with customer/vehicle names
+      // IMPORTANT: Show ALL orders with ALL statuses - do not filter
+      // Map ALL orders and enrich with customer/vehicle names
       const filtered = result.data.map(order => {
         // Get status from various possible field names
         const orderStatus = order.status || order.order_status || order.Status || 'Pending';
         
         // Map backend status to delivery display status
+        // Handle all possible status values: pending, Pending, delivered, Delivered, cancelled, Cancelled, Cancel, cancel
         let deliveryStatus = 'Not Delivered';
-        if (orderStatus === 'Delivered' || orderStatus === 'delivered') {
+        const statusLower = (orderStatus || '').toLowerCase().trim();
+        
+        if (statusLower === 'delivered') {
           deliveryStatus = 'Delivered';
-        } else if (orderStatus === 'Cancel' || orderStatus === 'cancel' || orderStatus === 'Cancelled' || orderStatus === 'cancelled') {
+        } else if (statusLower === 'cancel' || statusLower === 'cancelled') {
           deliveryStatus = 'Cancelled';
+        } else if (statusLower === 'pending') {
+          deliveryStatus = 'Not Delivered';
+        } else {
+          // For any other status, default to 'Not Delivered'
+          deliveryStatus = 'Not Delivered';
         }
         
         // Get customer and vehicle names from maps
@@ -137,15 +146,27 @@ const Delivery = () => {
     return true;
   });
 
-  // Get status badge
+  // Get status badge - handle all possible statuses
   const getStatusBadge = (status) => {
+    // Normalize status to handle case variations
+    const statusLower = (status || '').toLowerCase().trim();
+    let normalizedStatus = 'Not Delivered';
+    
+    if (statusLower === 'delivered') {
+      normalizedStatus = 'Delivered';
+    } else if (statusLower === 'cancel' || statusLower === 'cancelled') {
+      normalizedStatus = 'Cancelled';
+    } else if (statusLower === 'pending') {
+      normalizedStatus = 'Not Delivered';
+    }
+    
     const statusConfig = {
       'Delivered': { color: 'bg-green-100 text-green-800', icon: '✅', label: 'Delivered' },
       'Not Delivered': { color: 'bg-yellow-100 text-yellow-800', icon: '⏳', label: 'Not Delivered' },
       'Cancelled': { color: 'bg-red-100 text-red-800', icon: '❌', label: 'Cancelled' },
     };
 
-    const config = statusConfig[status] || { color: 'bg-gray-100 text-gray-800', icon: '❓', label: status };
+    const config = statusConfig[normalizedStatus] || { color: 'bg-gray-100 text-gray-800', icon: '❓', label: status || 'Unknown' };
     return (
       <span className={`inline-flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-semibold ${config.color}`}>
         <span>{config.icon}</span>

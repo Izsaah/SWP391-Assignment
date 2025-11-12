@@ -31,14 +31,19 @@ export function AuthProvider({ children }) {
         }
 
         try {
+            const isNgrokUrl = API_URL?.includes('ngrok');
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            if (isNgrokUrl) {
+                headers['ngrok-skip-browser-warning'] = 'true';
+            }
+            
             const res = await axios.post(
                 `${API_URL}/login`,
                 { email, password },
-                {
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                }
+                { headers }
             );
 
             const token = res.data?.data?.token;

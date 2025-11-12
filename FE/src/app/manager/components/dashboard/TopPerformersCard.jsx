@@ -5,44 +5,8 @@ import { useNavigate } from 'react-router';
 const TopPerformersCard = () => {
   const navigate = useNavigate();
 
-  const topPerformers = [
-    {
-      id: 1,
-      name: 'Nguyen Van Hung',
-      avatar: '👨‍💼',
-      orders: 12,
-      conversion: 48,
-      revenue: '6.3B',
-      rank: 1
-    },
-    {
-      id: 2,
-      name: 'Tran Thi Hoa',
-      avatar: '👩‍💼',
-      orders: 10,
-      conversion: 50,
-      revenue: '4.9B',
-      rank: 2
-    },
-    {
-      id: 3,
-      name: 'Le Van Minh',
-      avatar: '👨‍💼',
-      orders: 8,
-      conversion: 36,
-      revenue: '3.8B',
-      rank: 3
-    },
-    {
-      id: 4,
-      name: 'Pham Thu Ha',
-      avatar: '👩‍💼',
-      orders: 7,
-      conversion: 39,
-      revenue: '3.2B',
-      rank: 4
-    }
-  ];
+  // Top performers data - to be fetched from API
+  const topPerformers = [];
 
   const getRankBadge = (rank) => {
     if (rank === 1) return '🥇';

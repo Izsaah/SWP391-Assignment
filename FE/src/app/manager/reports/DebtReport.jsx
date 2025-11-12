@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Layout from '../layout/Layout';
 import {
   DollarSign,
@@ -24,108 +24,27 @@ const DebtReport = () => {
   const [selectedContract, setSelectedContract] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
-  // Sample debt data
-  const debtData = [
-    {
-      contractId: 'C-0012',
-      customerId: 'C-001',
-      customerName: 'Nguyen Van A',
-      assignedStaff: 'Duy',
-      staffId: 'S-005',
-      paymentType: 'Installment',
-      installmentMonths: 12,
-      totalAmount: 980000000,
-      paid: 150000000,
-      outstanding: 830000000,
-      dueDate: '2025-11-30',
-      aging: '90+ days',
-      agingDays: 95,
-      status: 'Overdue',
-      installments: [
-        { number: 1, dueDate: '2025-07-20', amount: 125000000, status: 'Paid' },
-        { number: 2, dueDate: '2025-08-20', amount: 125000000, status: 'Paid Late' },
-        { number: 3, dueDate: '2025-09-20', amount: 125000000, status: 'Overdue' },
-        { number: 4, dueDate: '2025-10-20', amount: 125000000, status: 'Overdue' },
-        { number: 5, dueDate: '2025-11-20', amount: 125000000, status: 'Overdue' },
-        { number: 6, dueDate: '2025-12-20', amount: 125000000, status: 'Pending' },
-        { number: 7, dueDate: '2026-01-20', amount: 125000000, status: 'Pending' },
-        { number: 8, dueDate: '2026-02-20', amount: 125000000, status: 'Pending' },
-        { number: 9, dueDate: '2026-03-20', amount: 125000000, status: 'Pending' },
-        { number: 10, dueDate: '2026-04-20', amount: 125000000, status: 'Pending' },
-        { number: 11, dueDate: '2026-05-20', amount: 125000000, status: 'Pending' },
-        { number: 12, dueDate: '2026-06-20', amount: 125000000, status: 'Pending' }
-      ],
-      startDate: '2025-06-20'
-    },
-    {
-      contractId: 'C-0203',
-      customerId: 'C-002',
-      customerName: 'Le Thi B',
-      assignedStaff: 'An',
-      staffId: 'S-006',
-      paymentType: 'Full Payment',
-      installmentMonths: 0,
-      totalAmount: 730000000,
-      paid: 730000000,
-      outstanding: 0,
-      dueDate: null,
-      aging: 'Paid Off',
-      agingDays: 0,
-      status: 'Paid Off',
-      installments: [],
-      startDate: '2025-09-15'
-    },
-    {
-      contractId: 'C-0143',
-      customerId: 'C-003',
-      customerName: 'John Doe',
-      assignedStaff: 'Minh',
-      staffId: 'S-007',
-      paymentType: 'Installment',
-      installmentMonths: 6,
-      totalAmount: 620000000,
-      paid: 250000000,
-      outstanding: 370000000,
-      dueDate: '2025-12-15',
-      aging: '30-60 days',
-      agingDays: 45,
-      status: 'Current',
-      installments: [
-        { number: 1, dueDate: '2025-09-15', amount: 125000000, status: 'Paid' },
-        { number: 2, dueDate: '2025-10-15', amount: 125000000, status: 'Paid' },
-        { number: 3, dueDate: '2025-11-15', amount: 125000000, status: 'Overdue' },
-        { number: 4, dueDate: '2025-12-15', amount: 125000000, status: 'Pending' },
-        { number: 5, dueDate: '2026-01-15', amount: 125000000, status: 'Pending' },
-        { number: 6, dueDate: '2026-02-15', amount: 125000000, status: 'Pending' }
-      ],
-      startDate: '2025-08-15'
-    },
-    {
-      contractId: 'C-0234',
-      customerId: 'C-004',
-      customerName: 'Tran Van C',
-      assignedStaff: 'Lan',
-      staffId: 'S-008',
-      paymentType: 'Installment',
-      installmentMonths: 24,
-      totalAmount: 1500000000,
-      paid: 500000000,
-      outstanding: 1000000000,
-      dueDate: '2025-11-25',
-      aging: '60-90 days',
-      agingDays: 75,
-      status: 'Overdue',
-      installments: [
-        { number: 1, dueDate: '2025-06-25', amount: 62500000, status: 'Paid' },
-        { number: 2, dueDate: '2025-07-25', amount: 62500000, status: 'Paid' },
-        { number: 3, dueDate: '2025-08-25', amount: 62500000, status: 'Paid' },
-        { number: 4, dueDate: '2025-09-25', amount: 62500000, status: 'Paid' },
-        { number: 5, dueDate: '2025-10-25', amount: 62500000, status: 'Overdue' },
-        { number: 6, dueDate: '2025-11-25', amount: 62500000, status: 'Overdue' }
-      ],
-      startDate: '2025-05-25'
-    }
-  ];
+  // Debt data from BE
+  const [debtData, setDebtData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError('');
+      const { fetchCustomerDebtSummary } = await import('../services/reportsService');
+      const res = await fetchCustomerDebtSummary();
+      if (res.success) {
+        setDebtData(res.data || []);
+      } else {
+        setDebtData([]);
+        setError(res.message || 'Failed to load debts');
+      }
+      setLoading(false);
+    };
+    load();
+  }, []);
 
   // Get unique staff list
   const staffList = [...new Set(debtData.map(d => d.assignedStaff))];
@@ -332,18 +251,13 @@ const DebtReport = () => {
 
         {/* Table */}
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          {error && <div className="p-3 text-sm text-red-700 bg-red-50 border-b border-red-200">{error}</div>}
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                     Customer
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                    Contract ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                    Payment Type
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                     Total Amount
@@ -354,32 +268,17 @@ const DebtReport = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                     Outstanding
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                    Due Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                    Aging
-                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredDebtData.map((debt) => (
                   <tr 
-                    key={debt.contractId} 
+                    key={debt.customerName} 
                     className="hover:bg-gray-50 cursor-pointer"
                     onClick={() => handleViewDetail(debt)}
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{debt.customerName}</div>
-                      <div className="text-xs text-gray-500">{debt.assignedStaff}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-700">{debt.contractId}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-700">
-                        {getPaymentTypeLabel(debt.paymentType, debt.installmentMonths)}
-                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="text-sm font-semibold text-gray-900">
@@ -395,12 +294,6 @@ const DebtReport = () => {
                       <span className="text-sm text-red-600 font-medium">
                         {formatCurrency(debt.outstanding)}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-700">{formatDate(debt.dueDate)}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getAgingBadge(debt.aging)}
                     </td>
                   </tr>
                 ))}

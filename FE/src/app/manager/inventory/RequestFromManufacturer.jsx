@@ -147,7 +147,7 @@ const RequestFromManufacturer = () => {
         notes: formData.notes.trim()
       };
 
-      const result = createManufacturerRequest(requestData);
+      const result = await createManufacturerRequest(requestData);
       
       if (result.success) {
         setShowToast(true);

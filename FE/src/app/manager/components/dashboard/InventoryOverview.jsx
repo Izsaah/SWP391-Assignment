@@ -5,58 +5,8 @@ import { useNavigate } from 'react-router';
 const InventoryOverview = () => {
   const navigate = useNavigate();
 
-  const inventoryData = [
-    {
-      id: 1,
-      model: 'Tesla Model 3 RWD',
-      available: 15,
-      reserved: 3,
-      sold: 8,
-      turnover: 73,
-      trend: 'up',
-      status: 'healthy'
-    },
-    {
-      id: 2,
-      model: 'VinFast VF e34 Plus',
-      available: 20,
-      reserved: 6,
-      sold: 12,
-      turnover: 68,
-      trend: 'up',
-      status: 'healthy'
-    },
-    {
-      id: 3,
-      model: 'Tesla Model Y AWD',
-      available: 8,
-      reserved: 2,
-      sold: 5,
-      turnover: 55,
-      trend: 'down',
-      status: 'normal'
-    },
-    {
-      id: 4,
-      model: 'VinFast VF 8 Eco',
-      available: 12,
-      reserved: 4,
-      sold: 7,
-      turnover: 62,
-      trend: 'up',
-      status: 'normal'
-    },
-    {
-      id: 5,
-      model: 'Tesla Model Y RWD',
-      available: 3,
-      reserved: 1,
-      sold: 2,
-      turnover: 42,
-      trend: 'down',
-      status: 'low'
-    }
-  ];
+  // Inventory data - to be fetched from API
+  const inventoryData = [];
 
   const getTurnoverColor = (turnover) => {
     if (turnover >= 65) return 'text-green-600';

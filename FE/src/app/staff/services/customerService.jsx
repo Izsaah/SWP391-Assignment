@@ -63,15 +63,22 @@ export const getAllCustomers = async () => {
   try {
     const token = localStorage.getItem('token');
     
+    // Prepare headers with ngrok support
+    const isNgrokUrl = API_URL?.includes('ngrok');
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+    
+    // Add ngrok-skip-browser-warning header if using ngrok
+    if (isNgrokUrl) {
+      headers['ngrok-skip-browser-warning'] = 'true';
+    }
+    
     const response = await axios.post(
       `${API_URL}/staff/viewAllCustomer`,
       {}, // Empty body
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      }
+      { headers }
     );
 
     if (response.data && response.data.status === 'success') {

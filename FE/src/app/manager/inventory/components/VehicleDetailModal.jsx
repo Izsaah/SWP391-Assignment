@@ -1,44 +1,8 @@
-import React, { useState } from 'react';
-import { X, CheckCircle, Clock, ShoppingCart, Edit2, Save, XCircle } from 'lucide-react';
+import React from 'react';
+import { X, CheckCircle, XCircle } from 'lucide-react';
 
 const VehicleDetailModal = ({ vehicle, isOpen, onClose }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedVehicle, setEditedVehicle] = useState(null);
-
   if (!isOpen || !vehicle) return null;
-
-  // Initialize edited vehicle when entering edit mode
-  const handleEditClick = () => {
-    setIsEditing(true);
-    setEditedVehicle({
-      ...vehicle,
-      price: vehicle.price,
-      color: vehicle.color,
-      dealer: vehicle.dealer,
-      status: vehicle.status
-    });
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditing(false);
-    setEditedVehicle(null);
-  };
-
-  const handleSaveEdit = () => {
-    // In real implementation, this would call an API to update the vehicle
-    console.log('Saving vehicle:', editedVehicle);
-    // Update the vehicle data (in real app, this would come from API response)
-    setIsEditing(false);
-    setEditedVehicle(null);
-    // You could call an onUpdate callback here if needed
-  };
-
-  const handleFieldChange = (field, value) => {
-    setEditedVehicle(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('en-US', {
@@ -48,44 +12,27 @@ const VehicleDetailModal = ({ vehicle, isOpen, onClose }) => {
     }).format(price);
   };
 
-  const getStatusInfo = (status) => {
-    switch(status) {
-      case 'Available':
-        return {
-          label: 'Available',
-          color: 'text-green-600',
-          bgColor: 'bg-green-50',
-          borderColor: 'border-green-200',
-          icon: CheckCircle
-        };
-      case 'Reserved':
-        return {
-          label: 'Reserved',
-          color: 'text-yellow-600',
-          bgColor: 'bg-yellow-50',
-          borderColor: 'border-yellow-200',
-          icon: Clock
-        };
-      case 'Sold':
-        return {
-          label: 'Sold',
-          color: 'text-blue-600',
-          bgColor: 'bg-blue-50',
-          borderColor: 'border-blue-200',
-          icon: ShoppingCart
-        };
-      default:
-        return {
-          label: status,
-          color: 'text-gray-600',
-          bgColor: 'bg-gray-50',
-          borderColor: 'border-gray-200',
-          icon: CheckCircle
-        };
+  const getStatusInfo = (isActive) => {
+    // Use isActive field from database instead of status
+    if (isActive === true || isActive === 'true') {
+      return {
+        label: 'Active',
+        color: 'text-green-600',
+        bgColor: 'bg-green-50',
+        borderColor: 'border-green-200',
+        icon: CheckCircle
+      };
+    } else {
+      return {
+        label: 'Inactive',
+        color: 'text-gray-600',
+        bgColor: 'bg-gray-50',
+        borderColor: 'border-gray-200',
+        icon: XCircle
+      };
     }
   };
 
-  const currentVehicle = isEditing ? editedVehicle : vehicle;
 
   return (
     <div 
@@ -99,40 +46,12 @@ const VehicleDetailModal = ({ vehicle, isOpen, onClose }) => {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-2xl font-bold text-gray-900">Vehicle Details</h2>
-          <div className="flex items-center space-x-2">
-            {!isEditing ? (
-              <button
-                onClick={handleEditClick}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-indigo-600"
-                title="Edit vehicle details"
-              >
-                <Edit2 className="w-5 h-5" />
-              </button>
-            ) : (
-              <>
-                <button
-                  onClick={handleSaveEdit}
-                  className="p-2 hover:bg-green-50 rounded-lg transition-colors text-gray-600 hover:text-green-600"
-                  title="Save changes"
-                >
-                  <Save className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={handleCancelEdit}
-                  className="p-2 hover:bg-red-50 rounded-lg transition-colors text-gray-600 hover:text-red-600"
-                  title="Cancel editing"
-                >
-                  <XCircle className="w-5 h-5" />
-                </button>
-              </>
-            )}
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200 hover:scale-110"
-            >
-              <X className="w-6 h-6 text-gray-600" />
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200 hover:scale-110"
+          >
+            <X className="w-6 h-6 text-gray-600" />
+          </button>
         </div>
 
         {/* Content */}
@@ -161,31 +80,22 @@ const VehicleDetailModal = ({ vehicle, isOpen, onClose }) => {
               {/* Model Name & Price */}
               <div className="pb-4 border-b border-gray-200">
                 <h1 className="text-3xl font-bold text-gray-900 mb-4">
-                  {currentVehicle.model}
+                  {vehicle.model}
                 </h1>
                 <div className="mb-4">
                   <div className="text-sm text-gray-500 mb-1">Price</div>
-                  {isEditing ? (
-                    <input
-                      type="number"
-                      value={currentVehicle.price}
-                      onChange={(e) => handleFieldChange('price', parseFloat(e.target.value) || 0)}
-                      className="text-4xl font-bold text-gray-900 w-full border-b-2 border-indigo-500 focus:outline-none focus:border-indigo-600"
-                    />
-                  ) : (
-                    <div className="text-4xl font-bold text-gray-900">
-                      {formatPrice(currentVehicle.price)}
-                    </div>
-                  )}
+                  <div className="text-4xl font-bold text-gray-900">
+                    {formatPrice(vehicle.price)}
+                  </div>
                 </div>
               </div>
 
               {/* Status Badge */}
-              <div className={`rounded-lg border-2 p-4 ${getStatusInfo(currentVehicle.status).bgColor} ${getStatusInfo(currentVehicle.status).borderColor}`}>
+              <div className={`rounded-lg border-2 p-4 ${getStatusInfo(vehicle.isActive).bgColor} ${getStatusInfo(vehicle.isActive).borderColor}`}>
                 <div className="flex items-center space-x-2">
-                  {React.createElement(getStatusInfo(currentVehicle.status).icon, { className: `w-5 h-5 ${getStatusInfo(currentVehicle.status).color}` })}
+                  {React.createElement(getStatusInfo(vehicle.isActive).icon, { className: `w-5 h-5 ${getStatusInfo(vehicle.isActive).color}` })}
                   <div>
-                    <p className={`font-semibold ${getStatusInfo(currentVehicle.status).color}`}>Status: {getStatusInfo(currentVehicle.status).label}</p>
+                    <p className={`font-semibold ${getStatusInfo(vehicle.isActive).color}`}>Status: {getStatusInfo(vehicle.isActive).label}</p>
                   </div>
                 </div>
               </div>
@@ -196,87 +106,54 @@ const VehicleDetailModal = ({ vehicle, isOpen, onClose }) => {
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <div className="text-xs text-gray-500 uppercase mb-1">VIN</div>
-                    <div className="text-sm font-mono font-medium text-gray-900">{currentVehicle.vin}</div>
+                    <div className="text-xs text-gray-500 uppercase mb-1">Model Name</div>
+                    <div className="text-sm font-medium text-gray-900">{vehicle.modelName || vehicle.model || 'N/A'}</div>
+                  </div>
+                  
+                  <div>
+                    <div className="text-xs text-gray-500 uppercase mb-1">Version</div>
+                    <div className="text-sm font-medium text-gray-900">{vehicle.versionName || 'N/A'}</div>
                   </div>
                   
                   <div>
                     <div className="text-xs text-gray-500 uppercase mb-1">Color</div>
-                    {isEditing ? (
-                      <select
-                        value={currentVehicle.color}
-                        onChange={(e) => handleFieldChange('color', e.target.value)}
-                        className="text-sm font-medium text-gray-900 w-full border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        <option value="White">White</option>
-                        <option value="Black">Black</option>
-                        <option value="Blue">Blue</option>
-                        <option value="Red">Red</option>
-                        <option value="Green">Green</option>
-                        <option value="Silver">Silver</option>
-                        <option value="Gray">Gray</option>
-                      </select>
-                    ) : (
-                      <div className="text-sm font-medium text-gray-900">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                          {currentVehicle.color}
-                        </span>
-                      </div>
-                    )}
+                    <div className="text-sm font-medium text-gray-900">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        {vehicle.color || 'N/A'}
+                      </span>
+                    </div>
                   </div>
                   
                   <div>
-                    <div className="text-xs text-gray-500 uppercase mb-1">Dealer</div>
-                    {isEditing ? (
-                      <select
-                        value={currentVehicle.dealer}
-                        onChange={(e) => handleFieldChange('dealer', e.target.value)}
-                        className="text-sm font-medium text-gray-900 w-full border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        <option value="Dealer A">Dealer A</option>
-                        <option value="Dealer B">Dealer B</option>
-                        <option value="Dealer C">Dealer C</option>
-                      </select>
-                    ) : (
-                      <div className="text-sm font-medium text-gray-900">{currentVehicle.dealer}</div>
-                    )}
+                    <div className="text-xs text-gray-500 uppercase mb-1">Model ID</div>
+                    <div className="text-sm font-medium text-gray-900">{vehicle.modelId || 'N/A'}</div>
                   </div>
                   
                   <div>
-                    <div className="text-xs text-gray-500 uppercase mb-1">Import Date</div>
-                    {isEditing ? (
-                      <input
-                        type="date"
-                        value={currentVehicle.importDate}
-                        onChange={(e) => handleFieldChange('importDate', e.target.value)}
-                        className="text-sm font-medium text-gray-900 w-full border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    ) : (
-                      <div className="text-sm font-medium text-gray-900">{currentVehicle.importDate}</div>
-                    )}
-                  </div>
-                  
-                  <div>
-                    <div className="text-xs text-gray-500 uppercase mb-1">Days in Stock</div>
-                    <div className="text-sm font-medium text-gray-900">{currentVehicle.days} days</div>
+                    <div className="text-xs text-gray-500 uppercase mb-1">Variant ID</div>
+                    <div className="text-sm font-medium text-gray-900">{vehicle.variantId || 'N/A'}</div>
                   </div>
                 </div>
+                
+                {/* Description */}
+                {vehicle.description && (
+                  <div className="mt-4">
+                    <div className="text-xs text-gray-500 uppercase mb-1">Description</div>
+                    <div className="text-sm text-gray-700">{vehicle.description}</div>
+                  </div>
+                )}
               </div>
 
               {/* Additional Details */}
               <div className="pt-4 border-t border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Additional Information</h3>
                 <div className="space-y-2 text-sm text-gray-600">
-                  <p>• Vehicle is currently {currentVehicle.status.toLowerCase()} in inventory</p>
-                  <p>• Located at {currentVehicle.dealer}</p>
-                  {currentVehicle.status === 'Sold' && (
-                    <p>• This vehicle has been sold and delivered to customer</p>
-                  )}
-                  {currentVehicle.status === 'Reserved' && (
-                    <p>• This vehicle is reserved for a customer</p>
-                  )}
-                  {currentVehicle.status === 'Available' && (
-                    <p>• This vehicle is available for sale</p>
+                  <p>• Vehicle model: <strong>{vehicle.modelName || vehicle.model || 'N/A'}</strong></p>
+                  <p>• Version: <strong>{vehicle.versionName || 'N/A'}</strong></p>
+                  <p>• Color: <strong>{vehicle.color || 'N/A'}</strong></p>
+                  <p>• Status: <strong>{vehicle.isActive ? 'Active' : 'Inactive'}</strong></p>
+                  {vehicle.description && (
+                    <p>• {vehicle.description}</p>
                   )}
                 </div>
               </div>
@@ -286,11 +163,6 @@ const VehicleDetailModal = ({ vehicle, isOpen, onClose }) => {
 
         {/* Footer */}
         <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200 bg-gray-50">
-          {isEditing && (
-            <div className="flex-1 text-sm text-gray-500 italic">
-              Editing mode • Click save to apply changes
-            </div>
-          )}
           <button
             onClick={onClose}
             className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"

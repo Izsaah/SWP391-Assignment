@@ -3,7 +3,6 @@ import './App.css'
 import { AuthProvider } from './app/login/AuthContext';
 import React from 'react';
 import Login from './app/login/Login';
-// (duplicate import removed)
 
 // Staff imports
 import { DashBoard as StaffDashboard } from './app/staff/dashboard/Dashboard';
@@ -36,6 +35,17 @@ import DebtReport from './app/manager/reports/DebtReport';
 import SalesPerformance from './app/manager/reports/SalesPerformance';
 import ProtectedRoute from './app/login/ProtectedRoute';
 
+// EVM area imports
+import EVMLayout from './EVM/layout/EVMLayout';
+import EVMStaffDashboard from './EVM/pages/staff/StaffDashboard';
+import InventoryEVM from './EVM/pages/manager/Inventory';
+import PromotionsEVM from './EVM/pages/manager/Promotions';
+import Users from './EVM/pages/manager/Users';
+import SalesReport from './EVM/pages/manager/SalesReport';
+import InventoryReport from './EVM/pages/manager/InventoryReport';
+const Approvals = React.lazy(() => import('./EVM/pages/manager/Approvals'));
+import VehicleCatalog from './EVM/pages/manager/VehicleCatalog';
+
 // Role-based redirect for root path with auth check
 const RoleRedirect = () => {
   try {
@@ -44,9 +54,10 @@ const RoleRedirect = () => {
     if (savedToken && savedUser) {
       const user = JSON.parse(savedUser);
       const role = user?.roles?.[0]?.roleName;
-      const normalized = role === 'Dealer Manager' ? 'MANAGER' : role === 'Dealer Staff' ? 'STAFF' : role;
+      const normalized = role === 'Dealer Manager' ? 'MANAGER' : role === 'Dealer Staff' ? 'STAFF' : (role ? role.toUpperCase() : role);
       if (normalized === 'MANAGER') return <Navigate to="/manager/dashboard" />;
       if (normalized === 'STAFF') return <Navigate to="/staff/dashboard" />;
+      if (normalized === 'EVM' || normalized === 'ADMIN') return <Navigate to="/evm" />;
     }
   } catch {
     // ignore and fall through to login
@@ -212,7 +223,7 @@ function App() {
         <Route 
           path="/manager/sales/payment" 
           element={
-            <ProtectedRoute allowRoles={['MANAGER']}>
+            <ProtectedRoute allowRoles={['MANAGER', 'EVM', 'ADMIN']}>
               <ManagerPayment />
             </ProtectedRoute>
           } 
@@ -220,7 +231,7 @@ function App() {
         <Route 
           path="/manager/sales/delivery" 
           element={
-            <ProtectedRoute allowRoles={['MANAGER']}>
+            <ProtectedRoute allowRoles={['MANAGER', 'EVM', 'ADMIN']}>
               <ManagerDelivery />
             </ProtectedRoute>
           } 
@@ -233,55 +244,83 @@ function App() {
             </ProtectedRoute>
           } 
         />
-                  <Route 
-            path="/manager/customers/:customerId"
-            element={
-              <ProtectedRoute allowRoles={['MANAGER']}>
-                <ManagerCustomerDetail />
-              </ProtectedRoute>
-            }
-          />
-          <Route 
-            path="/manager/test-drive"
-            element={
-              <ProtectedRoute allowRoles={['MANAGER']}>
-                <TestDriveSchedule />
-              </ProtectedRoute>
-            }
-          />
-          <Route 
-            path="/manager/promotions"
-            element={
-              <ProtectedRoute allowRoles={['MANAGER']}>
-                <Promotions />
-              </ProtectedRoute>
-            }
-          />
-          <Route 
-            path="/manager/promotions/:promotionId"
-            element={
-              <ProtectedRoute allowRoles={['MANAGER']}>
-                <PromotionDetail />
-              </ProtectedRoute>
-            }
-          />
-          <Route 
-            path="/manager/reports/debt"
-            element={
-              <ProtectedRoute allowRoles={['MANAGER']}>
-                <DebtReport />
-              </ProtectedRoute>
-            }
-          />
-          <Route 
-            path="/manager/reports/sales-performance"
-            element={
-              <ProtectedRoute allowRoles={['MANAGER']}>
-                <SalesPerformance />
-              </ProtectedRoute>
-            }
-          />
-        {/* Add more manager routes here as you build them */}
+        <Route 
+          path="/manager/customers/:customerId"
+          element={
+            <ProtectedRoute allowRoles={['MANAGER']}>
+              <ManagerCustomerDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route 
+          path="/manager/test-drive"
+          element={
+            <ProtectedRoute allowRoles={['MANAGER']}>
+              <TestDriveSchedule />
+            </ProtectedRoute>
+          }
+        />
+        <Route 
+          path="/manager/customers/feedback"
+          element={
+            <ProtectedRoute allowRoles={['MANAGER']}>
+              <FeedbackComplaints />
+            </ProtectedRoute>
+          }
+        />
+        <Route 
+          path="/manager/promotions"
+          element={
+            <ProtectedRoute allowRoles={['MANAGER']}>
+              <Promotions />
+            </ProtectedRoute>
+          }
+        />
+        <Route 
+          path="/manager/promotions/:promotionId"
+          element={
+            <ProtectedRoute allowRoles={['MANAGER']}>
+              <PromotionDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route 
+          path="/manager/reports/debt"
+          element={
+            <ProtectedRoute allowRoles={['MANAGER']}>
+              <DebtReport />
+            </ProtectedRoute>
+          }
+        />
+        <Route 
+          path="/manager/reports/sales-performance"
+          element={
+            <ProtectedRoute allowRoles={['MANAGER']}>
+              <SalesPerformance />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* EVM routes - Only accessible by EVM or ADMIN role */}
+        <Route 
+          path="/evm" 
+          element={
+            <ProtectedRoute allowRoles={['EVM', 'ADMIN']}>
+              <EVMLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<EVMStaffDashboard />} />
+          <Route path="vehicle-catalog" element={<VehicleCatalog />} />
+          <Route path="vehicle-models" element={<Navigate to="/evm/vehicle-catalog?tab=models" replace />} />
+          <Route path="vehicle-variants" element={<Navigate to="/evm/vehicle-catalog?tab=variants" replace />} />
+          <Route path="inventory" element={<InventoryEVM />} />
+          <Route path="promotions" element={<PromotionsEVM />} />
+          <Route path="users" element={<Users />} />
+          <Route path="sales-report" element={<SalesReport />} />
+          <Route path="inventory-report" element={<InventoryReport />} />
+          <Route path="approvals" element={<React.Suspense fallback={<div />}> <Approvals /> </React.Suspense>} />
+        </Route>
 
         {/* Legacy redirects - redirect old paths to new role-based paths */}
         <Route path="/dashboard" element={<Navigate to="/staff/dashboard" />} />

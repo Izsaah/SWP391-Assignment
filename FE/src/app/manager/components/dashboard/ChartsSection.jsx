@@ -2,32 +2,20 @@ import React, { useMemo, useState } from 'react';
 import { TrendingUp } from 'lucide-react';
 
 const ChartsSection = () => {
-  // Mock Monthly Revenue data - Replace with API data
-  const revenueData = [
-    { month: 'Jan', revenue: 35.2, target: 40 },
-    { month: 'Feb', revenue: 38.5, target: 40 },
-    { month: 'Mar', revenue: 42.1, target: 40 },
-    { month: 'Apr', revenue: 39.8, target: 42 },
-    { month: 'May', revenue: 45.3, target: 42 },
-    { month: 'Jun', revenue: 42.5, target: 42 },
-    { month: 'Jul', revenue: 36.0, target: 42 },
-    { month: 'Aug', revenue: 34.5, target: 42 },
-    { month: 'Sep', revenue: 33.0, target: 42 },
-    { month: 'Oct', revenue: 31.5, target: 42 },
-    { month: 'Nov', revenue: 28.0, target: 42 },
-    { month: 'Dec', revenue: 35.0, target: 42 },
-  ];
+  // Revenue data - to be fetched from API
+  const revenueData = [];
 
   const maxRevenue = useMemo(
-    () => Math.max(...revenueData.map(d => Math.max(d.revenue, d.target))),
+    () => revenueData.length > 0 ? Math.max(...revenueData.map(d => Math.max(d.revenue || 0, d.target || 0))) : 100,
     [revenueData]
   );
 
   const [hoverIndex, setHoverIndex] = useState(null);
   const handleMouseMove = (e) => {
+    if (revenueData.length === 0) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const step = rect.width / (revenueData.length - 1);
+    const step = rect.width / Math.max(revenueData.length - 1, 1);
     const idx = Math.round(x / step);
     setHoverIndex(Math.max(0, Math.min(revenueData.length - 1, idx)));
   };

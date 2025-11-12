@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '../layout/Layout';
 import { FileText, Eye, Search, CheckCircle, Star, AlertTriangle, Send, Filter, TrendingUp, Users } from 'lucide-react';
+import axios from 'axios';
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 const OrderForm = () => {
   const [statusFilter, setStatusFilter] = useState('all');
@@ -9,95 +12,336 @@ const OrderForm = () => {
   const [selectedOrderForm, setSelectedOrderForm] = useState(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Sample order forms data from all staff
-  const [orderForms, setOrderForms] = useState([
-    {
-      id: 'OF-2025-001',
-      customer: 'Le Minh Tuan',
-      customerId: 'C-001',
-      vehicle: 'Model 3 Standard RWD',
-      vin: '5YJ3E1EA0001',
-      amount: 920000000,
-      paymentMethod: 'Full Payment',
-      status: 'Pending',
-      createdDate: '2025-10-22',
-      salesperson: 'Nguyen Van Hung',
-      salespersonId: 'S-001',
-      isSpecialOrder: false,
-      quantity: 1,
-      flaggedForCompany: false,
-      discountCode: 'SPRING2025',
-      discountAmount: 50000000
-    },
-    {
-      id: 'OF-2025-002',
-      customer: 'Tran Hoa',
-      customerId: 'C-002',
-      vehicle: 'Model Y Long Range',
-      vin: 'Pending',
-      amount: 1040000000,
-      paymentMethod: 'Installment',
-      status: 'Pending',
-      createdDate: '2025-10-23',
-      salesperson: 'Le Thi Mai',
-      salespersonId: 'S-002',
-      isSpecialOrder: true,
-      quantity: 20,
-      flaggedForCompany: true,
-      discountCode: 'BULK-50',
-      discountAmount: 300000000
-    },
-    {
-      id: 'OF-2025-003',
-      customer: 'Nguyen Van An',
-      customerId: 'C-003',
-      vehicle: 'Model 3 Performance AWD',
-      vin: '5YJ3E3EA0003',
-      amount: 1250000000,
-      paymentMethod: 'Full Payment',
-      status: 'Completed',
-      createdDate: '2025-10-21',
-      salesperson: 'Pham Thi Lan',
-      salespersonId: 'S-003',
-      isSpecialOrder: false,
-      quantity: 1,
-      flaggedForCompany: false,
-      discountCode: 'VIP-DISCOUNT',
-      discountAmount: 150000000
-    },
-    {
-      id: 'OF-2025-004',
-      customer: 'Hoang Thi Lan',
-      customerId: 'C-004',
-      vehicle: 'Model 3 Premium AWD',
-      vin: 'Pending',
-      amount: 1080000000,
-      paymentMethod: 'Installment',
-      status: 'Pending',
-      createdDate: '2025-10-24',
-      salesperson: 'Tran Van Minh',
-      salespersonId: 'S-004',
-      isSpecialOrder: true,
-      quantity: 5,
-      flaggedForCompany: false,
-      discountCode: 'FIRST-CUSTOMER',
-      discountAmount: 100000000
-    },
-  ]);
+  // Order forms data - fetched from API
+  const [orderForms, setOrderForms] = useState([]);
+  
+  // Maps for customer, vehicle, and staff names
+  const [customerMap, setCustomerMap] = useState(new Map());
+  const [vehicleMap, setVehicleMap] = useState(new Map());
+  const [staffMap, setStaffMap] = useState(new Map());
+
+  // Fetch orders from API with name mapping
+  useEffect(() => {
+    const loadAllData = async () => {
+      // ✅ FIX: Khai báo maps bên ngoài try block để tránh undefined
+      let customerNameMap = new Map();
+      let vehicleNameMap = new Map();
+      let staffNameMap = new Map();
+      
+      try {
+        // Fetch all customers for name mapping
+        const token = localStorage.getItem('token');
+        const isNgrokUrl = API_URL?.includes('ngrok');
+        const headers = {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        };
+        
+        if (isNgrokUrl) {
+          headers['ngrok-skip-browser-warning'] = 'true';
+        }
+
+        // Fetch customers
+        try {
+          const customersResponse = await axios.post(
+            `${API_URL}/staff/viewAllCustomer`,
+            {},
+            { headers }
+          );
+          
+          if (customersResponse.data && customersResponse.data.status === 'success' && customersResponse.data.data) {
+            for (const customer of customersResponse.data.data) {
+              const customerId = customer.customerId || customer.customer_id || customer.id;
+              if (customerId) {
+                const id = parseInt(customerId);
+                if (!isNaN(id)) {
+                  customerNameMap.set(id, customer.name || `Customer ${id}`);
+                }
+              }
+            }
+          }
+          setCustomerMap(customerNameMap);
+          console.log(`✅ Loaded ${customerNameMap.size} customers for name mapping`);
+        } catch (err) {
+          console.warn('⚠️ Could not load customers:', err);
+        }
+
+        // Fetch vehicle models for name mapping
+        try {
+          // ✅ FIX: Đổi endpoint từ viewInventory sang viewVehicle
+          const inventoryResponse = await axios.post(
+            `${API_URL}/staff/viewVehicle`,
+            {},
+            { headers }
+          );
+          
+          if (inventoryResponse.data && inventoryResponse.data.status === 'success' && inventoryResponse.data.data) {
+            for (const model of inventoryResponse.data.data) {
+              const modelId = model.modelId || model.model_id;
+              const modelName = model.modelName || model.name || `Model ${modelId}`;
+              if (modelId) {
+                const id = parseInt(modelId);
+                if (!isNaN(id)) {
+                  vehicleNameMap.set(id, modelName);
+                }
+              }
+            }
+          }
+          setVehicleMap(vehicleNameMap);
+          console.log(`✅ Loaded ${vehicleNameMap.size} vehicle models for name mapping`);
+        } catch (err) {
+          console.warn('⚠️ Could not load vehicles:', err);
+        }
+
+        // Now fetch orders first, then we'll fetch staff accounts based on unique staffIds
+        await fetchOrdersWithMaps(customerNameMap, vehicleNameMap, staffNameMap);
+      } catch (err) {
+        console.error('Error loading data:', err);
+        // Still try to fetch orders (will show IDs if names not available)
+        await fetchOrdersWithMaps(customerNameMap, vehicleNameMap, staffNameMap);
+      }
+    };
+    
+    loadAllData();
+  }, []);
+
+  const fetchOrdersWithMaps = async (customerNameMap, vehicleNameMap, staffNameMap) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem('token');
+      const isNgrokUrl = API_URL?.includes('ngrok');
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+      
+      if (isNgrokUrl) {
+        headers['ngrok-skip-browser-warning'] = 'true';
+      }
+      
+      const response = await axios.post(
+        `${API_URL}/staff/viewOrdersByStaffId`,
+        {},
+        { headers }
+      );
+      
+      if (response.data && response.data.status === 'success' && response.data.data) {
+        console.log(`📥 Raw orders from API: ${response.data.data.length} orders`);
+        
+        // Debug: Check if backend returns dealerStaffName
+        if (response.data.data.length > 0) {
+          const firstOrder = response.data.data[0];
+          console.log('📥 Sample order from API:', {
+            orderId: firstOrder.orderId,
+            dealerStaffId: firstOrder.dealerStaffId,
+            dealerStaffName: firstOrder.dealerStaffName,
+            hasDealerStaffName: !!firstOrder.dealerStaffName
+          });
+        }
+        
+        // Build staff name map from orders response if username is available
+        // Note: We don't fetch from EVM API as manager doesn't have access
+        // Backend OrderService.GetListOrderByDealerStaffId() returns dealerStaffName field
+        
+        // Transform backend data to frontend format with name mapping
+        const transformedOrders = response.data.data.map((order, index) => {
+          try {
+            // Parse order date
+            let orderDate = order.orderDate || new Date().toISOString().split('T')[0];
+            if (order.orderDate && order.orderDate.includes(' ')) {
+              orderDate = order.orderDate.split(' ')[0];
+            }
+            
+            // Get amount from order detail (preferred) or calculate from quantity * unitPrice
+            const detail = order.detail || order.orderDetail || null;
+            let quantity = 1;
+            let unitPrice = 0;
+            let amount = 0;
+            
+            if (detail) {
+              // Get from detail object
+              quantity = parseInt(detail.quantity || '1');
+              unitPrice = parseFloat(detail.unitPrice || 0);
+              amount = quantity * unitPrice;
+            } else {
+              // Fallback: try to get from order directly
+              quantity = parseInt(order.quantity || '1');
+              unitPrice = parseFloat(order.unitPrice || 0);
+              amount = quantity * unitPrice;
+            }
+            
+            // Get IDs
+            const customerId = order.customerId || order.customer_id;
+            const modelId = order.modelId || order.model_id;
+            const staffId = order.dealerStaffId || order.dealer_staff_id || order.salespersonId;
+            
+            // Get names from maps or order data
+            const customerName = customerNameMap.get(customerId) || order.customerName || `Customer ${customerId || 'N/A'}`;
+            const vehicleName = vehicleNameMap.get(modelId) || order.vehicleName || `Model ${modelId || 'N/A'}`;
+            
+            // ✅ FIX: Get username from order response - backend returns dealerStaffName
+            // Backend OrderService.GetListOrderByDealerStaffId() returns dealerStaffName field
+            const staffName = order.dealerStaffName || order.username || order.salespersonName || 
+                            order.staffName || order.staffUsername || 
+                            (staffId ? `Staff ${staffId}` : 'N/A');
+            
+            // If we have username from order, add it to map for future use
+            if (staffId && (order.dealerStaffName || order.username || order.salespersonName || 
+                          order.staffName || order.staffUsername)) {
+              const staffIdInt = parseInt(staffId);
+              if (!isNaN(staffIdInt)) {
+                const username = order.dealerStaffName || order.username || order.salespersonName || 
+                               order.staffName || order.staffUsername;
+                if (username && username !== `Staff ${staffId}` && username !== 'N/A' && username !== 'Unknown') {
+                  staffNameMap.set(staffIdInt, username);
+                }
+              }
+            }
+            
+            // Transform order - include ALL orders regardless of status or detail
+            const transformed = {
+              id: `OF-${order.orderId}`,
+              orderId: order.orderId,
+              customer: customerName,
+              customerId: customerId,
+              salesperson: staffName,
+              dealerStaffId: staffId,
+              vehicle: vehicleName,
+              modelId: modelId,
+              serialId: order.serialId || null,
+              amount: amount,
+              quantity: quantity,
+              unitPrice: unitPrice,
+              status: order.status || 'Pending', // Default to 'Pending' if null
+              orderDate: orderDate,
+              createdDate: orderDate,
+              isSpecialOrder: order.isCustom || false,
+              flaggedForCompany: order.flaggedForCompany || false,
+              orderDetailId: order.orderDetailId || null,
+              confirmationId: order.confirmationId || null,
+              agreement: order.agreement || null,
+              confirmationDateTime: order.confirmationDateTime || null
+            };
+            
+            return transformed;
+          } catch (err) {
+            console.error(`❌ Error transforming order ${order.orderId}:`, err);
+            // Even if transform fails, still return a basic order object
+            const staffId = order.dealerStaffId || order.dealer_staff_id || order.salespersonId;
+            const staffIdInt = staffId ? parseInt(staffId) : null;
+            const usernameFromMap = staffIdInt ? staffNameMap.get(staffIdInt) : null;
+            // ✅ FIX: Prioritize dealerStaffName from backend response
+            const staffName = order.dealerStaffName || usernameFromMap || order.username || 
+                            order.salespersonName || order.staffName || order.staffUsername ||
+                            (staffId ? `Staff ${staffId}` : 'N/A');
+            
+            // Try to get amount from detail even in error case
+            const detail = order.detail || order.orderDetail || null;
+            let amount = 0;
+            if (detail) {
+              const qty = parseInt(detail.quantity || '1');
+              const price = parseFloat(detail.unitPrice || 0);
+              amount = qty * price;
+            }
+            
+            return {
+              id: `OF-${order.orderId}`,
+              orderId: order.orderId,
+              customer: `Customer ${order.customerId || 'N/A'}`,
+              customerId: order.customerId,
+              salesperson: staffName,
+              dealerStaffId: staffId,
+              vehicle: `Model ${order.modelId || 'N/A'}`,
+              modelId: order.modelId,
+              serialId: null,
+              amount: amount,
+              quantity: 1,
+              unitPrice: 0,
+              status: order.status || 'Pending',
+              orderDate: new Date().toISOString().split('T')[0],
+              createdDate: new Date().toISOString().split('T')[0],
+              isSpecialOrder: false,
+              flaggedForCompany: false,
+              orderDetailId: null,
+              confirmationId: null,
+              agreement: null,
+              confirmationDateTime: null
+            };
+          }
+        }).filter(Boolean);
+        
+        // Update staff map from orders (extract staff names if available)
+        const newStaffMap = new Map(staffNameMap);
+        transformedOrders.forEach(order => {
+          if (order.dealerStaffId && order.salesperson && order.salesperson !== `Staff ${order.dealerStaffId}`) {
+            newStaffMap.set(order.dealerStaffId, order.salesperson);
+          }
+        });
+        setStaffMap(newStaffMap);
+        
+        console.log(`✅ Transformed ${transformedOrders.length} orders (should match raw count: ${response.data.data.length})`);
+        console.log(`📋 Orders by status:`, transformedOrders.reduce((acc, o) => {
+          acc[o.status] = (acc[o.status] || 0) + 1;
+          return acc;
+        }, {}));
+        
+        setOrderForms(transformedOrders);
+      } else {
+        console.warn('⚠️ API response not successful or no data:', response.data);
+        setOrderForms([]);
+        setError(response.data?.message || 'Failed to load orders');
+      }
+    } catch (err) {
+      console.error('❌ Error fetching orders:', err);
+      setOrderForms([]);
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        setError('Authentication failed. Please log in again.');
+      } else {
+        setError(err.response?.data?.message || 'Failed to load orders');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Get unique staff list
   const staffList = [...new Set(orderForms.map(of => of.salesperson))];
+  
+  // Get unique status list for dynamic filter dropdown
+  const statusList = [...new Set(orderForms.map(of => of.status).filter(Boolean))].sort();
 
-  // Filter order forms
+  // Filter order forms - Show ALL orders by default, filter only when user selects
+  // IMPORTANT: This is only for UI filtering. All orders are already loaded from backend.
   const filteredOrderForms = orderForms.filter(of => {
-    if (statusFilter !== 'all' && of.status !== statusFilter) return false;
+    // Status filter - case-insensitive comparison (only filter if user selected a specific status)
+    if (statusFilter !== 'all') {
+      const orderStatus = (of.status || '').toLowerCase();
+      const filterStatus = statusFilter.toLowerCase();
+      if (orderStatus !== filterStatus) return false;
+    }
+    
+    // Staff filter (only filter if user selected a specific staff)
     if (staffFilter !== 'all' && of.salesperson !== staffFilter) return false;
+    
+    // Special order filter (only filter if user selected a specific type)
     if (specialOrderFilter === 'special' && !of.isSpecialOrder) return false;
     if (specialOrderFilter === 'flagged' && !of.flaggedForCompany) return false;
     if (specialOrderFilter === 'normal' && of.isSpecialOrder) return false;
-    if (searchQuery && !of.id.toLowerCase().includes(searchQuery.toLowerCase()) && 
-        !of.customer.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    
+    // Search filter (only filter if user entered search query)
+    if (searchQuery) {
+      const searchLower = searchQuery.toLowerCase();
+      const matchesId = of.id?.toLowerCase().includes(searchLower);
+      const matchesCustomer = of.customer?.toLowerCase().includes(searchLower);
+      const matchesOrderId = of.orderId?.toString().includes(searchLower);
+      if (!matchesId && !matchesCustomer && !matchesOrderId) return false;
+    }
+    
+    // Include all other orders
     return true;
   });
 
@@ -118,12 +362,29 @@ const OrderForm = () => {
   };
 
   const getStatusBadge = (status) => {
+    if (!status) {
+      status = 'Unknown';
+    }
+    
+    // Normalize status to lowercase for comparison
+    const statusLower = status.toLowerCase();
+    
     const statusConfig = {
-      'Pending': { color: 'bg-yellow-100 text-yellow-800', icon: '⏳' },
-      'Completed': { color: 'bg-green-100 text-green-800', icon: '✅' },
-      'Cancelled': { color: 'bg-red-100 text-red-800', icon: '❌' },
+      'pending': { color: 'bg-yellow-100 text-yellow-800', icon: '⏳' },
+      'completed': { color: 'bg-green-100 text-green-800', icon: '✅' },
+      'delivered': { color: 'bg-green-100 text-green-800', icon: '✅' },
+      'cancelled': { color: 'bg-red-100 text-red-800', icon: '❌' },
+      'cancel': { color: 'bg-red-100 text-red-800', icon: '❌' },
+      'confirmed': { color: 'bg-blue-100 text-blue-800', icon: '✓' },
+      'in progress': { color: 'bg-purple-100 text-purple-800', icon: '🔄' },
+      'approved': { color: 'bg-indigo-100 text-indigo-800', icon: '✓' },
     };
-    const config = statusConfig[status] || { color: 'bg-gray-100 text-gray-800', icon: '❓' };
+    
+    const config = statusConfig[statusLower] || { 
+      color: 'bg-gray-100 text-gray-800', 
+      icon: '📋' 
+    };
+    
     return (
       <span className={`inline-flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-semibold ${config.color}`}>
         <span>{config.icon}</span>
@@ -144,15 +405,45 @@ const OrderForm = () => {
     }
   };
 
-  // Statistics
+  // Statistics - Count all orders regardless of status
   const stats = {
     total: orderForms.length,
-    pending: orderForms.filter(of => of.status === 'Pending').length,
-    completed: orderForms.filter(of => of.status === 'Completed').length,
+    pending: orderForms.filter(of => of.status && of.status.toLowerCase() === 'pending').length,
+    completed: orderForms.filter(of => {
+      const status = of.status?.toLowerCase();
+      return status === 'completed' || status === 'delivered';
+    }).length,
     specialOrders: orderForms.filter(of => of.isSpecialOrder).length,
     flagged: orderForms.filter(of => of.flaggedForCompany).length,
-    totalRevenue: orderForms.reduce((sum, of) => sum + of.amount, 0)
+    totalRevenue: orderForms.reduce((sum, of) => sum + (of.amount || 0), 0)
   };
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading orders...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <p className="text-gray-900 font-semibold">Error loading orders</p>
+            <p className="text-gray-600 mt-2">{error}</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -238,16 +529,16 @@ const OrderForm = () => {
               />
             </div>
 
-            {/* Status Filter */}
+            {/* Status Filter - Dynamic based on available statuses */}
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Status</option>
-              <option value="Pending">Pending</option>
-              <option value="Completed">Completed</option>
-              <option value="Cancelled">Cancelled</option>
+              {statusList.map(status => (
+                <option key={status} value={status}>{status}</option>
+              ))}
             </select>
 
             {/* Staff Filter */}
@@ -370,6 +661,18 @@ const OrderForm = () => {
               </tbody>
             </table>
           </div>
+          
+          {filteredOrderForms.length === 0 && (
+            <div className="text-center py-12">
+              <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500 text-lg">No orders found</p>
+              <p className="text-gray-400 text-sm mt-2">
+                {orderForms.length === 0 
+                  ? "There are no orders in the system yet."
+                  : "No orders match your current filters."}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* View Modal */}
@@ -392,39 +695,130 @@ const OrderForm = () => {
               </div>
 
               <div className="p-6 space-y-4">
+                {/* Order Basic Information */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-semibold text-gray-700">Created By (Staff)</label>
-                    <p className="text-gray-900 mt-1">{selectedOrderForm.salesperson}</p>
+                    <label className="text-sm font-semibold text-gray-700">Order ID</label>
+                    <p className="text-gray-900 mt-1">{selectedOrderForm.orderId}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-semibold text-gray-700">Customer</label>
-                    <p className="text-gray-900 mt-1">{selectedOrderForm.customer}</p>
+                    <label className="text-sm font-semibold text-gray-700">Order Date</label>
+                    <p className="text-gray-900 mt-1">{formatDate(selectedOrderForm.orderDate || selectedOrderForm.createdDate)}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-semibold text-gray-700">Vehicle</label>
-                    <p className="text-gray-900 mt-1">{selectedOrderForm.vehicle}</p>
+                    <label className="text-sm font-semibold text-gray-700">Status</label>
+                    <p className="text-gray-900 mt-1">{getStatusBadge(selectedOrderForm.status)}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-semibold text-gray-700">Amount</label>
-                    <p className="text-gray-900 mt-1 font-semibold">{formatCurrency(selectedOrderForm.amount)}</p>
+                    <label className="text-sm font-semibold text-gray-700">Created By (Staff ID)</label>
+                    <p className="text-gray-900 mt-1">{selectedOrderForm.salesperson} (ID: {selectedOrderForm.dealerStaffId})</p>
                   </div>
-                  {selectedOrderForm.isSpecialOrder && (
-                    <div className="col-span-2 bg-purple-50 p-4 rounded-lg">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <Star className="w-5 h-5 text-purple-600" />
-                        <span className="font-semibold text-purple-900">Special Order</span>
+                </div>
+
+                {/* Customer Information */}
+                <div className="border-t pt-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Customer Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-semibold text-gray-700">Customer ID</label>
+                      <p className="text-gray-900 mt-1">{selectedOrderForm.customerId}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-semibold text-gray-700">Customer</label>
+                      <p className="text-gray-900 mt-1">{selectedOrderForm.customer}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Vehicle Information */}
+                <div className="border-t pt-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Vehicle Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-semibold text-gray-700">Model ID</label>
+                      <p className="text-gray-900 mt-1">{selectedOrderForm.modelId}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-semibold text-gray-700">Vehicle</label>
+                      <p className="text-gray-900 mt-1">{selectedOrderForm.vehicle}</p>
+                    </div>
+                    {selectedOrderForm.serialId && (
+                      <div>
+                        <label className="text-sm font-semibold text-gray-700">Serial ID / VIN</label>
+                        <p className="text-gray-900 mt-1">{selectedOrderForm.serialId}</p>
                       </div>
-                      <p className="text-sm text-gray-700">Quantity: {selectedOrderForm.quantity} units</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Order Detail Information */}
+                <div className="border-t pt-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Order Details</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {selectedOrderForm.orderDetailId && (
+                      <div>
+                        <label className="text-sm font-semibold text-gray-700">Order Detail ID</label>
+                        <p className="text-gray-900 mt-1">{selectedOrderForm.orderDetailId}</p>
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-sm font-semibold text-gray-700">Quantity</label>
+                      <p className="text-gray-900 mt-1">{selectedOrderForm.quantity} units</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-semibold text-gray-700">Unit Price</label>
+                      <p className="text-gray-900 mt-1">{formatCurrency(selectedOrderForm.unitPrice || 0)}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-semibold text-gray-700">Total Amount</label>
+                      <p className="text-gray-900 mt-1 font-semibold text-lg">{formatCurrency(selectedOrderForm.amount)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Special Order Information */}
+                {selectedOrderForm.isSpecialOrder && (
+                  <div className="border-t pt-4">
+                    <div className="bg-purple-50 p-4 rounded-lg">
+                      <div className="flex items-center space-x-2 mb-3">
+                        <Star className="w-5 h-5 text-purple-600" />
+                        <span className="font-semibold text-purple-900 text-lg">Special Order</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-semibold text-gray-700">Quantity</label>
+                          <p className="text-gray-900 mt-1">{selectedOrderForm.quantity} units</p>
+                        </div>
+                        {selectedOrderForm.confirmationId && (
+                          <div>
+                            <label className="text-sm font-semibold text-gray-700">Confirmation ID</label>
+                            <p className="text-gray-900 mt-1">{selectedOrderForm.confirmationId}</p>
+                          </div>
+                        )}
+                        {selectedOrderForm.agreement && (
+                          <div className="col-span-2">
+                            <label className="text-sm font-semibold text-gray-700">Agreement</label>
+                            <p className="text-gray-900 mt-1">{selectedOrderForm.agreement}</p>
+                          </div>
+                        )}
+                        {selectedOrderForm.confirmationDateTime && (
+                          <div>
+                            <label className="text-sm font-semibold text-gray-700">Confirmation Date/Time</label>
+                            <p className="text-gray-900 mt-1">{selectedOrderForm.confirmationDateTime}</p>
+                          </div>
+                        )}
+                      </div>
                       {selectedOrderForm.flaggedForCompany && (
-                        <p className="text-sm text-red-600 mt-2 flex items-center">
-                          <AlertTriangle className="w-4 h-4 mr-1" />
-                          Flagged for company review
-                        </p>
+                        <div className="mt-3 p-3 bg-red-50 rounded-lg">
+                          <p className="text-sm text-red-600 flex items-center">
+                            <AlertTriangle className="w-4 h-4 mr-2" />
+                            <span className="font-semibold">Flagged for company review</span>
+                          </p>
+                        </div>
                       )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
