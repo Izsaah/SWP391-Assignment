@@ -28,7 +28,7 @@ public class GetCustomerDebSummaryByDealerController extends HttpServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
         try {
-            // Step 1: Validate and extract dealer staff info from JWT token
+          
             String token = JwtUtil.extractToken(req);
             if (token == null || token.isEmpty()) {
                 ResponseUtils.error(resp, "Missing or invalid token");
@@ -41,14 +41,14 @@ public class GetCustomerDebSummaryByDealerController extends HttpServlet {
                 return;
             }
 
-            // Step 2: Extract dealer ID (depends on your Jwt payload)
-            int dealerId = JwtUtil.extractUserId(token); //  Make sure this method exists in your JwtUtil
+         
+            int dealerId = JwtUtil.extractUserId(token);
             if (dealerId <= 0) {
                 ResponseUtils.error(resp, "Dealer ID not found or unauthorized");
                 return;
             }
 
-            // Step 3: Get customer debts from service
+           
             List<Map<String, Object>> customerDebts = PS.getCustomerDebtSummaryByDealer(dealerId);
 
             if (customerDebts == null || customerDebts.isEmpty()) {
@@ -56,7 +56,7 @@ public class GetCustomerDebSummaryByDealerController extends HttpServlet {
                 return;
             }
 
-            // Step 4: Return success response
+            
             ResponseUtils.success(resp, "Customer debt summary retrieved successfully", customerDebts);
 
         } catch (Exception e) {

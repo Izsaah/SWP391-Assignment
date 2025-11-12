@@ -10,77 +10,102 @@ import model.dto.TestDriveScheduleDTO;
 
 public class TestDriveScheduleService {
 
-    private final TestDriveScheduleDAO TDDAO = new TestDriveScheduleDAO();
-    private final CustomerDAO CDAO = new CustomerDAO();
+    private final TestDriveScheduleDAO testDriveScheduleDAO = new TestDriveScheduleDAO();
+    private final CustomerDAO customerDAO = new CustomerDAO();
 
-    /**
-     * Create a new test drive schedule for a customer.
-     */
-    public TestDriveScheduleDTO createTestDriveSchedule(int customerId, String serialId, String date) throws ClassNotFoundException {
-        if (customerId <= 0 || serialId == null || serialId.trim().isEmpty() || date == null || date.trim().isEmpty()) {
+    public TestDriveScheduleDTO createTestDriveSchedule(int customerId, String serialId, String date, String encodedStatus) throws ClassNotFoundException {
+        if (customerId <= 0 || serialId == null || serialId.trim().isEmpty()
+                || date == null || date.trim().isEmpty() || encodedStatus == null || encodedStatus.trim().isEmpty()) {
             throw new IllegalArgumentException("Invalid input parameters for creating test drive schedule.");
         }
-        return TDDAO.create(customerId, serialId, date, "PENDING");
-    }
 
-    /**
-     * Get test drive schedules by customer name.
-     */
-    public List<CustomerDTO> getTestDriveScheduleByCustomer(String name) {
-        if (name == null || name.trim().isEmpty()) return new ArrayList<>();
-
-        List<CustomerDTO> customers = CDAO.findByName(name);
-        if (customers == null || customers.isEmpty()) return new ArrayList<>();
-
-        for (CustomerDTO customer : customers) {
-            TestDriveScheduleDTO schedule = TDDAO.getTestDriveScheduleByCustomerId(customer.getCustomerId());
-            if (schedule != null) {
-                customer.setTestDriveSchedule(schedule);
-            }
+        int dealerId = utils.JwtUtil.extractDealerIdFromStatus(encodedStatus);
+        if (dealerId == -1) {
+            throw new IllegalArgumentException("Status must be encoded with dealer ID (format: STATUS_dealerId)");
         }
-        return customers;
+
+        return testDriveScheduleDAO.create(customerId, serialId, date, encodedStatus);
     }
 
-    /**
-     * Update the status of a test drive schedule.
-     */
-    public TestDriveScheduleDTO updateTestDriveSchedule(int appointmentId, String newStatus) {
-        if (appointmentId <= 0 || newStatus == null || newStatus.trim().isEmpty()) return null;
-        return TDDAO.updateStatus(appointmentId, newStatus);
+    public List<TestDriveScheduleDTO> getSchedulesByCustomer(int customerId) throws ClassNotFoundException {
+        if (customerId <= 0) {
+            return new ArrayList<>();
+        }
+        return testDriveScheduleDAO.retrieve("customer_id = ?", customerId);
     }
 
-    /**
-     * Get a test drive schedule by customer and dealer.
-     */
-    public TestDriveScheduleDTO getTestDriveScheduleByCustomerAndDealer(int customerId, int dealerId) throws ClassNotFoundException {
+
+    public List<TestDriveScheduleDTO> getTestDriveScheduleByCustomerAndDealer(int customerId, int dealerId) throws ClassNotFoundException {
         if (customerId <= 0 || dealerId <= 0) {
             throw new IllegalArgumentException("Customer ID and Dealer ID must be positive numbers");
         }
 
-        TestDriveScheduleDTO schedule = TDDAO.getTestDriveScheduleByCustomerIdAndDealer(customerId, dealerId);
-        if (schedule == null) {
-            System.out.println("No test drive found for customer " + customerId + " at dealer " + dealerId);
+        List<TestDriveScheduleDTO> allCustomerSchedules = getSchedulesByCustomer(customerId);
+        List<TestDriveScheduleDTO> filteredSchedules = new ArrayList<>();
+
+        for (TestDriveScheduleDTO schedule : allCustomerSchedules) {
+            String status = schedule.getStatus();
+            if (status != null && status.contains("_")) {
+                try {
+                    int encodedDealer = Integer.parseInt(status.substring(status.lastIndexOf("_") + 1));
+                    if (encodedDealer == dealerId) {
+                        filteredSchedules.add(schedule);
+                    }
+                } catch (NumberFormatException e) {
+                    // Skip invalid status format
+                }
+            }
         }
-        return schedule;
+        return filteredSchedules;
     }
 
-    /**
-     * Get all test drive schedules for a dealer.
-     * Includes all customers who have schedules at this dealer.
-     */
-    public List<CustomerDTO> getAllTestDriveSchedulesByDealer(int dealerId) throws SQLException, ClassNotFoundException {
-        if (dealerId <= 0) throw new IllegalArgumentException("Dealer ID must be a positive number.");
 
-        // Get all test drive schedules for this dealer
-        List<TestDriveScheduleDTO> schedules = TDDAO.getTestDriveSchedulesByDealer(dealerId);
-        if (schedules == null || schedules.isEmpty()) return new ArrayList<>();
+    public TestDriveScheduleDTO updateTestDriveSchedule(int appointmentId, String newStatus) {
+        if (appointmentId <= 0 || newStatus == null || newStatus.trim().isEmpty()) {
+            return null;
+        }
+        return testDriveScheduleDAO.updateStatus(appointmentId, newStatus);
+    }
 
+
+    public TestDriveScheduleDTO getTestDriveScheduleById(int appointmentId) {
+        if (appointmentId <= 0) {
+            throw new IllegalArgumentException("Invalid appointment ID");
+        }
+
+        List<TestDriveScheduleDTO> results = testDriveScheduleDAO.retrieve("appointment_id=?", appointmentId);
+        return (results != null && !results.isEmpty()) ? results.get(0) : null;
+    }
+
+
+    public List<TestDriveScheduleDTO> getSchedulesByDealer(int dealerId) throws ClassNotFoundException {
+        if (dealerId <= 0) return new ArrayList<>();
+        return testDriveScheduleDAO.getByDealerId(dealerId);
+    }
+
+    public List<TestDriveScheduleDTO> getSchedulesByDealerAndStatus(int dealerId, String baseStatus) throws ClassNotFoundException {
+        if (dealerId <= 0 || baseStatus == null || baseStatus.trim().isEmpty()) {
+            return new ArrayList<>();
+        }
+        return testDriveScheduleDAO.getTestDriveSchedulesByDealerAndStatus(dealerId, baseStatus);
+    }
+
+    public List<TestDriveScheduleDTO> getSchedulesByDealerAndDateRange(int dealerId, String startDate, String endDate) throws ClassNotFoundException {
+        if (dealerId <= 0 || startDate == null || endDate == null) {
+            return new ArrayList<>();
+        }
+        return testDriveScheduleDAO.getTestDriveSchedulesByDealerAndDateRange(dealerId, startDate, endDate);
+    }
+
+
+    public List<CustomerDTO> getAllSchedulesWithCustomers(int dealerId) throws SQLException, ClassNotFoundException {
+        List<TestDriveScheduleDTO> schedules = testDriveScheduleDAO.getByDealerId(dealerId);
         List<CustomerDTO> customers = new ArrayList<>();
-        for (TestDriveScheduleDTO schedule : schedules) {
-            CustomerDTO customer = CDAO.getCustomerById(schedule.getCustomerId());
-            if (customer != null) {
-                customer.setTestDriveSchedule(schedule);
-                customers.add(customer);
+        for (TestDriveScheduleDTO s : schedules) {
+            CustomerDTO c = customerDAO.getCustomerById(s.getCustomerId());
+            if (c != null) {
+                c.setTestDriveSchedule(s);
+                customers.add(c);
             }
         }
         return customers;
