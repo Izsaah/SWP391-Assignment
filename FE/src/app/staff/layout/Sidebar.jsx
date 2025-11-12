@@ -5,7 +5,6 @@ import {
   Users,
   ShoppingCart,
   BarChart3,
-  Settings,
   ChevronLast,
   ChevronFirst,
   ChevronDown,
@@ -265,5 +264,4 @@ const menuItems = [
     ]
   },
   { id: "reports", label: "Reports", icon: BarChart3, path: "/staff/reports" },
-  { id: "settings", label: "Settings", icon: Settings, path: "/staff/settings" },
 ];
