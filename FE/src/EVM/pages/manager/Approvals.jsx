@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { CheckCircle, XCircle, RefreshCw, Search, Clock, BadgeCheck } from 'lucide-react';
 import { getAllConfirmations, approveCustomOrder } from '../../services/approvalsService';
 
@@ -25,15 +25,40 @@ const Approvals = () => {
     row: null,
   });
 
-  const load = async () => {
+  const disallowedAgreements = useMemo(
+    () => new Set(['reject', 'rejected', 'disagree', 'disagreed', 'disapprove', 'disapproved']),
+    []
+  );
+
+  const isRowRejected = useCallback(
+    (entry) => {
+      if (!entry) return false;
+      if (entry.isRejected) return true;
+      const agreementCandidates = [
+        entry.agreement,
+        entry.status,
+        entry.firstItem?.agreement,
+        entry.firstItem?.status,
+      ];
+      return agreementCandidates.some((val) => {
+        if (!val && val !== 0) return false;
+        return disallowedAgreements.has(String(val).toLowerCase().trim());
+      });
+    },
+    [disallowedAgreements]
+  );
+
+  const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const res = await getAllConfirmations();
       if (res.success) {
-        setItems(res.data || []);
+        const incoming = Array.isArray(res.data) ? res.data : [];
+        setItems(incoming.filter((entry) => !isRowRejected(entry)));
       } else {
-        setItems(res.data || []);
+        const incoming = Array.isArray(res.data) ? res.data : [];
+        setItems(incoming.filter((entry) => !isRowRejected(entry)));
         setError(res.message || 'Failed to load approvals');
       }
     } catch (e) {
@@ -42,15 +67,14 @@ const Approvals = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isRowRejected]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const filtered = useMemo(() => {
-    let data = Array.isArray(items) ? items : [];
-    data = data.filter((entry) => !entry.isRejected);
+    let data = Array.isArray(items) ? items.filter((entry) => !isRowRejected(entry)) : [];
     if (onlyPending) {
       data = data.filter((i) => {
         if (i.isPending !== undefined) return i.isPending;
@@ -67,7 +91,7 @@ const Approvals = () => {
       );
     }
     return data;
-  }, [items, query, onlyPending]);
+  }, [items, query, onlyPending, isRowRejected]);
 
   const handleDecision = async (row, decision, extra = {}) => {
     const resolvedOrderId = row?.orderId || row?.order_id || null;
@@ -194,9 +218,13 @@ const Approvals = () => {
                 const date = row.date || row.date_time || '';
                 const isPending = row.isPending !== undefined ? row.isPending :
                   (!agreementRaw || agreementRaw.toString().toLowerCase() === 'pending');
-                const agreementLower = agreementRaw ? agreementRaw.toString().toLowerCase() : '';
+              const agreementLower = agreementRaw ? agreementRaw.toString().toLowerCase().trim() : '';
                 const isApproved = row.isApproved ?? (agreementLower === 'agree' || agreementLower === 'approved');
-                const isRejected = row.isRejected ?? (agreementLower === 'reject' || agreementLower === 'disagree');
+              const isRejected = row.isRejected ?? (agreementLower === 'reject' || agreementLower === 'rejected' || agreementLower === 'disagree' || agreementLower === 'disagreed');
+
+              if (isRejected) {
+                return null;
+              }
 
                 return (
                   <tr key={`${orderId}-${idx}`} className="hover:bg-gray-50">
