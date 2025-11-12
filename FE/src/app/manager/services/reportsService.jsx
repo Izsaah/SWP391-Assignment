@@ -27,20 +27,42 @@ export async function fetchDealerSalesRecords({ startDate, endDate }) {
     // Aggregate by dealerStaffId to compute totals and counts; keep records as details.
     const byStaff = new Map();
     for (const r of list) {
-      const staffId = String(r.dealerStaffId ?? '');
-    const staffUsername =
-      r.username ??
-      r.userName ??
-      r.staffUsername ??
-      r.dealerStaffUsername ??
-      r.dealerStaffName ??
-      r.staffName ??
-      null;
+      // Support multiple BE shapes for staff id and username
+      const resolvedStaffId =
+        r.dealerStaffId ??
+        r.staffId ??
+        r.dealerStaff?.dealerStaffId ??
+        r.dealerStaff?.id ??
+        r.staff?.id ??
+        r.staff?.staffId ??
+        r.userAccount?.userId ??
+        r.user?.id ??
+        '';
+      const staffId = String(resolvedStaffId);
+
+      const nestedUsername =
+        r.username ??
+        r.userName ??
+        r.dealername ??
+        r.staffUsername ??
+        r.dealerStaffUsername ??
+        r.dealerStaffName ??
+        r.staffName ??
+        r.dealerStaff?.username ??
+        r.dealerStaff?.userName ??
+        r.dealerStaff?.account?.username ??
+        r.staff?.username ??
+        r.staff?.userName ??
+        r.staff?.account?.username ??
+        r.userAccount?.username ??
+        r.user?.username ??
+        null;
       if (!byStaff.has(staffId)) {
         byStaff.set(staffId, {
           staffId,
-          staffName: staffUsername || `Staff ${staffId}`,
-          username: staffUsername || null,
+          // Only use username provided by BE; do not fallback to "Staff <id>"
+          staffName: nestedUsername || '',
+          username: nestedUsername || '',
           totalOrders: 0,
           totalRevenue: 0,
           orders: [],
@@ -48,9 +70,9 @@ export async function fetchDealerSalesRecords({ startDate, endDate }) {
       }
       const entry = byStaff.get(staffId);
       // If later records contain a username and the current label is a fallback, upgrade it
-      if (staffUsername && (!entry.username || entry.staffName?.startsWith('Staff '))) {
-        entry.username = staffUsername;
-        entry.staffName = staffUsername;
+      if (nestedUsername && !entry.username) {
+        entry.username = nestedUsername;
+        entry.staffName = nestedUsername;
       }
       entry.totalOrders += 1;
       entry.totalRevenue += Number(r.saleAmount || 0);

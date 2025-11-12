@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router'
-import { LayoutDashboard, Package, Tags, Users, BarChart3, ChevronLast, ChevronFirst, ChevronDown, ChevronRight, Car, Palette, Boxes, ScrollText, BadgePercent, BadgeCheck } from 'lucide-react'
+import { LayoutDashboard, Package, Tags, Users, BarChart3, ChevronLast, ChevronFirst, ChevronDown, ChevronRight, Car, Palette, Boxes, BadgePercent, BadgeCheck } from 'lucide-react'
 
 const SidebarContext = createContext()
 const useSidebar = () => useContext(SidebarContext)
@@ -171,8 +171,7 @@ const menuItems = [
     { id: 'evm-inventory', label: 'Inventory', icon: Boxes, path: '/evm/inventory' },
     { id: 'evm-promotions', label: 'Promotions', icon: BadgePercent, path: '/evm/promotions' }
   ]},
-  { id: 'evm-dealers', label: 'Dealer Management', icon: Users, path: '/evm/contracts', subItems: [
-    { id: 'evm-contracts', label: 'Contracts', icon: ScrollText, path: '/evm/contracts' },
+  { id: 'evm-dealers', label: 'Dealer Management', icon: Users, path: '/evm/users', subItems: [
     { id: 'evm-users', label: 'Users', icon: Users, path: '/evm/users' },
     { id: 'evm-approvals', label: 'Approvals', icon: BadgeCheck, path: '/evm/approvals' }
   ]},

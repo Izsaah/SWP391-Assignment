@@ -373,8 +373,18 @@ export const createStockRequest = async (modelId, quantity, notes = '') => {
  */
 // In-memory cache for models to support brand/model/color lookups
 let cachedModels = null;
-const ensureModels = async () => {
-  if (cachedModels) return cachedModels;
+let modelsPromise = null;
+const ensureModels = async (options = {}) => {
+  const force = typeof options === 'boolean' ? options : options?.force;
+
+  if (!force && Array.isArray(cachedModels) && cachedModels.length > 0) {
+    return cachedModels;
+  }
+
+  if (!force && modelsPromise) {
+    return modelsPromise;
+  }
+
   const token = localStorage.getItem('token');
   const isNgrokUrl = API_URL?.includes('ngrok');
   const headers = {
@@ -382,13 +392,58 @@ const ensureModels = async () => {
     'Content-Type': 'application/json'
   };
   if (isNgrokUrl) headers['ngrok-skip-browser-warning'] = 'true';
-  const res = await axios.post(`${API_URL}/staff/viewVehicle`, {}, { headers });
-  cachedModels = res.data?.data || [];
-  return cachedModels;
+
+  const request = axios
+    .post(`${API_URL}/staff/viewVehicle`, {}, { headers })
+    .then((res) => {
+      const incoming = Array.isArray(res.data?.data) ? res.data.data : [];
+      const hasExisting = Array.isArray(cachedModels) && cachedModels.length > 0;
+      if (incoming.length > 0) {
+        cachedModels = incoming;
+      } else if (!hasExisting) {
+        cachedModels = [];
+      }
+      return cachedModels || [];
+    })
+    .catch((error) => {
+      handleAuthError(error);
+      if (!cachedModels) cachedModels = [];
+      throw error;
+    })
+    .finally(() => {
+      if (modelsPromise === request) {
+        modelsPromise = null;
+      }
+    });
+
+  modelsPromise = request;
+  return request;
+};
+
+export const refreshVehicleModelsCache = async () => {
+  const previous = cachedModels;
+  cachedModels = null;
+  try {
+    const result = await ensureModels({ force: true });
+    if (Array.isArray(result) && result.length === 0 && Array.isArray(previous) && previous.length > 0) {
+      cachedModels = previous;
+      return previous;
+    }
+    return result;
+  } catch (error) {
+    if (Array.isArray(previous) && previous.length > 0) {
+      cachedModels = previous;
+    }
+    return cachedModels || [];
+  }
+};
+
+export const getCachedVehicleModels = async () => {
+  return ensureModels().catch(() => cachedModels || []);
 };
 
 export const getBrands = async () => {
-  const models = await ensureModels();
+  const models = await ensureModels().catch(() => cachedModels || []);
   // Assuming `brandName` may exist on model; if not, deduce from modelName prefix
   const brandSet = new Map();
   models.forEach(m => {
@@ -402,13 +457,23 @@ export const getBrands = async () => {
 
 export const getModelsByBrand = async (brandName) => {
   if (!brandName || brandName === '') return [];
-  const models = await ensureModels();
+  const models = await ensureModels().catch(() => cachedModels || []);
+  if (!Array.isArray(models)) return [];
   // Filter by brandName (simple startsWith match against modelName if brand field absent)
+  const normalizedBrand = brandName.trim().toLowerCase();
   const filtered = models.filter(m => {
     const brand = m.brandName || (m.modelName ? m.modelName.split(' ')[0] : '');
-    return brand.toLowerCase() === brandName.toLowerCase();
+    const normalizedModelBrand = String(brand || '').trim().toLowerCase();
+    if (normalizedBrand && normalizedModelBrand) {
+      return (
+        normalizedModelBrand === normalizedBrand ||
+        normalizedModelBrand.startsWith(normalizedBrand)
+      );
+    }
+    return false;
   });
-  return filtered.map(m => ({
+  const source = filtered.length > 0 ? filtered : models;
+  return source.map(m => ({
     modelId: m.modelId,
     modelName: m.modelName,
     lists: m.lists || []

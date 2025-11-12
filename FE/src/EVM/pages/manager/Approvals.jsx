@@ -7,7 +7,7 @@ const Approvals = () => {
   const [error, setError] = useState('');
   const [items, setItems] = useState([]);
   const [query, setQuery] = useState('');
-  const [onlyPending, setOnlyPending] = useState(true);
+  const [onlyPending, setOnlyPending] = useState(false);
   const [confirmModal, setConfirmModal] = useState({
     open: false,
     type: '', // 'approve' | 'reject'
@@ -50,13 +50,12 @@ const Approvals = () => {
 
   const filtered = useMemo(() => {
     let data = Array.isArray(items) ? items : [];
+    data = data.filter((entry) => !entry.isRejected);
     if (onlyPending) {
       data = data.filter((i) => {
-        const isPending = i.isPending !== undefined ? i.isPending : 
-          ((i.agreement || i.status || '').toString().toLowerCase() === '' || 
-           (i.agreement || i.status || '').toString().toLowerCase() === 'pending' || 
-           (i.agreement || i.status || '').toString().toLowerCase() === 'null');
-        return isPending;
+        if (i.isPending !== undefined) return i.isPending;
+        const agreement = (i.agreement || i.status || '').toString().toLowerCase();
+        return !['agree', 'approved'].includes(agreement);
       });
     }
     if (query) {
@@ -191,12 +190,13 @@ const Approvals = () => {
                 const color = row.color || 'N/A';
                 const quantity = row.quantity || 0;
                 const price = row.price;
-                const agreement = row.agreement || row.status || '';
+                const agreementRaw = row.agreement || row.status || '';
                 const date = row.date || row.date_time || '';
-                const isPending = row.isPending !== undefined ? row.isPending : 
-                  (!agreement || agreement.toLowerCase() === 'pending');
-                const isAgreed = agreement && agreement.toLowerCase() === 'agree';
-                const isRejected = agreement && (agreement.toLowerCase() === 'reject' || agreement.toLowerCase() === 'disagree');
+                const isPending = row.isPending !== undefined ? row.isPending :
+                  (!agreementRaw || agreementRaw.toString().toLowerCase() === 'pending');
+                const agreementLower = agreementRaw ? agreementRaw.toString().toLowerCase() : '';
+                const isApproved = row.isApproved ?? (agreementLower === 'agree' || agreementLower === 'approved');
+                const isRejected = row.isRejected ?? (agreementLower === 'reject' || agreementLower === 'disagree');
 
                 return (
                   <tr key={`${orderId}-${idx}`} className="hover:bg-gray-50">
@@ -205,16 +205,16 @@ const Approvals = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{color}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{quantity}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {price != null ? `$${price.toLocaleString('en-US')}` : 'N/A'}
+                      {price != null ? `$${Number(price).toLocaleString('en-US')}` : 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {isPending ? (
                         <span className="px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 inline-flex items-center gap-1">
                           <Clock className="w-3 h-3" /> Pending
                         </span>
-                      ) : isAgreed ? (
+                      ) : isApproved ? (
                         <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 inline-flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3" /> Agreed
+                          <CheckCircle className="w-3 h-3" /> Approved
                         </span>
                       ) : (
                         <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 inline-flex items-center gap-1">

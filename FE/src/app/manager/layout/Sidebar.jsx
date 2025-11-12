@@ -5,7 +5,6 @@ import {
   Users,
   ShoppingCart,
   BarChart3,
-  Settings,
   ChevronLast,
   ChevronFirst,
   ChevronDown,
@@ -299,20 +298,6 @@ const menuItems = [
         label: "Debt Report",
         icon: DollarSign,
         path: "/manager/reports/debt"
-      }
-    ]
-  },
-  { 
-    id: "settings", 
-    label: "Settings", 
-    icon: Settings, 
-    path: "/manager/settings",
-    subItems: [
-      {
-        id: "account-settings",
-        label: "Account Settings",
-        icon: UserCog,
-        path: "/manager/settings/account"
       }
     ]
   },

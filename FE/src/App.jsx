@@ -40,7 +40,6 @@ import EVMLayout from './EVM/layout/EVMLayout';
 import EVMStaffDashboard from './EVM/pages/staff/StaffDashboard';
 import InventoryEVM from './EVM/pages/manager/Inventory';
 import PromotionsEVM from './EVM/pages/manager/Promotions';
-import ContractsEVM from './EVM/pages/manager/Contracts';
 import Users from './EVM/pages/manager/Users';
 import SalesReport from './EVM/pages/manager/SalesReport';
 import InventoryReport from './EVM/pages/manager/InventoryReport';
@@ -309,7 +308,6 @@ function App() {
           <Route path="vehicle-variants" element={<Navigate to="/evm/vehicle-catalog?tab=variants" replace />} />
           <Route path="inventory" element={<InventoryEVM />} />
           <Route path="promotions" element={<PromotionsEVM />} />
-          <Route path="contracts" element={<ContractsEVM />} />
           <Route path="users" element={<Users />} />
           <Route path="sales-report" element={<SalesReport />} />
           <Route path="inventory-report" element={<InventoryReport />} />
