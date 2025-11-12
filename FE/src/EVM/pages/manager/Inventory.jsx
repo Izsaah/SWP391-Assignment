@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react'
-import { RefreshCw, TrendingUp, Package, Building2, BarChart3, AlertTriangle, Clock } from 'lucide-react'
+import { RefreshCw, TrendingUp, Package, BarChart3, AlertTriangle, Clock } from 'lucide-react'
 import axios from 'axios'
 
 const API_URL = import.meta.env.VITE_API_URL
@@ -187,9 +187,8 @@ const Inventory = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Metric label="Total Units" value={summary.totalUnits} icon={Package} />
-        <Metric label="Dealers" value={summary.dealers} icon={Building2} />
         <Metric label="Models" value={summary.models} icon={BarChart3} />
       </div>
 

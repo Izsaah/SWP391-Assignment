@@ -12,7 +12,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import model.dto.UserAccountDTO;
 import model.service.PaymentService;
+import model.service.UserAccountService;
 import utils.JwtUtil;
 import utils.ResponseUtils;
 
@@ -23,32 +25,29 @@ import utils.ResponseUtils;
 @WebServlet("/api/staff/getCustomerDebt")
 public class getCustomerDebSummaryByDealerController extends HttpServlet {
     private final  PaymentService PS = new PaymentService();
+    private final  UserAccountService userService = new UserAccountService();
     
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
         try {
-          
             String token = JwtUtil.extractToken(req);
+            int userId = JwtUtil.extractUserId(token);
+            
+            // Get user details to check role and dealer
+            UserAccountDTO user = userService.getDealerStaffById(userId);
             if (token == null || token.isEmpty()) {
                 ResponseUtils.error(resp, "Missing or invalid token");
                 return;
             }
 
-            int userId = JwtUtil.extractUserId(token);
-            if (userId <= 0) {
-                ResponseUtils.error(resp, "Invalid user ID from token");
-                return;
-            }
-
-         
-            int dealerId = JwtUtil.extractUserId(token);
+            int dealerId = user.getDealerId();
             if (dealerId <= 0) {
                 ResponseUtils.error(resp, "Dealer ID not found or unauthorized");
                 return;
             }
 
-           
+            // Step 3: Get customer debts from service
             List<Map<String, Object>> customerDebts = PS.getCustomerDebtSummaryByDealer(dealerId);
 
             if (customerDebts == null || customerDebts.isEmpty()) {
@@ -56,7 +55,7 @@ public class getCustomerDebSummaryByDealerController extends HttpServlet {
                 return;
             }
 
-            
+            // Step 4: Return success response
             ResponseUtils.success(resp, "Customer debt summary retrieved successfully", customerDebts);
 
         } catch (Exception e) {
