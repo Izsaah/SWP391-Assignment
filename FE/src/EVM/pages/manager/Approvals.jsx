@@ -488,32 +488,15 @@ const Approvals = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Color <span className="text-red-500">*</span>
                 </label>
-                {customApprovalModal.availableColors?.length ? (
-                  <select
-                    value={customApprovalModal.color}
-                    onChange={(e) =>
-                      setCustomApprovalModal((prev) => ({ ...prev, color: e.target.value }))
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select a color...</option>
-                    {customApprovalModal.availableColors.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    value={customApprovalModal.color}
-                    onChange={(e) =>
-                      setCustomApprovalModal((prev) => ({ ...prev, color: e.target.value }))
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter color"
-                  />
-                )}
+                <input
+                  type="text"
+                  value={customApprovalModal.color}
+                  onChange={(e) =>
+                    setCustomApprovalModal((prev) => ({ ...prev, color: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter color (e.g., Red, Blue, White)"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

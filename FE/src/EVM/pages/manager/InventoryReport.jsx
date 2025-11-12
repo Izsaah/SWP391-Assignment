@@ -131,7 +131,6 @@ const InventoryReport = () => {
   const filtered = useMemo(() => rows.filter(r => model === 'All' || r.model === model), [rows, model])
 
   const totalStock = useMemo(() => filtered.reduce((s, r) => s + (r.stock || 0), 0), [filtered])
-  const totalSold = useMemo(() => filtered.reduce((s, r) => s + (r.sold || 0), 0), [filtered])
   
   // Consumption rate: Sum of all rates from BE (no calculation, just display BE data)
   const totalConsumptionRate = useMemo(() => {
@@ -139,14 +138,6 @@ const InventoryReport = () => {
     const sum = consumptionRates.reduce((total, item) => total + (item.consumptionRate || 0), 0)
     return sum > 0 ? sum : null
   }, [consumptionRates])
-  
-  // Forecast: Use total consumption rate * 30 days (only if we have BE data)
-  const forecast = useMemo(() => {
-    if (totalConsumptionRate !== null && totalConsumptionRate > 0) {
-      return Math.round(totalConsumptionRate * 30)
-    }
-    return 0
-  }, [totalConsumptionRate])
 
   return (
     <div className="space-y-6">
@@ -182,14 +173,10 @@ const InventoryReport = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="text-sm text-gray-600 mb-2">Total Stock</div>
           <div className="text-3xl font-bold text-gray-900">{totalStock}</div>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="text-sm text-gray-600 mb-2">Total Sold</div>
-          <div className="text-3xl font-bold text-gray-900">{totalSold}</div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="text-sm text-gray-600 mb-2">Consumption Rate</div>
@@ -197,12 +184,8 @@ const InventoryReport = () => {
             {totalConsumptionRate !== null ? totalConsumptionRate.toFixed(2) : 'N/A'}
           </div>
           <div className="text-xs text-gray-500 mt-1">
-            {totalConsumptionRate !== null ? 'Total daily consumption (from BE)' : 'No data available'}
+            {totalConsumptionRate !== null ? 'Total daily consumption' : 'No data available'}
           </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="text-sm text-gray-600 mb-2">Forecast (next period)</div>
-          <div className="text-3xl font-bold text-gray-900">{forecast}</div>
         </div>
       </div>
 

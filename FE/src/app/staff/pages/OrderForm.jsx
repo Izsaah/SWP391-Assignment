@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '../layout/Layout';
-import { Plus, Eye, Edit2, Trash2, FileText, CheckCircle, Loader2, RefreshCw, AlertTriangle, X, Search, Sparkles } from 'lucide-react';
+import { Plus, Eye, Edit2, Trash2, FileText, CheckCircle, Loader2, RefreshCw, AlertTriangle, X, Search, Sparkles, CreditCard, Calendar, DollarSign, Building2 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router';
 import { createOrder, viewOrdersByStaffId } from '../services/orderService';
 import { createPayment } from '../services/paymentService';
@@ -18,6 +18,14 @@ const OrderForm = () => {
   const [selectedOrderForm, setSelectedOrderForm] = useState(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [paymentFormData, setPaymentFormData] = useState({
+    promotion: '',
+    paymentMethod: 'Full Payment',
+    installmentPeriod: '12',
+    interestRate: '0'
+  });
   
   // Data states
   const [orderForms, setOrderForms] = useState([]);
@@ -123,7 +131,7 @@ const deactivateCustomMode = useCallback(() => {
 }, []);
 
   // Transform backend OrderDTO to order form format
-  const transformOrderToOrderForm = (order, customerName = null) => {
+  const transformOrderToOrderForm = (order, customerName = null, modelNameMap = null) => {
     // Parse order date from backend (format: "yyyy-MM-dd HH:mm:ss" or ISO string)
     let orderDate = new Date().toISOString().split('T')[0];
     if (order.orderDate) {
@@ -146,16 +154,51 @@ const deactivateCustomMode = useCallback(() => {
     // Get status from backend (can be "Pending", "Delivered", "Cancelled")
     const status = order.status || 'Pending';
     
+    // Check if this is a custom order (from backend flag or by checking customerId > 0 and isCustom flag)
+    // Custom orders are those created by staff with "Custom Vehicle Request" option
+    // They have customerId > 0 (unlike manufacturer requests which have customerId = 0)
+    const isCustom = order.isCustom || 
+                     order.is_custom || 
+                     (order.customerId > 0 && (order.isCustom === true || order.is_custom === true)) ||
+                     false;
+    
+    // Check if custom order has been approved by EVM
+    // A custom order is approved when:
+    // 1. It's marked as custom (isCustom = true)
+    // 2. It has unitPrice > 0 (EVM has set the price)
+    // 3. It has customerId > 0 (created by staff for a customer)
+    const isCustomApproved = isCustom && 
+                              unitPrice > 0 && 
+                              order.customerId > 0;
+    
+    // Get vehicle name from backend modelName field or from modelNameMap
+    let vehicleName = `Model ${order.modelId}`;
+    if (order.modelName) {
+      vehicleName = order.modelName;
+    } else if (order.model_name) {
+      vehicleName = order.model_name;
+    } else if (order.vehicleName) {
+      vehicleName = order.vehicleName;
+    } else if (order.vehicle_name) {
+      vehicleName = order.vehicle_name;
+    } else if (modelNameMap && order.modelId) {
+      const mappedName = modelNameMap.get(order.modelId);
+      if (mappedName) {
+        vehicleName = mappedName;
+      }
+    }
+    
     return {
       id: `OF-${order.orderId}`,
       orderId: order.orderId,
       customer: customerName || `Customer ${order.customerId}`,
       customerId: order.customerId,
-      vehicle: `Model ${order.modelId}`, // Will be replaced with actual model name if available
+      vehicle: vehicleName, // Use actual model name instead of "Model X"
       modelId: order.modelId,
       variantId: null, // Not directly available in OrderDTO
       vin: serialId,
       price: totalPrice,
+      unitPrice: unitPrice, // Store unitPrice separately for custom orders
       discount: 0, // Backend doesn't provide discount in OrderDTO
       discountCode: 'None',
       paymentMethod: 'Full Payment', // Default, will be updated if payment info available
@@ -164,6 +207,8 @@ const deactivateCustomMode = useCallback(() => {
       notes: '',
       quantity: quantity,
       status: status,
+      isCustom: isCustom, // Store isCustom flag
+      isCustomApproved: isCustomApproved, // Store approval status
       // Keep original order data for reference
       _originalOrder: order
     };
@@ -814,6 +859,35 @@ const deactivateCustomMode = useCallback(() => {
         }
       }
       
+      // Build model name map: modelId -> modelName
+      // Use existing vehicles state or fetch if needed
+      const modelNameMap = new Map();
+      if (vehicles.length > 0) {
+        vehicles.forEach((model) => {
+          const modelId = model.modelId || model.id;
+          const modelName = model.modelName || model.name;
+          if (modelId && modelName) {
+            modelNameMap.set(modelId, modelName);
+          }
+        });
+      } else {
+        // Fetch vehicles if not already loaded
+        try {
+          const vehiclesResult = await fetchInventory();
+          if (vehiclesResult.success && vehiclesResult.data) {
+            vehiclesResult.data.forEach((model) => {
+              const modelId = model.modelId || model.id;
+              const modelName = model.modelName || model.name;
+              if (modelId && modelName) {
+                modelNameMap.set(modelId, modelName);
+              }
+            });
+          }
+        } catch (err) {
+          console.warn('⚠️ Could not fetch vehicles for model name mapping:', err);
+        }
+      }
+      
       // Fetch orders ONLY for the logged-in staff member
       console.log('🔄 Fetching orders for logged-in staff member...');
       try {
@@ -830,6 +904,7 @@ const deactivateCustomMode = useCallback(() => {
               console.log(`  Order ${orderId}:`, {
                 status: order.status,
                 modelId: order.modelId,
+                modelName: order.modelName || order.model_name || modelNameMap.get(order.modelId),
                 customerId: customerId,
                 customerName: customerName,
                 orderDate: order.orderDate,
@@ -839,7 +914,7 @@ const deactivateCustomMode = useCallback(() => {
                 unitPrice: order.detail?.unitPrice
               });
               
-              const transformed = transformOrderToOrderForm(order, customerName);
+              const transformed = transformOrderToOrderForm(order, customerName, modelNameMap);
               allOrders.push(transformed);
             }
           }
@@ -2212,6 +2287,53 @@ const deactivateCustomMode = useCallback(() => {
                   </div>
                   
                   <div className="flex items-center gap-2">
+                    {/* Show Create Payment button for custom orders that have been approved by EVM */}
+                    {/* Check multiple conditions to ensure it's a custom order that's been approved */}
+                    {(() => {
+                      const originalOrder = selectedOrderForm._originalOrder || {};
+                      const detail = originalOrder.detail || {};
+                      
+                      // Check if it's a custom order:
+                      // 1. Has isCustom flag from backend (primary check)
+                      // 2. Fallback: If no flag but has customerId > 0 and unitPrice > 0, likely a custom order
+                      const hasCustomFlag = selectedOrderForm.isCustom || 
+                                           originalOrder.isCustom || 
+                                           originalOrder.is_custom;
+                      
+                      // Check if it's been approved by EVM:
+                      // 1. Has unitPrice > 0 (EVM has set the price)
+                      // 2. Has customerId > 0 (staff-created custom order, not manufacturer request)
+                      const unitPrice = selectedOrderForm.unitPrice || 
+                                       detail.unitPrice || 
+                                       detail.unit_price || 
+                                       0;
+                      const hasPrice = Number(unitPrice) > 0;
+                      const hasCustomer = selectedOrderForm.customerId > 0;
+                      
+                      // Show button if:
+                      // - Has custom flag AND has price AND has customer, OR
+                      // - No custom flag but has price AND has customer (fallback for custom orders without flag)
+                      const isApproved = (hasCustomFlag && hasPrice && hasCustomer) || 
+                                        (!hasCustomFlag && hasPrice && hasCustomer);
+                      
+                      return isApproved;
+                    })() && (
+                      <button
+                        onClick={() => {
+                          setPaymentFormData({
+                            promotion: '',
+                            paymentMethod: 'Full Payment',
+                            installmentPeriod: '12',
+                            interestRate: '0'
+                          });
+                          setIsPaymentModalOpen(true);
+                        }}
+                        className="px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors text-xs whitespace-nowrap flex items-center gap-2"
+                      >
+                        <CreditCard className="w-4 h-4" />
+                        Create Payment
+                      </button>
+                    )}
                     <button
                       onClick={() => handleDelete(selectedOrderForm.id)}
                       className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors text-xs whitespace-nowrap"
@@ -2347,6 +2469,341 @@ const deactivateCustomMode = useCallback(() => {
             </div>
           </div>
         )}
+
+        {/* Create Payment Modal for Custom Orders */}
+        {isPaymentModalOpen && selectedOrderForm && (() => {
+          // Calculate discount and final price based on selected promotion
+          const selectedPromotion = promotions.find(p => p.id === paymentFormData.promotion);
+          const unitPrice = selectedOrderForm.unitPrice || 0;
+          const quantity = selectedOrderForm.quantity || 1;
+          const baseTotal = unitPrice * quantity;
+          
+          let discountAmount = 0;
+          if (selectedPromotion) {
+            if (selectedPromotion.type === 'PERCENTAGE' && selectedPromotion.rate) {
+              discountAmount = baseTotal * selectedPromotion.rate;
+            } else if (selectedPromotion.type === 'FIXED' && selectedPromotion.amount) {
+              discountAmount = selectedPromotion.amount;
+            }
+          }
+          
+          const finalTotal = Math.max(0, baseTotal - discountAmount);
+          
+          return (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              {/* Modal Header */}
+              <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold flex items-center space-x-2">
+                      <FileText className="w-6 h-6" />
+                      <span>Create Payment</span>
+                    </h2>
+                    <p className="text-blue-100 text-sm mt-1">
+                      Fill in details after discussion with customer
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setIsPaymentModalOpen(false)}
+                    className="p-2 hover:bg-white/10 rounded-full transition-all duration-200"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Content */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {/* Promotion */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Promotion
+                  </label>
+                  <select
+                    value={paymentFormData.promotion}
+                    onChange={(e) => setPaymentFormData(prev => ({ ...prev, promotion: e.target.value }))}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={loadingPromotions}
+                  >
+                    <option value="">Select promotion...</option>
+                    {loadingPromotions ? (
+                      <option disabled>Loading promotions...</option>
+                    ) : promotions.length === 0 ? (
+                      <option disabled>No promotions available</option>
+                    ) : (
+                      promotions.map((promo) => (
+                        <option key={promo.id} value={promo.id}>
+                          {promo.description} {promo.displayValue ? `(${promo.displayValue})` : ''}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
+                {/* Unit Price (from EVM approval) */}
+                {selectedOrderForm.unitPrice > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Unit Price (₫) <span className="text-green-600 text-xs">*Set by EVM</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formatCurrency(selectedOrderForm.unitPrice || 0)}
+                      disabled
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-green-50 text-gray-900 font-semibold cursor-not-allowed"
+                    />
+                  </div>
+                )}
+
+                {/* Quantity */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Quantity <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={selectedOrderForm.quantity || 1}
+                    disabled
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 cursor-not-allowed"
+                  />
+                </div>
+
+                {/* Discount (if promotion selected) */}
+                {discountAmount > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Discount
+                    </label>
+                    <input
+                      type="text"
+                      value={`-${formatCurrency(discountAmount)}`}
+                      disabled
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-green-50 text-green-700 font-semibold cursor-not-allowed"
+                    />
+                    {selectedPromotion && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Applied: {selectedPromotion.description} ({selectedPromotion.displayValue})
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Total Price (Auto-calculated from EVM price with discount) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Total Price (₫) <span className="text-gray-500 text-xs">*Auto-calculated</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formatCurrency(finalTotal)}
+                    disabled
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-blue-50 text-gray-900 font-semibold cursor-not-allowed"
+                  />
+                  {selectedOrderForm.unitPrice > 0 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {discountAmount > 0 ? (
+                        <>
+                          Base: {formatCurrency(baseTotal)} - Discount: {formatCurrency(discountAmount)} = {formatCurrency(finalTotal)}
+                        </>
+                      ) : (
+                        <>
+                          Calculated: {selectedOrderForm.quantity || 1} × {formatCurrency(selectedOrderForm.unitPrice || 0)} = {formatCurrency(baseTotal)}
+                        </>
+                      )}
+                    </p>
+                  )}
+                </div>
+
+                {/* Payment Method */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Payment Method <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentFormData(prev => ({ ...prev, paymentMethod: 'Full Payment' }))}
+                      className={`p-4 border-2 rounded-lg transition-all flex items-center justify-center space-x-2 ${
+                        paymentFormData.paymentMethod === 'Full Payment'
+                          ? 'border-black bg-green-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <DollarSign className={`w-5 h-5 ${paymentFormData.paymentMethod === 'Full Payment' ? 'text-green-600' : 'text-gray-400'}`} />
+                      <span className={`font-medium ${paymentFormData.paymentMethod === 'Full Payment' ? 'text-gray-900' : 'text-gray-600'}`}>
+                        Full Payment
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentFormData(prev => ({ ...prev, paymentMethod: 'Installment' }))}
+                      className={`p-4 border-2 rounded-lg transition-all flex items-center justify-center space-x-2 ${
+                        paymentFormData.paymentMethod === 'Installment'
+                          ? 'border-black bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <Building2 className={`w-5 h-5 ${paymentFormData.paymentMethod === 'Installment' ? 'text-blue-600' : 'text-gray-400'}`} />
+                      <span className={`font-medium ${paymentFormData.paymentMethod === 'Installment' ? 'text-gray-900' : 'text-gray-600'}`}>
+                        Installment
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Installment Payment Details */}
+                {paymentFormData.paymentMethod === 'Installment' && (
+                  <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-5">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <CreditCard className="w-5 h-5 text-blue-600" />
+                      <h3 className="text-lg font-semibold text-gray-900">Installment Payment Details</h3>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Select payment period. The total amount will be divided into monthly payments over the selected period.
+                    </p>
+                    
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Payment Period <span className="text-red-500">*</span>
+                      </label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <button
+                          type="button"
+                          onClick={() => setPaymentFormData(prev => ({ ...prev, installmentPeriod: '6' }))}
+                          className={`p-3 border-2 rounded-lg transition-all flex items-center justify-center space-x-2 ${
+                            paymentFormData.installmentPeriod === '6'
+                              ? 'border-blue-600 bg-blue-100'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <Calendar className={`w-4 h-4 ${paymentFormData.installmentPeriod === '6' ? 'text-blue-600' : 'text-gray-400'}`} />
+                          <span className={`font-medium ${paymentFormData.installmentPeriod === '6' ? 'text-blue-900' : 'text-gray-600'}`}>
+                            6 Months
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPaymentFormData(prev => ({ ...prev, installmentPeriod: '12' }))}
+                          className={`p-3 border-2 rounded-lg transition-all flex items-center justify-center space-x-2 ${
+                            paymentFormData.installmentPeriod === '12'
+                              ? 'border-blue-600 bg-blue-100'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <Calendar className={`w-4 h-4 ${paymentFormData.installmentPeriod === '12' ? 'text-blue-600' : 'text-gray-400'}`} />
+                          <span className={`font-medium ${paymentFormData.installmentPeriod === '12' ? 'text-blue-900' : 'text-gray-600'}`}>
+                            12 Months
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Interest Rate (%)
+                      </label>
+                      <input
+                        type="number"
+                        value={paymentFormData.interestRate}
+                        onChange={(e) => setPaymentFormData(prev => ({ ...prev, interestRate: e.target.value }))}
+                        placeholder="0"
+                        min="0"
+                        step="0.1"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Internal Notes */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center space-x-2">
+                    <FileText className="w-4 h-4" />
+                    <span>Internal Notes</span>
+                  </label>
+                  <textarea
+                    rows="3"
+                    placeholder="Customer wants delivery this month, prefers white color..."
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  />
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="border-t border-gray-200 p-6 bg-gray-50">
+                <div className="flex items-center justify-end space-x-3">
+                  <button
+                    onClick={() => setIsPaymentModalOpen(false)}
+                    className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors flex items-center space-x-2"
+                  >
+                    <X className="w-4 h-4" />
+                    <span>Cancel</span>
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!selectedOrderForm.orderId) {
+                        alert('❌ Invalid order ID');
+                        return;
+                      }
+
+                      setProcessingPayment(true);
+                      try {
+                        const orderId = selectedOrderForm.orderId;
+                        const method = paymentFormData.paymentMethod === 'Full Payment' ? 'TT' : 'TG';
+                        
+                        const paymentData = {
+                          orderId: orderId,
+                          method: method
+                        };
+
+                        if (method === 'TG') {
+                          paymentData.interestRate = paymentFormData.interestRate || '0';
+                          paymentData.termMonth = paymentFormData.installmentPeriod || '12';
+                          paymentData.status = 'Active';
+                        }
+
+                        console.log('📤 Creating payment with data:', paymentData);
+                        
+                        const result = await createPayment(paymentData);
+                        
+                        if (result.success) {
+                          alert(`✅ Payment created successfully!\n\nOrder ID: ${orderId}\nMethod: ${paymentFormData.paymentMethod}`);
+                          setIsPaymentModalOpen(false);
+                          setIsViewModalOpen(false);
+                          // Refresh order list
+                          await reloadAllOrders();
+                        } else {
+                          alert(`❌ Failed to create payment: ${result.message}`);
+                        }
+                      } catch (error) {
+                        console.error('Error creating payment:', error);
+                        alert(`❌ Error: ${error.message || 'Failed to create payment'}`);
+                      } finally {
+                        setProcessingPayment(false);
+                      }
+                    }}
+                    disabled={processingPayment}
+                    className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  >
+                    {processingPayment ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Processing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Create Payment</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          );
+        })()}
       </div>
     </Layout>
   );
