@@ -62,19 +62,25 @@ const Customers = () => {
       
       if (result.success) {
         // Transform backend data to match frontend format
-        const transformedData = (result.data || []).map(customer => ({
-          customerId: customer.customerId || `C-${customer.customer_id || 'N/A'}`,
-          name: customer.name || '',
-          email: customer.email || '',
-          phone: customer.phoneNumber || customer.phone_number || '',
-          phoneNumber: customer.phoneNumber || customer.phone_number || '',
-          address: customer.address || '',
-          // These fields are not available from BE, set defaults
-          type: 'New', // Cannot determine from BE
-          totalOrderForms: 0, // Not available from BE
-          testDrive: '', // Not available from BE
-          status: 'Active' // Cannot determine from BE
-        }));
+        const transformedData = (result.data || []).map(customer => {
+          const numericId = getNumericCustomerId(customer);
+          const displayId = customer.customerId || `C-${customer.customer_id || 'N/A'}`;
+          
+          return {
+            customerId: displayId, // For display purposes
+            numericCustomerId: numericId, // For navigation and API calls
+            name: customer.name || '',
+            email: customer.email || '',
+            phone: customer.phoneNumber || customer.phone_number || '',
+            phoneNumber: customer.phoneNumber || customer.phone_number || '',
+            address: customer.address || '',
+            // These fields are not available from BE, set defaults
+            type: 'New', // Cannot determine from BE
+            totalOrderForms: 0, // Not available from BE
+            testDrive: '', // Not available from BE
+            status: 'Active' // Cannot determine from BE
+          };
+        });
         
         setCustomersData(transformedData);
         
@@ -157,6 +163,30 @@ const Customers = () => {
     return phone.substring(0, phone.length - 2).replace(/\d/g, (d, i) => i > 3 ? '*' : d) + phone.substring(phone.length - 2);
   };
 
+  // Helper function to extract numeric customer ID
+  // Returns the actual numeric ID from backend (customer_id) for database queries
+  const getNumericCustomerId = (customer) => {
+    // Prefer customer_id (from backend database)
+    if (customer.customer_id) {
+      return customer.customer_id;
+    }
+    // Fall back to id or customerId
+    if (customer.id) {
+      return customer.id;
+    }
+    if (customer.customerId) {
+      // If it's a number, return it
+      const numId = parseInt(customer.customerId);
+      if (!isNaN(numId)) return numId;
+      // If it's a string like "C-1", extract the number
+      const match = String(customer.customerId).match(/(\d+)/);
+      if (match && match[1]) {
+        return parseInt(match[1]);
+      }
+    }
+    return null;
+  };
+
   // Load all customers automatically on page load
   const loadAllCustomers = async () => {
     setLoadingInitial(true);
@@ -170,23 +200,29 @@ const Customers = () => {
       if (result.success && result.data) {
         // Transform backend data to match frontend format
         // Handle both empty array and array with data
-        const transformedData = (result.data || []).map(customer => ({
-          customerId: customer.customerId || customer.customer_id || `C-${customer.customer_id || 'N/A'}`,
-          name: customer.name || '',
-          email: customer.email || '',
-          phone: customer.phoneNumber || customer.phone_number || '',
-          phoneNumber: customer.phoneNumber || customer.phone_number || '',
-          address: customer.address || '',
-          type: 'Returning',
-          totalOrderForms: 0,
-          testDrive: '',
-          status: 'Active'
-        }));
+        const transformedData = (result.data || []).map(customer => {
+          const numericId = getNumericCustomerId(customer);
+          const displayId = customer.customerId || customer.customer_id || `C-${customer.customer_id || 'N/A'}`;
+          
+          return {
+            customerId: displayId, // For display purposes
+            numericCustomerId: numericId, // For navigation and API calls
+            name: customer.name || '',
+            email: customer.email || '',
+            phone: customer.phoneNumber || customer.phone_number || '',
+            phoneNumber: customer.phoneNumber || customer.phone_number || '',
+            address: customer.address || '',
+            type: 'Returning',
+            totalOrderForms: 0,
+            testDrive: '',
+            status: 'Active'
+          };
+        });
         
-        // Sort by customer ID
+        // Sort by numeric customer ID
         transformedData.sort((a, b) => {
-          const idA = parseInt(String(a.customerId).replace('C-', '').replace(/[^0-9]/g, '')) || 0;
-          const idB = parseInt(String(b.customerId).replace('C-', '').replace(/[^0-9]/g, '')) || 0;
+          const idA = a.numericCustomerId || 0;
+          const idB = b.numericCustomerId || 0;
           return idA - idB;
         });
         
@@ -398,10 +434,13 @@ const Customers = () => {
                   </tr>
                 )}
 
-                {!loading && !loadingInitial && paginatedCustomers.map((customer, index) => (
+                {!loading && !loadingInitial && paginatedCustomers.map((customer, index) => {
+                  // Use numeric customer ID for navigation (required for backend queries)
+                  const navigationId = customer.numericCustomerId || customer.customerId;
+                  return (
                   <tr 
                     key={index} 
-                    onClick={() => navigate(`/staff/customers/${customer.customerId}`)}
+                    onClick={() => navigate(`/staff/customers/${navigationId}`)}
                     className="hover:bg-gray-50 transition-colors cursor-pointer"
                   >
                     <td className="px-4 py-4 whitespace-nowrap">
@@ -425,7 +464,8 @@ const Customers = () => {
                       <span className="text-sm text-gray-700">{customer.address || 'N/A'}</span>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

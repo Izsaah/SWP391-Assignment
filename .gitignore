@@ -36,7 +36,7 @@ BE/*.rar
 
 # Log files
 BE/*.log
-
+echo "/BE/target/"
 # Maven Wrapper (if you use it)
 # Keep the wrapper files but ignore the downloaded binary
 # BE/.mvn/wrapper/maven-wrapper.jar

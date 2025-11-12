@@ -272,13 +272,7 @@ const menuItems = [
           label: "Test Drive Schedule",
           icon: Calendar,
           path: "/manager/test-drive"
-        },
-      {
-        id: "feedback-complaints",
-        label: "Feedback & Complaints",
-        icon: MessageSquare,
-        path: "/manager/customers/feedback"
-      }
+        }
     ]
   },
   { 

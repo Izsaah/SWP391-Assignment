@@ -1,11 +1,8 @@
-import React, { useState } from 'react';
-import { X, Plus, Check, X as CloseIcon } from 'lucide-react';
+import React from 'react';
+import { X } from 'lucide-react';
 import { useNavigate } from 'react-router';
 
 const CarDetailModal = ({ vehicle, isOpen, onClose }) => {
-  const [showAddNote, setShowAddNote] = useState(false);
-  const [newNote, setNewNote] = useState('');
-  const [notes, setNotes] = useState([]);
   const navigate = useNavigate();
 
   if (!isOpen || !vehicle) return null;
@@ -15,7 +12,7 @@ const CarDetailModal = ({ vehicle, isOpen, onClose }) => {
     const statusMap = {
       available: { 
         emoji: '🟢', 
-        label: 'Available for Quotation', 
+        label: 'Available for Order', 
         color: 'text-green-600',
         bgColor: 'bg-green-50',
         borderColor: 'border-green-200'
@@ -45,72 +42,73 @@ const CarDetailModal = ({ vehicle, isOpen, onClose }) => {
     switch (status) {
       case 'available':
         return [
-          { text: 'Create Quotation', style: 'bg-blue-600 hover:bg-blue-700 text-white' },
-          { text: 'Schedule Test Drive', style: 'bg-gray-100 hover:bg-gray-200 text-gray-700' }
+          { text: 'Create Order', style: 'bg-blue-600 hover:bg-blue-700 text-white', action: 'createOrder' },
+          { text: 'Schedule Test Drive', style: 'bg-gray-100 hover:bg-gray-200 text-gray-700', action: 'scheduleTestDrive' }
         ];
       case 'reserved':
         return [
-          { text: 'View Quotation / Contract', style: 'bg-blue-600 hover:bg-blue-700 text-white' },
-          { text: 'Contact Customer', style: 'bg-gray-100 hover:bg-gray-200 text-gray-700' }
+          { text: 'View Quotation / Contract', style: 'bg-blue-600 hover:bg-blue-700 text-white', action: 'viewContract' },
+          { text: 'Contact Customer', style: 'bg-gray-100 hover:bg-gray-200 text-gray-700', action: 'contactCustomer' }
         ];
       case 'sold':
         return [
-          { text: 'Track Delivery', style: 'bg-blue-600 hover:bg-blue-700 text-white' },
-          { text: 'View Contract', style: 'bg-gray-100 hover:bg-gray-200 text-gray-700' }
+          { text: 'Track Delivery', style: 'bg-blue-600 hover:bg-blue-700 text-white', action: 'trackDelivery' },
+          { text: 'View Contract', style: 'bg-gray-100 hover:bg-gray-200 text-gray-700', action: 'viewContract' }
         ];
       default:
         return [
-          { text: 'Create Quotation', style: 'bg-blue-600 hover:bg-blue-700 text-white' },
-          { text: 'Schedule Test Drive', style: 'bg-gray-100 hover:bg-gray-200 text-gray-700' }
+          { text: 'Create Order', style: 'bg-blue-600 hover:bg-blue-700 text-white', action: 'createOrder' },
+          { text: 'Schedule Test Drive', style: 'bg-gray-100 hover:bg-gray-200 text-gray-700', action: 'scheduleTestDrive' }
         ];
     }
   };
 
   const actionButtons = getActionButtons(vehicle.status);
 
-  // Handle adding new notes
-  const handleAddNote = () => {
-    if (newNote.trim()) {
-      const note = {
-        id: Date.now(),
-        text: newNote.trim(),
-        timestamp: new Date().toLocaleString(),
-        author: 'Current User'
-      };
-      setNotes([...notes, note]);
-      setNewNote('');
-      setShowAddNote(false);
-    }
-  };
-
-  const handleCancelNote = () => {
-    setNewNote('');
-    setShowAddNote(false);
-  };
-
-  // Handle create quotation - navigate to quotations page with vehicle data
-  const handleCreateQuotation = () => {
-    navigate('/sales/quotations', { 
+  // Handle create order - navigate to order form page with vehicle data
+  const handleCreateOrder = () => {
+    // Prepare vehicle data for order form
+    // Map inventory vehicle structure to order form expected structure
+    const orderVehicleData = {
+      modelId: vehicle.modelId,
+      variantId: vehicle.variantId,
+      modelName: vehicle.title || vehicle.model || vehicle.modelName,
+      title: vehicle.title,
+      price: vehicle.price || vehicle.priceUsd || vehicle.dealerPrice,
+      dealerPrice: vehicle.dealerPrice || vehicle.price || vehicle.priceUsd,
+      color: vehicle.color || 'White',
+      vin: vehicle.vin || 'Pending',
+      serialId: vehicle.vin, // Use vin as serialId if available
+      imageUrl: vehicle.imageUrl,
+      status: vehicle.status,
+      variant: vehicle.variant,
+      model: vehicle.model || vehicle.title,
+    };
+    
+    navigate('/staff/sales/order-form', { 
       state: { 
-        vehicleData: {
-          id: vehicle.id,
-          title: vehicle.title,
-          vin: vehicle.vin || 'Pending',
-          dealerPrice: vehicle.dealerPrice,
-          msrp: vehicle.msrp,
-          discount: vehicle.discount,
-          imageUrl: vehicle.imageUrl,
-          status: vehicle.status,
-          location: vehicle.location,
-          range: vehicle.range,
-          topSpeed: vehicle.topSpeed,
-          acceleration: vehicle.acceleration,
-          driveType: vehicle.driveType,
-          batteryCapacity: vehicle.batteryCapacity,
-          seating: vehicle.seating,
-          warranty: vehicle.warranty,
-          mileage: vehicle.mileage,
-        }
+        vehicleData: orderVehicleData
+      } 
+    });
+    onClose();
+  };
+
+  // Handle schedule test drive - navigate to test drive page with vehicle data
+  const handleScheduleTestDrive = () => {
+    // Prepare vehicle data for test drive
+    const testDriveVehicleData = {
+      modelId: vehicle.modelId,
+      variantId: vehicle.variantId,
+      modelName: vehicle.title || vehicle.model || vehicle.modelName,
+      title: vehicle.title,
+      serialId: vehicle.vin || '', // Pre-fill serial ID if available
+      color: vehicle.color,
+      imageUrl: vehicle.imageUrl,
+    };
+    
+    navigate('/staff/customers/test-drives', { 
+      state: { 
+        vehicleData: testDriveVehicleData
       } 
     });
     onClose();
@@ -196,12 +194,6 @@ const CarDetailModal = ({ vehicle, isOpen, onClose }) => {
                       <div className="text-sm font-medium text-gray-900">{vehicle.color}</div>
                     </div>
                   )}
-                  {vehicle.quantity && (
-                    <div>
-                      <div className="text-xs text-gray-500 uppercase mb-1">Available</div>
-                      <div className="text-sm font-medium text-gray-900">{vehicle.quantity} units</div>
-                    </div>
-                  )}
                   {vehicle.modelActive !== undefined && (
                     <div>
                       <div className="text-xs text-gray-500 uppercase mb-1">Status</div>
@@ -233,100 +225,21 @@ const CarDetailModal = ({ vehicle, isOpen, onClose }) => {
                       <span className="text-sm font-medium text-gray-900">{vehicle.variantId}</span>
                     </div>
                   )}
-                  
-                  <div className="text-xs text-gray-400 italic mt-4 pt-3 border-t border-gray-200">
-                    Additional details require backend API update
-                  </div>
                 </div>
               </div>
 
               {/* Availability Status */}
-              <div className="pb-6 border-b border-gray-200">
+              <div className="pb-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
                   Availability
                 </h3>
                 
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Status</span>
-                    <span className={`text-sm font-semibold ${statusInfo.color} flex items-center gap-1.5`}>
-                      <span>{statusInfo.emoji}</span>
-                      <span>{statusInfo.label}</span>
-                    </span>
-                  </div>
-                  
-                  {/* Notes */}
-                  <div className="pt-3 mt-3 border-t border-gray-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="text-sm font-medium text-gray-700">Notes</div>
-                      <button
-                        onClick={() => setShowAddNote(true)}
-                        className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add</span>
-                      </button>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      {/* Show message if no notes */}
-                      {notes.length === 0 && !showAddNote && (
-                        <div className="text-sm text-gray-400 italic py-2">
-                          No notes yet
-                        </div>
-                      )}
-
-                      {/* User-added notes */}
-                      {notes.map((note) => (
-                        <div key={note.id} className="rounded-lg p-3 border border-gray-200 bg-gray-50">
-                          <div className="flex justify-between items-start gap-2">
-                            <div className="flex-1">
-                              <div className="text-sm text-gray-700">{note.text}</div>
-                              <div className="text-xs text-gray-400 mt-1">
-                                {note.timestamp}
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => setNotes(notes.filter(n => n.id !== note.id))}
-                              className="text-gray-400 hover:text-red-500 transition-colors"
-                            >
-                              <CloseIcon className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-
-                      {/* Add Note Input */}
-                      {showAddNote && (
-                        <div className="rounded-lg p-3 border-2 border-blue-200">
-                          <textarea
-                            value={newNote}
-                            onChange={(e) => setNewNote(e.target.value)}
-                            placeholder="Type your note here..."
-                            className="w-full text-sm border-none outline-none resize-none bg-transparent text-gray-700"
-                            rows={2}
-                            autoFocus
-                          />
-                          <div className="flex justify-end gap-2 mt-2">
-                            <button
-                              onClick={handleCancelNote}
-                              className="text-xs text-gray-600 hover:text-gray-800 px-3 py-1.5 rounded transition-colors"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              onClick={handleAddNote}
-                              disabled={!newNote.trim()}
-                              className="flex items-center gap-1 text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                              <span>Save</span>
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Status</span>
+                  <span className={`text-sm font-semibold ${statusInfo.color} flex items-center gap-1.5`}>
+                    <span>{statusInfo.emoji}</span>
+                    <span>{statusInfo.label}</span>
+                  </span>
                 </div>
               </div>
 
@@ -336,11 +249,13 @@ const CarDetailModal = ({ vehicle, isOpen, onClose }) => {
                   <button 
                     key={index}
                     onClick={() => {
-                      if (button.text === 'Create Quotation') {
-                        handleCreateQuotation();
+                      if (button.action === 'createOrder') {
+                        handleCreateOrder();
+                      } else if (button.action === 'scheduleTestDrive') {
+                        handleScheduleTestDrive();
                       } else {
                         // Handle other button actions
-                        console.log(`Button clicked: ${button.text}`);
+                        console.log(`Button clicked: ${button.text} (${button.action})`);
                       }
                     }}
                     className={`w-full py-3 px-6 rounded-lg font-medium transition-all duration-200 ${button.style}`}

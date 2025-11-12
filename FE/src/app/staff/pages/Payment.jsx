@@ -46,32 +46,59 @@ const Payment = () => {
         console.log(`✅ Received ${result.data.length} customers with active installments`);
         
         // Transform backend data to frontend format
-        // ✅ Backend now returns ALL needed data: planId, interestRate, termMonth, monthlyPay, status, paymentId, orderId, totalAmount, paymentDate, method
-        // ✅ totalAmount comes from Payment.amount (Payment table) - this is the correct source
-        // ✅ paidAmount = totalAmount - outstandingAmount (NOT calculated from monthlyPay * months + interest)
+        // ✅ Backend returns ALL needed data: planId, interestRate, termMonth, monthlyPay, status, paymentId, orderId, totalAmount, paymentDate, method
+        // ✅ Backend calculation logic (PaymentService.java):
+        //    1. originalPrincipal = payment.getAmount() (from Payment table)
+        //    2. originalTermMonth = round(originalPrincipal / monthlyPay)
+        //    3. totalAmountWithInterest = monthlyPay * originalTermMonth (total commitment)
+        //    4. outstandingAmount = monthlyPay * remainingTermMonth (remaining to pay)
+        //    5. paidAmount = monthlyPay * (originalTermMonth - remainingTermMonth) (already paid)
+        // ✅ We use backend's calculated values directly - no recalculation needed
         const transformed = result.data.map((customer) => {
           // ✅ Use backend data directly - no need to fetch from orders API anymore!
           const planId = customer.planId || null;
-          const interestRate = parseFloat(customer.interestRate || 0);
+          // Parse interest rate (handle both numeric strings and percentage strings like "5" or "5%")
+          let interestRate = 0;
+          if (customer.interestRate) {
+            const rateStr = String(customer.interestRate).replace('%', '').trim();
+            interestRate = parseFloat(rateStr) || 0;
+          }
           const termMonth = customer.termMonth ? parseInt(customer.termMonth) : null;
           const monthlyPay = parseFloat(customer.monthlyPay || 0);
           const status = customer.status || 'ACTIVE';
-          const outstandingAmount = parseFloat(customer.outstandingAmount || 0);
           
-          // ✅ Get payment information directly from backend response (Payment table)
-          // Backend now returns: paymentId, orderId, totalAmount, paymentDate, method
+          // ✅ Get payment information directly from backend response
+          // Backend returns: paymentId, orderId, totalAmount, paymentDate, method, outstandingAmount, paidAmount
           const paymentId = customer.paymentId || null;
           const orderId = customer.orderId || null;
-          const totalAmount = parseFloat(customer.totalAmount || 0); // ⭐ From Payment.amount (Payment table)
+          const totalAmount = parseFloat(customer.totalAmount || 0); // Total commitment (monthlyPay * originalTermMonth)
           const paymentDate = customer.paymentDate || null;
           const method = customer.method || 'TG';
           
-          // ⭐ CORRECT CALCULATION: paidAmount = totalAmount - outstandingAmount
-          // ❌ WRONG: paidAmount ≠ monthlyPay * monthsPaid + interest (cannot calculate this way)
-          // ✅ RIGHT: paidAmount = totalAmount (from Payment table) - outstandingAmount (from InstallmentPlan)
-          const paidAmount = totalAmount > 0 ? Math.max(0, totalAmount - outstandingAmount) : 0;
+          // ✅ Use backend's calculated values directly
+          const outstandingAmount = parseFloat(customer.outstandingAmount || 0);
+          const paidAmount = parseFloat(customer.paidAmount || 0);
           
-          // Log if totalAmount is missing (should not happen after backend fix)
+          // Debug logging to verify backend calculations
+          if (customer.customerId) {
+            console.log(`🔍 Customer ${customer.customerId} (${customer.name}):`, {
+              outstandingAmount: outstandingAmount,
+              paidAmount: paidAmount,
+              totalAmount: totalAmount,
+              monthlyPay: monthlyPay,
+              remainingTermMonth: termMonth,
+              interestRate: interestRate
+            });
+          }
+          
+          // Validate calculations: totalAmount should equal paidAmount + outstandingAmount (approximately)
+          const calculatedTotal = paidAmount + outstandingAmount;
+          const difference = Math.abs(totalAmount - calculatedTotal);
+          if (difference > 0.01 && totalAmount > 0) { // Allow small rounding differences
+            console.warn(`⚠️ Calculation mismatch for customer ${customer.customerId}: totalAmount=${totalAmount}, paidAmount=${paidAmount}, outstandingAmount=${outstandingAmount}, sum=${calculatedTotal}, diff=${difference}`);
+          }
+          
+          // Log if totalAmount is missing (should not happen)
           if (totalAmount === 0) {
             console.warn(`⚠️ totalAmount is 0 for customer ${customer.customerId} (${customer.name}) - check backend response`);
           }
@@ -85,12 +112,12 @@ const Payment = () => {
             customerPhone: customer.phoneNumber || 'N/A',
             customerAddress: customer.address || 'N/A',
             
-            // Payment info (from backend - Payment table) ✅
+            // Payment info (from backend - calculated values) ✅
             paymentId: paymentId || null,
             orderId: orderId || null,
-            totalAmount: totalAmount || 0,
-            paidAmount: paidAmount,
-            outstandingAmount: outstandingAmount,
+            totalAmount: totalAmount || 0, // Total commitment: monthlyPay * originalTermMonth
+            paidAmount: paidAmount || 0, // Already paid: monthlyPay * paidMonths
+            outstandingAmount: outstandingAmount || 0, // Remaining: monthlyPay * remainingTermMonth
             paymentDate: paymentDate || null,
             method: method,
             
@@ -390,26 +417,32 @@ const Payment = () => {
        console.log('📥 Completed Payments API Response:', result);
        
        if (result.success && result.data && result.data.length > 0) {
-         // ✅ Backend returns data in format: {customerId, name, address, email, phoneNumber, paymentId, orderId, amount, paymentDate, method}
+         // ✅ Backend returns data in format: {customerId, name, address, email, phoneNumber, paymentId, orderId, totalAmount, amount, paymentDate, method, vehicleName, vehicle}
          // Transform data to match frontend format
          const transformedData = result.data.map((payment) => {
+           // Use totalAmount first (most accurate), fall back to amount, then 0
+           const paymentAmount = payment.totalAmount || payment.amount || 0;
+           
+           // Get vehicle name from backend (vehicleName or vehicle field)
+           const vehicleName = payment.vehicleName || payment.vehicle || 'N/A';
+           
            return {
              paymentId: payment.paymentId || payment.payment_id,
              orderId: payment.orderId || payment.order_id,
              customerName: payment.name || payment.customerName || payment.customer_name || 'N/A',
              customerId: payment.customerId || payment.customer_id,
              customerAddress: payment.address || payment.customerAddress || 'N/A',
-             amount: payment.amount || 0,
+             amount: paymentAmount, // Use the calculated amount from backend
              paymentDate: payment.paymentDate || payment.payment_date,
              method: payment.method || 'TT',
              // Additional fields from backend response
              phone: payment.phoneNumber || payment.phone || payment.customerPhone || 'N/A',
              email: payment.email || payment.customerEmail || 'N/A',
-             vehicle: payment.vehicle || payment.vehicleName || 'N/A' // May not be in backend response
+             vehicle: vehicleName // Vehicle name from backend
            };
          });
          setCompletedPayments(transformedData);
-         console.log(`✅ Loaded ${transformedData.length} completed payments (TT) filtered by staff ID`);
+         console.log(`✅ Loaded ${transformedData.length} completed payments (TT) with vehicle and amount information`);
        } else {
          // No data or empty response - this is OK, just means no TT payments for this staff
          setCompletedPayments([]);
@@ -455,10 +488,25 @@ const Payment = () => {
         const ordersResult = await viewOrdersByCustomerId(payment.customerId);
         
         if (ordersResult.success && ordersResult.data && ordersResult.data.length > 0) {
-          const order = ordersResult.data[0];
+          // If we have an orderId, try to find the matching order first
+          // Otherwise, find the first order with an installment plan
+          let order = null;
+          if (payment.orderId) {
+            order = ordersResult.data.find(o => 
+              (o.orderId && o.orderId === payment.orderId) || 
+              (o.order_id && o.order_id === payment.orderId) ||
+              (o.OrderId && o.OrderId === payment.orderId)
+            );
+          }
+          // If no matching order found or no orderId, use first order with installment plan
+          if (!order || !order.payment || !order.payment.installmentPlan) {
+            order = ordersResult.data.find(o => 
+              o.payment && o.payment.installmentPlan
+            ) || ordersResult.data[0];
+          }
           
           // Try to get payment/installment data from order
-          if (order.payment && order.payment.installmentPlan) {
+          if (order && order.payment && order.payment.installmentPlan) {
             const plan = order.payment.installmentPlan;
             payment.planId = payment.planId || plan.planId || plan.plan_id;
             payment.currentTermMonth = payment.currentTermMonth || 
@@ -470,16 +518,20 @@ const Payment = () => {
           }
           
           // Also update payment info
-          if (order.payment) {
+          if (order && order.payment) {
             payment.paymentId = payment.paymentId || order.payment.paymentId || order.payment.payment_id;
             payment.totalAmount = payment.totalAmount || order.payment.amount || order.payment.totalAmount || 0;
             payment.paymentDate = payment.paymentDate || order.payment.paymentDate || order.payment.payment_date;
           }
           
-          // Update in the list
+          // Update in the list - match by planId (unique identifier) not customerId
+          // A customer can have multiple orders/plans, so we need to match by planId
           setInstallmentPayments(prev => 
             prev.map(p => 
-              p.customerId === payment.customerId ? payment : p
+              (p.planId && payment.planId && p.planId === payment.planId) || 
+              (p.paymentId && payment.paymentId && p.paymentId === payment.paymentId)
+                ? payment 
+                : p
             )
           );
         }
@@ -505,9 +557,24 @@ const Payment = () => {
         const ordersResult = await viewOrdersByCustomerId(payment.customerId);
         
         if (ordersResult.success && ordersResult.data && ordersResult.data.length > 0) {
-          const order = ordersResult.data[0];
+          // If we have an orderId, try to find the matching order first
+          // Otherwise, find the first order with an installment plan
+          let order = null;
+          if (payment.orderId) {
+            order = ordersResult.data.find(o => 
+              (o.orderId && o.orderId === payment.orderId) || 
+              (o.order_id && o.order_id === payment.orderId) ||
+              (o.OrderId && o.OrderId === payment.orderId)
+            );
+          }
+          // If no matching order found or no orderId, use first order with installment plan
+          if (!order || !order.payment || !order.payment.installmentPlan) {
+            order = ordersResult.data.find(o => 
+              o.payment && o.payment.installmentPlan
+            ) || ordersResult.data[0];
+          }
           
-          if (order.payment && order.payment.installmentPlan) {
+          if (order && order.payment && order.payment.installmentPlan) {
             const plan = order.payment.installmentPlan;
             payment.planId = payment.planId || plan.planId || plan.plan_id;
             payment.currentTermMonth = payment.currentTermMonth || 
@@ -569,10 +636,12 @@ const Payment = () => {
         };
         setSelectedPayment(updatedPayment);
         
-        // Update the payment in the list
+        // Update the payment in the list - match by planId (unique identifier) not customerId
+        // A customer can have multiple orders/plans, so we need to match by planId to update the correct one
         setInstallmentPayments(prev => 
           prev.map(p => 
-            p.customerId === payment.customerId 
+            (p.planId && payment.planId && p.planId === payment.planId) || 
+            (p.paymentId && payment.paymentId && p.paymentId === payment.paymentId)
               ? updatedPayment 
               : p
           )
@@ -664,26 +733,29 @@ const Payment = () => {
       const newTermMonth = Math.max(0, currentTermMonth - months);
       
       // Determine new status
+      // Use payment.status (which may have been updated) instead of selectedPayment.status
       let newStatus = 'ACTIVE';
       if (newTermMonth <= 0) {
         newStatus = 'PAID';
       } else {
-        newStatus = selectedPayment.status === 'OVERDUE' || selectedPayment.status === 'Overdue' ? 'OVERDUE' : 'ACTIVE';
+        newStatus = payment.status === 'OVERDUE' || payment.status === 'Overdue' ? 'OVERDUE' : 'ACTIVE';
       }
 
       // Call backend to update installment plan
+      // Use payment.planId (not selectedPayment.planId) since payment may have been updated with fetched data
       const { updateInstallmentPlan } = await import('../services/paymentService');
       const result = await updateInstallmentPlan(
-        selectedPayment.planId,
+        payment.planId,
         newStatus,
         String(newTermMonth)
       );
 
       if (result.success) {
         // Calculate new outstanding amount
-        const monthlyPay = selectedPayment.monthlyPay || 0;
+        // Use payment values (which may have been updated with fetched data) instead of selectedPayment
+        const monthlyPay = payment.monthlyPay || 0;
         const amountToDeduct = monthlyPay * months;
-        const currentOutstanding = selectedPayment.outstandingAmount || 0;
+        const currentOutstanding = payment.outstandingAmount || 0;
         const newOutstanding = Math.max(0, currentOutstanding - amountToDeduct);
         
         // Update local state immediately for better UX
@@ -695,10 +767,12 @@ const Payment = () => {
           paidAmount: (payment.paidAmount || 0) + amountToDeduct
         };
         
-        // Update the payment in the list
+        // Update the payment in the list - match by planId (unique identifier) not customerId
+        // A customer can have multiple orders/plans, so we need to match by planId to update the correct one
         setInstallmentPayments(prev => 
           prev.map(p => 
-            p.customerId === payment.customerId 
+            (p.planId && payment.planId && p.planId === payment.planId) || 
+            (p.paymentId && payment.paymentId && p.paymentId === payment.paymentId)
               ? updatedPayment 
               : p
           )
@@ -902,7 +976,6 @@ const Payment = () => {
                         >
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">{payment.customerName || 'N/A'}</div>
-                            <div className="text-xs text-gray-500">ID: {payment.customerId}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">{payment.customerEmail || 'N/A'}</div>
@@ -945,7 +1018,9 @@ const Payment = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-600">
-                              {payment.interestRate ? `${payment.interestRate}%` : 'N/A'}
+                              {payment.interestRate !== null && payment.interestRate !== undefined 
+                                ? `${payment.interestRate}%` 
+                                : '0%'}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -1028,9 +1103,6 @@ const Payment = () => {
                           Order ID
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Vehicle
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Amount
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1058,9 +1130,6 @@ const Payment = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">#{payment.orderId}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">{payment.vehicle}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
@@ -1118,10 +1187,6 @@ const Payment = () => {
                       <div>
                         <p className="text-sm text-gray-600">Name</p>
                         <p className="text-base font-semibold text-gray-900">{selectedPayment.customerName || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Customer ID</p>
-                        <p className="text-base font-semibold text-gray-900">#{selectedPayment.customerId || 'N/A'}</p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-600">Email</p>
@@ -1224,7 +1289,9 @@ const Payment = () => {
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">Interest Rate</span>
                         <span className="text-base font-semibold text-gray-900">
-                          {selectedPayment.interestRate ? `${selectedPayment.interestRate}%` : 'N/A'}
+                          {selectedPayment.interestRate !== null && selectedPayment.interestRate !== undefined 
+                            ? `${selectedPayment.interestRate}%` 
+                            : '0%'}
                         </span>
                       </div>
                       <div className="flex justify-between items-center">

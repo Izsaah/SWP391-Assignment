@@ -249,6 +249,20 @@ const menuItems = [
     label: "Customers", 
     icon: Users, 
     path: "/staff/customers",
+    subItems: [
+      {
+        id: "customer-list",
+        label: "Customer List",
+        icon: Users,
+        path: "/staff/customers"
+      },
+      {
+        id: "test-drives",
+        label: "Test Drive",
+        icon: Calendar,
+        path: "/staff/customers/test-drives"
+      }
+    ]
   },
   { id: "reports", label: "Reports", icon: BarChart3, path: "/staff/reports" },
   { id: "settings", label: "Settings", icon: Settings, path: "/staff/settings" },

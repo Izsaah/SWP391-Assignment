@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import Layout from '../layout/Layout';
 import VehicleComparisonCard from './components/VehicleComparisonCard';
 import VehicleSelectorModal from './components/VehicleSelectorModal';
-import { FileText, Download, RefreshCw, Plus } from 'lucide-react';
+import { FileText, Download, RefreshCw, Plus, Truck } from 'lucide-react';
+import { useNavigate } from 'react-router';
 import { fetchInventory, transformInventoryData } from '../services/inventoryService';
 
 const CompareModels = () => {
+  const navigate = useNavigate();
   const [selectedVehicles, setSelectedVehicles] = useState([null, null, null]);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [selectorSlotIndex, setSelectorSlotIndex] = useState(null);
@@ -130,9 +132,60 @@ const CompareModels = () => {
     // Implement export functionality
   };
 
-  const handleCreateQuotation = (vehicle) => {
-    console.log('Create quotation for', vehicle);
-    // Implement quotation creation
+  // Handle create order - navigate to order form page with vehicle data
+  const handleCreateOrder = (vehicle) => {
+    // Prepare vehicle data for order form
+    const orderVehicleData = {
+      modelId: vehicle.modelId,
+      variantId: vehicle.variantId,
+      modelName: vehicle.model || vehicle.title || vehicle.modelName,
+      title: vehicle.title || vehicle.model,
+      price: vehicle.price || vehicle.priceUsd,
+      dealerPrice: vehicle.price || vehicle.priceUsd,
+      color: vehicle.color || 'White',
+      vin: vehicle.vin || 'Pending',
+      serialId: vehicle.vin, // Use vin as serialId if available
+      imageUrl: vehicle.imageUrl,
+      status: vehicle.status,
+      variant: vehicle.variant,
+      model: vehicle.model || vehicle.title,
+    };
+    
+    navigate('/staff/sales/order-form', { 
+      state: { 
+        vehicleData: orderVehicleData
+      } 
+    });
+  };
+
+  // Handle pick and deliver - navigate to order form, then to delivery
+  const handlePickAndDeliver = (vehicle) => {
+    // Prepare vehicle data for order form with delivery flag
+    const orderVehicleData = {
+      modelId: vehicle.modelId,
+      variantId: vehicle.variantId,
+      modelName: vehicle.model || vehicle.title || vehicle.modelName,
+      title: vehicle.title || vehicle.model,
+      price: vehicle.price || vehicle.priceUsd,
+      dealerPrice: vehicle.price || vehicle.priceUsd,
+      color: vehicle.color || 'White',
+      vin: vehicle.vin || 'Pending',
+      serialId: vehicle.vin,
+      imageUrl: vehicle.imageUrl,
+      status: vehicle.status,
+      variant: vehicle.variant,
+      model: vehicle.model || vehicle.title,
+      forDelivery: true, // Flag to indicate this is for delivery
+    };
+    
+    // Navigate to order form with vehicle data
+    // After order creation, user can navigate to delivery section
+    navigate('/staff/sales/order-form', { 
+      state: { 
+        vehicleData: orderVehicleData,
+        redirectToDelivery: true // Flag to redirect to delivery after order creation
+      } 
+    });
   };
 
   return (
@@ -263,15 +316,24 @@ const CompareModels = () => {
         {!loading && !error && selectedVehicles.some(v => v !== null) && (
           <div className="grid grid-cols-3 gap-6">
             {selectedVehicles.map((vehicle, index) => (
-              <div key={index} className="flex">
+              <div key={index} className="flex flex-col gap-3">
                 {vehicle ? (
-                  <button
-                    onClick={() => handleCreateQuotation(vehicle)}
-                    className="w-full py-3 px-4 bg-white border-2 border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-all flex items-center justify-center gap-2"
-                  >
-                    <FileText className="w-4 h-4" />
-                    <span>Create Quotation</span>
-                  </button>
+                  <>
+                    <button
+                      onClick={() => handleCreateOrder(vehicle)}
+                      className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all flex items-center justify-center gap-2 shadow-sm"
+                    >
+                      <FileText className="w-4 h-4" />
+                      <span>Create Order</span>
+                    </button>
+                    <button
+                      onClick={() => handlePickAndDeliver(vehicle)}
+                      className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all flex items-center justify-center gap-2 shadow-sm"
+                    >
+                      <Truck className="w-4 h-4" />
+                      <span>Pick and Deliver</span>
+                    </button>
+                  </>
                 ) : (
                   <div className="w-full"></div>
                 )}

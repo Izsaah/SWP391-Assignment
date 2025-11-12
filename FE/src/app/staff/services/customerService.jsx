@@ -123,7 +123,8 @@ export const createCustomer = async (customerData) => {
       }
     );
 
-    if (response.data && response.data.success) {
+    // Backend returns status: "success" or status: "error"
+    if (response.data && (response.data.status === 'success' || response.data.success)) {
       return {
         success: true,
         message: response.data.message,

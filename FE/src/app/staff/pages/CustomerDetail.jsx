@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router';
 import Layout from '../layout/Layout';
 import { viewOrdersByCustomerId } from '../services/orderService';
 import { getCustomerById, getFeedbackByCustomerId, getTestDrivesByCustomerId } from '../services/customerDetailService';
-import { fetchInventory } from '../services/inventoryService';
+import { fetchInventory, fetchAllVariants } from '../services/inventoryService';
+import { createTestDrive } from '../services/testDriveService';
 import {
   ChevronRight,
   Phone,
@@ -14,23 +15,19 @@ import {
   FileText,
   Car,
   MessageSquare,
-  StickyNote,
   Edit,
   Plus,
   Eye,
   Clock,
   CheckCircle,
-  XCircle,
-  Send,
-  ArrowLeft
+  ArrowLeft,
+  RefreshCw
 } from 'lucide-react';
 
 const CustomerDetail = () => {
-  const { customerId } = useParams();
+  const { customerId: customerIdParam } = useParams();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('info');
-  const [showNoteForm, setShowNoteForm] = useState(false);
-  const [newNote, setNewNote] = useState('');
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [customer, setCustomer] = useState(null);
@@ -40,6 +37,39 @@ const CustomerDetail = () => {
   const [feedbacks, setFeedbacks] = useState([]);
   const [loadingFeedbacks, setLoadingFeedbacks] = useState(false);
   const [vehicleMap, setVehicleMap] = useState(new Map()); // modelId -> modelName
+  const [vehiclesData, setVehiclesData] = useState([]); // Store vehicles for serialId mapping
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState({ serialId: '', date: '' });
+  const [scheduling, setScheduling] = useState(false);
+  const [scheduleError, setScheduleError] = useState('');
+  const [availableSerials, setAvailableSerials] = useState([]);
+
+  // Helper function to extract numeric customer ID from URL parameter
+  // Handles formats like: "1", "C-1", or any string containing numbers
+  const extractNumericCustomerId = (customerIdParam) => {
+    if (!customerIdParam) return null;
+    
+    // First try direct parsing (if it's already a number)
+    const directParse = parseInt(customerIdParam);
+    if (!isNaN(directParse)) {
+      return directParse;
+    }
+    
+    // If direct parse failed, try to extract number from string (e.g., "C-1" -> 1)
+    const match = String(customerIdParam).match(/(\d+)/);
+    if (match && match[1]) {
+      const extractedId = parseInt(match[1]);
+      if (!isNaN(extractedId)) {
+        return extractedId;
+      }
+    }
+    
+    console.warn('⚠️ Could not extract numeric customer ID from:', customerIdParam);
+    return null;
+  };
+
+  // Get the numeric customer ID
+  const customerId = extractNumericCustomerId(customerIdParam);
 
   // Fetch vehicle models for name mapping
   useEffect(() => {
@@ -48,6 +78,7 @@ const CustomerDetail = () => {
         const inventoryResult = await fetchInventory();
         const vehicleNameMap = new Map();
         if (inventoryResult.success && inventoryResult.data) {
+          setVehiclesData(inventoryResult.data); // Store vehicles for serialId mapping
           for (const model of inventoryResult.data) {
             const modelId = model.modelId || model.model_id;
             const modelName = model.modelName || model.name || `Model ${modelId}`;
@@ -70,11 +101,14 @@ const CustomerDetail = () => {
   // Fetch customer data when component mounts or customerId changes
   useEffect(() => {
     const fetchCustomerData = async () => {
-      if (!customerId) return;
+      if (!customerId) {
+        setLoadingCustomer(false);
+        return;
+      }
       
       setLoadingCustomer(true);
       try {
-        const result = await getCustomerById(parseInt(customerId));
+        const result = await getCustomerById(customerId);
         if (result.success && result.data) {
           const customerData = result.data;
           // Transform backend data to frontend format
@@ -102,14 +136,42 @@ const CustomerDetail = () => {
   // Fetch orders when component mounts or customerId changes
   useEffect(() => {
     const fetchOrders = async () => {
-      if (!customerId) return;
+      if (!customerId) {
+        setLoadingOrders(false);
+        setOrders([]);
+        return;
+      }
       
       setLoadingOrders(true);
       try {
-        const result = await viewOrdersByCustomerId(parseInt(customerId));
-        if (result.success && result.data) {
-          // Transform order data for display
-          const transformedOrders = result.data.map(order => {
+        const result = await viewOrdersByCustomerId(customerId);
+        console.log('📦 Orders fetched for customer', customerId, '(from param:', customerIdParam, '):', result);
+        console.log('📦 Raw orders data:', result.data);
+        console.log('📦 Orders count:', result.data?.length);
+        console.log('📦 Result success:', result.success);
+        
+        // Handle response - check if data exists and is an array
+        const ordersData = result.data;
+        const isArray = Array.isArray(ordersData);
+        const hasOrders = isArray && ordersData.length > 0;
+        
+        console.log('📦 Is array:', isArray);
+        console.log('📦 Has orders:', hasOrders);
+        
+        if (result.success && ordersData && isArray && hasOrders) {
+          // Log each order for debugging
+          ordersData.forEach((order, index) => {
+            console.log(`📦 Order ${index + 1}:`, {
+              orderId: order.orderId || order.order_id,
+              status: order.status,
+              modelId: order.modelId || order.model_id,
+              hasDetail: !!order.detail,
+              customerId: order.customerId || order.customer_id
+            });
+          });
+          
+          // Transform order data for display - include ALL orders regardless of status or detail
+          const transformedOrders = ordersData.map(order => {
             // Get price from order detail or confirmation
             let price = 0;
             let vehicleName = 'Unknown Vehicle';
@@ -118,7 +180,7 @@ const CustomerDetail = () => {
             const modelId = order.modelId || order.model_id;
             const serialId = order.detail?.serialId || order.detail?.serial_id;
             
-            // Get vehicle name from vehicleMap
+            // Get vehicle name from vehicleMap (if loaded) or use fallback
             if (modelId && vehicleMap.has(modelId)) {
               vehicleName = vehicleMap.get(modelId);
               if (serialId) {
@@ -133,14 +195,18 @@ const CustomerDetail = () => {
               vehicleName = `Serial: ${serialId}`;
             }
             
+            // Calculate price from order detail
             if (order.detail) {
-              price = order.detail.unitPrice || order.detail.unit_price || 0;
+              const quantity = parseFloat(order.detail.quantity || '1');
+              const unitPrice = parseFloat(order.detail.unitPrice || order.detail.unit_price || 0);
+              price = quantity * unitPrice;
             }
             
+            // Override with confirmation price if available
             if (order.confirmation) {
               const confirmationPrice = order.confirmation.totalPrice || order.confirmation.total_price;
               if (confirmationPrice) {
-                price = confirmationPrice;
+                price = parseFloat(confirmationPrice) || price;
               }
             }
             
@@ -153,11 +219,11 @@ const CustomerDetail = () => {
             }) : '';
             
             // Format price
-            const formattedPrice = price ? new Intl.NumberFormat('vi-VN', {
+            const formattedPrice = price > 0 ? new Intl.NumberFormat('vi-VN', {
               style: 'currency',
               currency: 'VND',
               minimumFractionDigits: 0
-            }).format(price) : 'N/A';
+            }).format(price) : '';
             
             return {
               id: `ORD-${order.orderId || order.order_id}`,
@@ -170,38 +236,282 @@ const CustomerDetail = () => {
             };
           });
           
+          console.log('✅ Transformed orders:', transformedOrders);
+          console.log('✅ Total orders to display:', transformedOrders.length);
           setOrders(transformedOrders);
+        } else if (result.success && ordersData && isArray && !hasOrders) {
+          // Success but empty array - no orders found
+          console.log('ℹ️ No orders found for customer ID:', customerId);
+          console.log('ℹ️ Empty orders array received');
+          setOrders([]);
         } else {
+          // Error or invalid response format
+          console.log('ℹ️ No orders found or invalid result:', result);
+          console.log('ℹ️ Result success:', result.success);
+          console.log('ℹ️ Result data:', result.data);
+          console.log('ℹ️ Result data type:', typeof result.data);
+          console.log('ℹ️ Result data is array:', Array.isArray(result.data));
           setOrders([]);
         }
       } catch (error) {
-        console.error('Error fetching orders:', error);
+        console.error('❌ Error fetching orders:', error);
         setOrders([]);
       } finally {
         setLoadingOrders(false);
       }
     };
     
-    if (vehicleMap.size > 0) {
+    // Fetch orders immediately when customerId changes, don't wait for vehicleMap
+    // Vehicle names will be updated when vehicleMap loads
       fetchOrders();
-    }
-  }, [customerId, vehicleMap]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerId, customerIdParam]); // vehicleMap intentionally excluded - orders fetched immediately, names updated later
 
-  // Fetch test drives
+  // Refresh orders when page becomes visible (e.g., returning from order form)
+  useEffect(() => {
+    if (!customerId) return;
+    
+    const fetchOrdersOnVisible = async () => {
+      try {
+        console.log('🔄 Refreshing orders on visibility change...');
+        const result = await viewOrdersByCustomerId(customerId);
+        const ordersData = result.data;
+        const isArray = Array.isArray(ordersData);
+        const hasOrders = isArray && ordersData && ordersData.length > 0;
+        
+        if (result.success && hasOrders) {
+          // Transform orders with the same logic as main fetch
+          const transformedOrders = ordersData.map(order => {
+            const modelId = order.modelId || order.model_id;
+            const serialId = order.detail?.serialId || order.detail?.serial_id;
+            let vehicleName = 'Unknown Vehicle';
+            
+            if (modelId && vehicleMap.has(modelId)) {
+              vehicleName = vehicleMap.get(modelId);
+              if (serialId) {
+                vehicleName = `${vehicleName} (Serial: ${serialId})`;
+              }
+            } else if (modelId) {
+              vehicleName = `Model ID: ${modelId}`;
+              if (serialId) {
+                vehicleName = `${vehicleName} (Serial: ${serialId})`;
+              }
+            } else if (serialId) {
+              vehicleName = `Serial: ${serialId}`;
+            }
+            
+            let price = 0;
+            if (order.detail) {
+              const quantity = parseFloat(order.detail.quantity || '1');
+              const unitPrice = parseFloat(order.detail.unitPrice || order.detail.unit_price || 0);
+              price = quantity * unitPrice;
+            }
+            
+            if (order.confirmation) {
+              const confirmationPrice = order.confirmation.totalPrice || order.confirmation.total_price;
+              if (confirmationPrice) {
+                price = parseFloat(confirmationPrice) || price;
+              }
+            }
+            
+            const orderDate = order.orderDate || order.order_date || '';
+            const formattedDate = orderDate ? new Date(orderDate).toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric'
+            }) : '';
+            
+            const formattedPrice = price > 0 ? new Intl.NumberFormat('vi-VN', {
+              style: 'currency',
+              currency: 'VND',
+              minimumFractionDigits: 0
+            }).format(price) : '';
+            
+            return {
+              id: `ORD-${order.orderId || order.order_id}`,
+              orderId: order.orderId || order.order_id,
+              vehicle: vehicleName,
+              price: formattedPrice,
+              status: order.status || 'Pending',
+              createdDate: formattedDate,
+              rawDate: orderDate
+            };
+          });
+          
+          console.log(`✅ Refreshed orders: ${transformedOrders.length} orders found`);
+          setOrders(transformedOrders);
+        } else if (result.success && isArray && !hasOrders) {
+          // Empty array - no orders
+          console.log('ℹ️ No orders found on refresh');
+          setOrders([]);
+        }
+      } catch (error) {
+        console.error('❌ Error refreshing orders on visibility change:', error);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && customerId && !loadingOrders) {
+        // Small delay to ensure page is fully loaded
+        setTimeout(fetchOrdersOnVisible, 500);
+      }
+    };
+
+    // Also listen for focus event (when user switches back to the tab)
+    const handleFocus = () => {
+      if (customerId && !loadingOrders && document.visibilityState === 'visible') {
+        console.log('🔄 Window focused, refreshing orders...');
+        setTimeout(fetchOrdersOnVisible, 500);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [customerId, loadingOrders, vehicleMap]);
+  
+  // Update vehicle names when vehicleMap loads (re-fetch orders to get proper names)
+  useEffect(() => {
+    if (vehicleMap.size > 0 && customerId) {
+      // Re-fetch orders to update vehicle names with the loaded vehicleMap
+      const updateVehicleNames = async () => {
+        try {
+          const result = await viewOrdersByCustomerId(customerId);
+          const ordersData = result.data;
+          const isArray = Array.isArray(ordersData);
+          const hasOrders = isArray && ordersData && ordersData.length > 0;
+          
+          if (result.success && hasOrders) {
+            const transformedOrders = ordersData.map(order => {
+              const modelId = order.modelId || order.model_id;
+              const serialId = order.detail?.serialId || order.detail?.serial_id;
+              let vehicleName = 'Unknown Vehicle';
+              
+              if (modelId && vehicleMap.has(modelId)) {
+                vehicleName = vehicleMap.get(modelId);
+                if (serialId) {
+                  vehicleName = `${vehicleName} (Serial: ${serialId})`;
+                }
+              } else if (modelId) {
+                vehicleName = `Model ID: ${modelId}`;
+                if (serialId) {
+                  vehicleName = `${vehicleName} (Serial: ${serialId})`;
+                }
+              } else if (serialId) {
+                vehicleName = `Serial: ${serialId}`;
+              }
+              
+              let price = 0;
+              if (order.detail) {
+                const quantity = parseFloat(order.detail.quantity || '1');
+                const unitPrice = parseFloat(order.detail.unitPrice || order.detail.unit_price || 0);
+                price = quantity * unitPrice;
+              }
+              
+              if (order.confirmation) {
+                const confirmationPrice = order.confirmation.totalPrice || order.confirmation.total_price;
+                if (confirmationPrice) {
+                  price = parseFloat(confirmationPrice) || price;
+                }
+              }
+              
+              const orderDate = order.orderDate || order.order_date || '';
+              const formattedDate = orderDate ? new Date(orderDate).toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+              }) : '';
+              
+              const formattedPrice = price > 0 ? new Intl.NumberFormat('vi-VN', {
+                style: 'currency',
+                currency: 'VND',
+                minimumFractionDigits: 0
+              }).format(price) : '';
+              
+              return {
+                id: `ORD-${order.orderId || order.order_id}`,
+                orderId: order.orderId || order.order_id,
+                vehicle: vehicleName,
+                price: formattedPrice,
+                status: order.status || 'Pending',
+                createdDate: formattedDate,
+                rawDate: orderDate
+              };
+            });
+            
+            setOrders(transformedOrders);
+          }
+        } catch (error) {
+          console.error('Error updating vehicle names:', error);
+        }
+      };
+      
+      updateVehicleNames();
+    }
+  }, [vehicleMap, customerId]);
+
+  // Fetch test drives and map serialId to vehicle names
   useEffect(() => {
     const fetchTestDrives = async () => {
-      if (!customerId) return;
+      if (!customerId) {
+        setLoadingTestDrives(false);
+        setTestDrives([]);
+        return;
+      }
       
       setLoadingTestDrives(true);
       try {
-        const result = await getTestDrivesByCustomerId(parseInt(customerId));
+        const result = await getTestDrivesByCustomerId(customerId);
         if (result.success && result.data) {
-          setTestDrives(result.data || []);
+          // Transform test drives to include vehicle names
+          const transformedTestDrives = result.data.map((drive) => {
+            const serialId = drive.serialId || drive.serial_id;
+            let vehicleName = 'N/A';
+            
+            // Try to map serialId to vehicle name using vehiclesData
+            if (serialId && serialId.length >= 3 && vehiclesData.length > 0) {
+              const prefix = serialId.substring(0, 3).toUpperCase();
+              // Try to find matching model by prefix (e.g., FAL -> EV Falcon, HAW -> EV Hawk)
+              const matchedModel = vehiclesData.find(model => {
+                const modelName = (model.modelName || model.name || '').toUpperCase();
+                // Extract first 3 chars from model name and compare
+                const modelPrefix = modelName.substring(0, Math.min(3, modelName.length)).replace(/\s/g, '');
+                // Check if model name contains the prefix or prefix matches model prefix
+                return modelName.includes(prefix) || 
+                       prefix.includes(modelPrefix) ||
+                       modelPrefix === prefix;
+              });
+              
+              if (matchedModel) {
+                vehicleName = matchedModel.modelName || matchedModel.name || `Model (${prefix})`;
+              } else {
+                vehicleName = `Serial: ${serialId}`;
+              }
+            } else if (serialId) {
+              vehicleName = `Serial: ${serialId}`;
+            }
+            
+            return {
+              appointmentId: drive.appointmentId || drive.appointment_id || drive.id || 'N/A',
+              serialId: serialId || 'N/A',
+              vehicleName: vehicleName,
+              date: drive.date || drive.scheduleDate || drive.schedule_at || 'N/A',
+              status: drive.status || 'Pending',
+              customerId: drive.customerId || drive.customer_id
+            };
+          });
+          
+          setTestDrives(transformedTestDrives);
         } else {
           setTestDrives([]);
         }
-      } catch (error) {
-        console.error('Error fetching test drives:', error);
+      } catch {
+        // Error is already handled in the service, just set empty array
+        // Don't log as error since 404 is expected if endpoint doesn't exist
         setTestDrives([]);
       } finally {
         setLoadingTestDrives(false);
@@ -209,16 +519,20 @@ const CustomerDetail = () => {
     };
     
     fetchTestDrives();
-  }, [customerId]);
+  }, [customerId, vehiclesData]);
 
   // Fetch feedbacks
   useEffect(() => {
     const fetchFeedbacks = async () => {
-      if (!customerId) return;
+      if (!customerId) {
+        setLoadingFeedbacks(false);
+        setFeedbacks([]);
+        return;
+      }
       
       setLoadingFeedbacks(true);
       try {
-        const result = await getFeedbackByCustomerId(parseInt(customerId));
+        const result = await getFeedbackByCustomerId(customerId);
         if (result.success && result.data) {
           setFeedbacks(result.data || []);
         } else {
@@ -235,37 +549,26 @@ const CustomerDetail = () => {
     fetchFeedbacks();
   }, [customerId]);
 
-  // Notes data (local state only, no backend API)
-  const [notes, setNotes] = useState([]);
-
-  const getStatusBadge = (status) => {
-    const configs = {
-      'Active': { dotColor: 'bg-green-500', label: 'Active' },
-      'Pending': { dotColor: 'bg-blue-500', label: 'Pending' },
-      'Prospect': { dotColor: 'bg-yellow-500', label: 'Prospect' },
-      'Inactive': { dotColor: 'bg-red-500', label: 'Inactive' }
-    };
-    const config = configs[status] || configs['Active'];
-    
-    return (
-      <span className="inline-flex items-center">
-        <span className={`w-2 h-2 rounded-full ${config.dotColor} mr-2`}></span>
-        <span className="text-sm text-gray-700">{config.label}</span>
-      </span>
-    );
-  };
-
   const getQuoteStatusBadge = (status) => {
+    // Normalize status to handle case-insensitive matching
+    const normalizedStatus = status?.toLowerCase() || '';
+
     const configs = {
-      'Approved': 'bg-green-100 text-green-700 border-green-200',
-      'Draft': 'bg-gray-100 text-gray-700 border-gray-200',
-      'Pending': 'bg-yellow-100 text-yellow-700 border-yellow-200',
-      'Rejected': 'bg-red-100 text-red-700 border-red-200'
+      'approved': 'bg-green-100 text-green-700 border-green-200',
+      'draft': 'bg-gray-100 text-gray-700 border-gray-200',
+      'pending': 'bg-yellow-100 text-yellow-700 border-yellow-200',
+      'rejected': 'bg-red-100 text-red-700 border-red-200',
+      'delivered': 'bg-blue-100 text-blue-700 border-blue-200',
+      'cancelled': 'bg-gray-100 text-gray-700 border-gray-200',
+      'canceled': 'bg-gray-100 text-gray-700 border-gray-200'
     };
     
+    const config = configs[normalizedStatus] || configs['draft'];
+    const displayStatus = status || 'Unknown';
+    
     return (
-      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${configs[status] || configs['Draft']}`}>
-        {status}
+      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${config}`}>
+        {displayStatus}
       </span>
     );
   };
@@ -289,19 +592,7 @@ const CustomerDetail = () => {
     return status;
   };
 
-  const handleAddNote = () => {
-    if (newNote.trim()) {
-      const newNoteObj = {
-        id: notes.length + 1,
-        date: new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }),
-        note: newNote,
-        createdBy: 'Current User' // TODO: Get from JWT token
-      };
-      setNotes([newNoteObj, ...notes]);
-      setNewNote('');
-      setShowNoteForm(false);
-    }
-  };
+  // Customer detail is read-only for schedules; no inline status edits here
 
   // Helper function to mask phone number
   const maskPhone = (phone) => {
@@ -396,27 +687,24 @@ const CustomerDetail = () => {
                 </div>
               </div>
 
-              {/* Customer Info */}
-              <div className="space-y-2 mb-4 pb-4 border-b border-gray-200">
-                <div className="flex justify-between text-xs items-center">
-                  <span className="text-gray-600">Status:</span>
-                  {getStatusBadge('Active')}
-                </div>
-              </div>
-
               {/* Quick Actions */}
               <div className="space-y-1.5">
-                <button className="w-full bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors text-sm">
+              <button onClick={async ()=>{
+                  setScheduleError('');
+                  const serialsFromModels = Array.from(new Set(
+                    vehiclesData.flatMap(m => (Array.isArray(m.lists)? m.lists: []).map(v => v.serialId || v.serial_id).filter(Boolean))
+                  ));
+                  if (serialsFromModels.length > 0) {
+                    setAvailableSerials(serialsFromModels);
+                  } else {
+                    const variants = await fetchAllVariants();
+                    const serials = Array.from(new Set((variants || []).map(v => v.serialId || v.serial_id).filter(Boolean)));
+                    setAvailableSerials(serials);
+                  }
+                  setShowScheduleModal(true);
+                }} className="w-full bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors text-sm">
                   <Calendar className="w-4 h-4" />
                   <span>Schedule Test Drive</span>
-                </button>
-                <button className="w-full bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors text-sm">
-                  <Send className="w-4 h-4" />
-                  <span>Send Email</span>
-                </button>
-                <button className="w-full border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors text-sm">
-                  <StickyNote className="w-4 h-4" />
-                  <span>Add Note</span>
                 </button>
               </div>
             </div>
@@ -472,17 +760,6 @@ const CustomerDetail = () => {
                     <MessageSquare className="w-4 h-4 inline mr-2" />
                     Feedback
                   </button>
-                  <button
-                    onClick={() => setActiveTab('notes')}
-                    className={`px-6 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                      activeTab === 'notes'
-                        ? 'border-blue-600 text-blue-600'
-                        : 'border-transparent text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    <StickyNote className="w-4 h-4 inline mr-2" />
-                    Internal Notes
-                  </button>
                 </div>
               </div>
 
@@ -535,15 +812,222 @@ const CustomerDetail = () => {
                   </div>
                 )}
 
+                {/* Schedule Test Drive Modal */}
+                {showScheduleModal && (
+                  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+                      <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+                        <h4 className="text-base font-semibold text-gray-900">Schedule Test Drive</h4>
+                        <button onClick={()=>setShowScheduleModal(false)} className="text-gray-500 hover:text-gray-700">&times;</button>
+                      </div>
+                      <form
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          if (!customerId) return;
+                          if (!scheduleForm.serialId || !scheduleForm.date) {
+                            setScheduleError('Please select serial and date.');
+                            return;
+                          }
+                          setScheduling(true);
+                          setScheduleError('');
+                          try {
+                            const res = await createTestDrive({
+                              customer_id: customerId,
+                              serial_id: scheduleForm.serialId,
+                              date: scheduleForm.date,
+                              status: 'Pending'
+                            });
+                            if (res.success) {
+                              setShowScheduleModal(false);
+                              setScheduleForm({ serialId: '', date: '' });
+                              // refresh list
+                              try {
+                                const r = await getTestDrivesByCustomerId(customerId);
+                                if (r.success && r.data) {
+                                  const td = r.data.map((drive) => ({
+                                    appointmentId: drive.appointmentId || drive.appointment_id || drive.id || 'N/A',
+                                    serialId: drive.serialId || drive.serial_id,
+                                    vehicleName: drive.serialId || drive.serial_id,
+                                    date: drive.date || drive.scheduleDate || drive.schedule_at || 'N/A',
+                                    status: drive.status || 'Pending',
+                                    customerId: drive.customerId || drive.customer_id
+                                  }));
+                                  setTestDrives(td);
+                                }
+                              } catch {
+                                // Ignore refresh errors
+                              }
+                            } else {
+                              setScheduleError(res.message || 'Failed to create test drive.');
+                            }
+                          } catch {
+                            setScheduleError('Failed to create test drive. Make sure serial and date are selected.');
+                          } finally {
+                            setScheduling(false);
+                          }
+                        }}
+                        className="p-5 space-y-4"
+                      >
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Vehicle Serial ID</label>
+                          <select
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                            value={scheduleForm.serialId}
+                            onChange={(e)=>setScheduleForm(f=>({...f, serialId: e.target.value}))}
+                            required
+                          >
+                            <option value="">Select serial...</option>
+                            {availableSerials.map((serial, idx)=>(
+                              <option key={idx} value={serial}>{serial}</option>
+                            ))}
+                          </select>
+                          {availableSerials.length === 0 && (
+                            <p className="text-xs text-yellow-700 mt-1">No serials available. Please check inventory or try again later.</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
+                          <input
+                            type="date"
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                            value={scheduleForm.date}
+                            onChange={(e)=>setScheduleForm(f=>({...f, date: e.target.value}))}
+                            min={new Date().toISOString().slice(0,10)}
+                            required
+                          />
+                        </div>
+                        {scheduleError && <div className="text-xs text-red-600">{scheduleError}</div>}
+                        <div className="pt-2 flex justify-end space-x-2">
+                          <button type="button" onClick={()=>setShowScheduleModal(false)} className="px-4 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200">Cancel</button>
+                          <button type="submit" disabled={scheduling || !scheduleForm.serialId || !scheduleForm.date} className="px-4 py-2 text-sm rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-60">
+                            {scheduling ? 'Creating...' : 'Create'}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                )}
+
                 {/* Order Form Tab */}
                 {activeTab === 'orders' && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold text-gray-900">Orders</h3>
-                      <button className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <button 
+                          onClick={async () => {
+                            if (!customerId) return;
+                            setLoadingOrders(true);
+                            try {
+                              const result = await viewOrdersByCustomerId(customerId);
+                              console.log('🔄 Refreshed orders:', result);
+                              const ordersData = result.data;
+                              const isArray = Array.isArray(ordersData);
+                              const hasOrders = isArray && ordersData && ordersData.length > 0;
+                              
+                              if (result.success && hasOrders) {
+                                const transformedOrders = ordersData.map(order => {
+                                  const modelId = order.modelId || order.model_id;
+                                  const serialId = order.detail?.serialId || order.detail?.serial_id;
+                                  let vehicleName = 'Unknown Vehicle';
+                                  
+                                  if (modelId && vehicleMap.has(modelId)) {
+                                    vehicleName = vehicleMap.get(modelId);
+                                    if (serialId) {
+                                      vehicleName = `${vehicleName} (Serial: ${serialId})`;
+                                    }
+                                  } else if (modelId) {
+                                    vehicleName = `Model ID: ${modelId}`;
+                                    if (serialId) {
+                                      vehicleName = `${vehicleName} (Serial: ${serialId})`;
+                                    }
+                                  } else if (serialId) {
+                                    vehicleName = `Serial: ${serialId}`;
+                                  }
+                                  
+                                  let price = 0;
+                                  if (order.detail) {
+                                    const quantity = parseFloat(order.detail.quantity || '1');
+                                    const unitPrice = parseFloat(order.detail.unitPrice || order.detail.unit_price || 0);
+                                    price = quantity * unitPrice;
+                                  }
+                                  
+                                  if (order.confirmation) {
+                                    const confirmationPrice = order.confirmation.totalPrice || order.confirmation.total_price;
+                                    if (confirmationPrice) {
+                                      price = parseFloat(confirmationPrice) || price;
+                                    }
+                                  }
+                                  
+                                  const orderDate = order.orderDate || order.order_date || '';
+                                  const formattedDate = orderDate ? new Date(orderDate).toLocaleDateString('en-GB', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric'
+                                  }) : '';
+                                  
+                                  const formattedPrice = price > 0 ? new Intl.NumberFormat('vi-VN', {
+                                    style: 'currency',
+                                    currency: 'VND',
+                                    minimumFractionDigits: 0
+                                  }).format(price) : '';
+                                  
+                                  return {
+                                    id: `ORD-${order.orderId || order.order_id}`,
+                                    orderId: order.orderId || order.order_id,
+                                    vehicle: vehicleName,
+                                    price: formattedPrice,
+                                    status: order.status || 'Pending',
+                                    createdDate: formattedDate,
+                                    rawDate: orderDate
+                                  };
+                                });
+                                setOrders(transformedOrders);
+                              } else {
+                                setOrders([]);
+                              }
+                            } catch (error) {
+                              console.error('Error refreshing orders:', error);
+                            } finally {
+                              setLoadingOrders(false);
+                            }
+                          }}
+                          disabled={loadingOrders}
+                          className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50"
+                          title="Refresh orders"
+                        >
+                          <RefreshCw className={`w-4 h-4 ${loadingOrders ? 'animate-spin' : ''}`} />
+                          <span className="text-sm">Refresh</span>
+                        </button>
+                        <button 
+                          onClick={() => {
+                            if (!customerId || !customer) {
+                              alert('Customer information is not available. Please refresh the page.');
+                              return;
+                            }
+                            // Navigate to order form with customer pre-filled
+                            navigate('/staff/sales/order-form', {
+                              state: {
+                                fromCustomerDetail: true,
+                                customerId: customerId,
+                                customer: {
+                                  customerId: customer.customerId || customerId,
+                                  name: customer.name,
+                                  email: customer.email,
+                                  phone: customer.phoneNumber || customer.phone,
+                                  phoneNumber: customer.phoneNumber || customer.phone,
+                                  address: customer.address
+                                },
+                                returnUrl: `/staff/customers/${customerIdParam}` // Return to this page after creating order
+                              }
+                            });
+                          }}
+                          className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                        >
                         <Plus className="w-4 h-4" />
                         <span className="text-sm font-medium">Create New Order</span>
                       </button>
+                      </div>
                     </div>
 
                     {loadingOrders ? (
@@ -561,7 +1045,6 @@ const CustomerDetail = () => {
                             <tr>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Order ID</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Vehicle</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Price</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Status</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Created</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Action</th>
@@ -572,7 +1055,6 @@ const CustomerDetail = () => {
                               <tr key={order.id} className="hover:bg-gray-50">
                                 <td className="px-4 py-4 text-sm font-medium text-gray-900">{order.id}</td>
                                 <td className="px-4 py-4 text-sm text-gray-700">{order.vehicle}</td>
-                                <td className="px-4 py-4 text-sm text-gray-700">{order.price}</td>
                                 <td className="px-4 py-4">{getQuoteStatusBadge(order.status)}</td>
                                 <td className="px-4 py-4 text-sm text-gray-700">{order.createdDate}</td>
                                 <td className="px-4 py-4">
@@ -601,7 +1083,20 @@ const CustomerDetail = () => {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold text-gray-900">Test Drive Schedule</h3>
-                      <button className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
+                      <button onClick={async ()=>{
+                        setScheduleError('');
+                        const serialsFromModels = Array.from(new Set(
+                          vehiclesData.flatMap(m => (Array.isArray(m.lists)? m.lists: []).map(v => v.serialId || v.serial_id).filter(Boolean))
+                        ));
+                        if (serialsFromModels.length > 0) {
+                          setAvailableSerials(serialsFromModels);
+                        } else {
+                          const variants = await fetchAllVariants();
+                          const serials = Array.from(new Set((variants || []).map(v => v.serialId || v.serial_id).filter(Boolean)));
+                          setAvailableSerials(serials);
+                        }
+                        setShowScheduleModal(true);
+                      }} className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
                         <Plus className="w-4 h-4" />
                         <span className="text-sm font-medium">Schedule Test Drive</span>
                       </button>
@@ -621,17 +1116,22 @@ const CustomerDetail = () => {
                           <thead className="bg-gray-50">
                             <tr>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">TestDrive ID</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Serial</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Vehicle</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Date</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Status</th>
+                              {/* Read-only in Customer Detail; no actions column */}
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
                             {testDrives.map((drive, index) => (
-                              <tr key={drive.id || index} className="hover:bg-gray-50">
-                                <td className="px-4 py-4 text-sm font-medium text-gray-900">{drive.id || drive.testDriveId || 'N/A'}</td>
-                                <td className="px-4 py-4 text-sm text-gray-700">{drive.vehicle || drive.vehicleName || 'N/A'}</td>
-                                <td className="px-4 py-4 text-sm text-gray-700">{drive.date || drive.scheduleDate || 'N/A'}</td>
+                              <tr key={drive.appointmentId || index} className="hover:bg-gray-50">
+                                <td className="px-4 py-4 text-sm font-medium text-gray-900">
+                                  {drive.appointmentId !== 'N/A' ? `TD-${drive.appointmentId}` : 'N/A'}
+                                </td>
+                                <td className="px-4 py-4 text-sm text-gray-700">{drive.serialId || 'N/A'}</td>
+                                <td className="px-4 py-4 text-sm text-gray-700">{drive.vehicleName || 'N/A'}</td>
+                                <td className="px-4 py-4 text-sm text-gray-700">{drive.date || 'N/A'}</td>
                                 <td className="px-4 py-4">{getTestDriveStatusBadge(drive.status || 'Scheduled')}</td>
                               </tr>
                             ))}
@@ -718,85 +1218,9 @@ const CustomerDetail = () => {
                   </div>
                 )}
 
-                {/* Internal Notes Tab */}
-                {activeTab === 'notes' && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-gray-900">Internal Notes</h3>
-                      <button
-                        onClick={() => setShowNoteForm(!showNoteForm)}
-                        className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span className="text-sm font-medium">Add New Note</span>
-                      </button>
                     </div>
-
-                    {showNoteForm && (
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <textarea
-                          value={newNote}
-                          onChange={(e) => setNewNote(e.target.value)}
-                          placeholder="Enter your note here..."
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          rows="3"
-                        />
-                        <div className="flex space-x-2 mt-2">
-                          <button
-                            onClick={handleAddNote}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm"
-                          >
-                            Save Note
-                          </button>
-                          <button
-                            onClick={() => {
-                              setShowNoteForm(false);
-                              setNewNote('');
-                            }}
-                            className="bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg text-sm"
-                          >
-                            Cancel
-                          </button>
                         </div>
                       </div>
-                    )}
-
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Date</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Note</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Created By</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {notes.map((note) => (
-                            <tr key={note.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-4 text-sm text-gray-700">{note.date}</td>
-                              <td className="px-4 py-4 text-sm text-gray-700">{note.note}</td>
-                              <td className="px-4 py-4 text-sm text-gray-700">{note.createdBy}</td>
-                              <td className="px-4 py-4">
-                                <div className="flex items-center space-x-2">
-                                  <button className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors">
-                                    <Edit className="w-4 h-4 text-blue-600" />
-                                  </button>
-                                  <button className="p-1.5 hover:bg-red-50 rounded-lg transition-colors">
-                                    <XCircle className="w-4 h-4 text-red-600" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </Layout>
