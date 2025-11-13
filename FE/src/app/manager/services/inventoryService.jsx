@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getImageByModelId, getImageByVariantId, getImageByModelAndVariant, getImageByIndex } from '../../../assets/ListOfCar';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -27,22 +28,52 @@ export const handleAuthError = (error) => {
 };
 
 /**
- * Fix image URL - Thêm base URL nếu cần
+ * Fix image URL - Thêm base URL nếu cần, với fallback to ListOfCar
+ * @param {string} imageUrl - URL ảnh từ BE
+ * @param {number} modelId - Model ID (optional)
+ * @param {number} variantId - Variant ID (optional)
+ * @returns {string} - URL ảnh đã fix
  */
-const fixImageUrl = (imageUrl) => {
-  if (!imageUrl) return null;
-  
-  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-    return imageUrl;
+const fixImageUrl = (imageUrl, modelId = null, variantId = null) => {
+  // First, try to get image from ListOfCar.js (Google Drive) by modelId/variantId
+  if (modelId && variantId) {
+    const driveImage = getImageByModelAndVariant(modelId, variantId);
+    if (driveImage) return driveImage;
+  }
+  if (variantId) {
+    const driveImage = getImageByVariantId(variantId);
+    if (driveImage) return driveImage;
+  }
+  if (modelId) {
+    const driveImage = getImageByModelId(modelId);
+    if (driveImage) return driveImage;
   }
   
-  if (imageUrl.startsWith('/')) {
+  // If backend has image, use it
+  if (imageUrl) {
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return imageUrl;
+    }
+    
+    if (imageUrl.startsWith('/')) {
+      const baseUrl = API_URL.replace('/api', '');
+      return `${baseUrl}${imageUrl}`;
+    }
+    
     const baseUrl = API_URL.replace('/api', '');
-    return `${baseUrl}${imageUrl}`;
+    return `${baseUrl}/images/${imageUrl}`;
   }
   
-  const baseUrl = API_URL.replace('/api', '');
-  return `${baseUrl}/images/${imageUrl}`;
+  // If no backend image, use fallback from ListOfCar
+  // Use modelId or variantId as index (modulo to stay within bounds)
+  if (modelId || variantId) {
+    const index = ((modelId || 0) + (variantId || 0)) % 17; // 17 is the number of images
+    const fallbackImage = getImageByIndex(index);
+    if (fallbackImage) return fallbackImage;
+  }
+  
+  // Last resort: get first image
+  return getImageByIndex(0);
 };
 
 /**
@@ -134,7 +165,7 @@ export const getVehicles = async (filters = {}) => {
           versionName: variant.versionName || '',
           color: variant.color || 'N/A',
           price: variant.price || 0,
-          image: variant.image ? fixImageUrl(variant.image) : null,
+          image: fixImageUrl(variant.image, model.modelId, variant.variantId),
           isActive: variant.isActive,
           description: model.description || '',
         });

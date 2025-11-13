@@ -1,37 +1,84 @@
 import axios from 'axios';
+import { getImageByModelId, getImageByVariantId, getImageByModelAndVariant, getImageByIndex } from '../../../assets/ListOfCar';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
 /**
- * Fix image URL - Thêm base URL nếu cần
+ * Fix image URL - Thêm base URL nếu cần, với fallback to ListOfCar
  * @param {string} imageUrl - URL ảnh từ BE
+ * @param {number} modelId - Model ID (optional)
+ * @param {number} variantId - Variant ID (optional)
  * @returns {string} - URL ảnh đã fix
  */
-const fixImageUrl = (imageUrl) => {
-  if (!imageUrl) return null;
-  
-  console.log('🖼️ Original image URL from BE:', imageUrl);
-  
-  // Nếu đã có http/https thì giữ nguyên
-  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-    console.log('✅ URL already has protocol, keeping as is:', imageUrl);
-    return imageUrl;
+const fixImageUrl = (imageUrl, modelId = null, variantId = null) => {
+  // First, try to get image from ListOfCar.js (Google Drive) by modelId/variantId
+  if (modelId && variantId) {
+    const driveImage = getImageByModelAndVariant(modelId, variantId);
+    if (driveImage) {
+      console.log('✅ Using image from ListOfCar (model + variant):', driveImage);
+      return driveImage;
+    }
+  }
+  if (variantId) {
+    const driveImage = getImageByVariantId(variantId);
+    if (driveImage) {
+      console.log('✅ Using image from ListOfCar (variant):', driveImage);
+      return driveImage;
+    }
+  }
+  if (modelId) {
+    const driveImage = getImageByModelId(modelId);
+    if (driveImage) {
+      console.log('✅ Using image from ListOfCar (model):', driveImage);
+      return driveImage;
+    }
   }
   
-  // Nếu là relative path (bắt đầu bằng /), thêm base URL
-  if (imageUrl.startsWith('/')) {
+  // If backend has image, use it
+  if (imageUrl) {
+    console.log('🖼️ Original image URL from BE:', imageUrl);
+    
+    // Nếu đã có http/https thì giữ nguyên
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      console.log('✅ URL already has protocol, keeping as is:', imageUrl);
+      return imageUrl;
+    }
+    
+    // Nếu là relative path (bắt đầu bằng /), thêm base URL
+    if (imageUrl.startsWith('/')) {
+      const baseUrl = API_URL.replace('/api', ''); // Remove /api
+      const fixedUrl = `${baseUrl}${imageUrl}`;
+      console.log('🔧 Fixed relative path:', fixedUrl);
+      return fixedUrl;
+    }
+    
+    // Nếu chỉ là filename (không có / và không có http), thêm base URL + /images/
+    // Ví dụ: "tesla-model3-white.jpg" -> "https://.../images/tesla-model3-white.jpg"
     const baseUrl = API_URL.replace('/api', ''); // Remove /api
-    const fixedUrl = `${baseUrl}${imageUrl}`;
-    console.log('🔧 Fixed relative path:', fixedUrl);
+    const fixedUrl = `${baseUrl}/images/${imageUrl}`;
+    console.log('🔧 Fixed filename with /images/ path:', fixedUrl);
     return fixedUrl;
   }
   
-  // Nếu chỉ là filename (không có / và không có http), thêm base URL + /images/
-  // Ví dụ: "tesla-model3-white.jpg" -> "https://.../images/tesla-model3-white.jpg"
-  const baseUrl = API_URL.replace('/api', ''); // Remove /api
-  const fixedUrl = `${baseUrl}/images/${imageUrl}`;
-  console.log('🔧 Fixed filename with /images/ path:', fixedUrl);
-  return fixedUrl;
+  // If no backend image, use fallback from ListOfCar
+  // Use modelId or variantId as index (modulo to stay within bounds)
+  if (modelId || variantId) {
+    const index = ((modelId || 0) + (variantId || 0)) % 17; // 17 is the number of images
+    const fallbackImage = getImageByIndex(index);
+    if (fallbackImage) {
+      console.log('✅ Using fallback image from ListOfCar (index):', fallbackImage);
+      return fallbackImage;
+    }
+  }
+  
+  // Last resort: get first image
+  const firstImage = getImageByIndex(0);
+  if (firstImage) {
+    console.log('✅ Using first image from ListOfCar as fallback:', firstImage);
+    return firstImage;
+  }
+  
+  return null;
 };
 
 /**
@@ -257,8 +304,8 @@ export const transformInventoryData = (backendData) => {
           price: variant.price || 0,
           priceUsd: variant.price || 0,
           
-          // Image - Fix URL nếu cần
-          imageUrl: variant.image ? fixImageUrl(variant.image) : null,
+          // Image - Fix URL nếu cần, với fallback to ListOfCar
+          imageUrl: fixImageUrl(variant.image, model.modelId, variant.variantId),
           
           // Status - luôn là "available" vì đã filter active
           status: 'available',

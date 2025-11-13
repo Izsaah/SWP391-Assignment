@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Layout from '../layout/Layout';
 import {
   TrendingUp,
@@ -22,16 +22,7 @@ const SalesPerformance = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    // Default: load current month
-    const now = new Date();
-    const first = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
-    setDateFrom(first);
-    setDateTo(last);
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!dateFrom || !dateTo) return;
     setLoading(true);
     setError('');
@@ -44,7 +35,23 @@ const SalesPerformance = () => {
       setError(res.message || 'Failed to load sales data');
     }
     setLoading(false);
-  };
+  }, [dateFrom, dateTo]);
+
+  useEffect(() => {
+    // Default: load current month
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+    setDateFrom(first);
+    setDateTo(last);
+  }, []);
+
+  // Auto-load data when dateFrom and dateTo are set
+  useEffect(() => {
+    if (dateFrom && dateTo) {
+      loadData();
+    }
+  }, [loadData]);
 
   // Helper functions
   const formatCurrency = (amount) => {
@@ -260,13 +267,13 @@ const SalesPerformance = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {selectedStaff.orders.map((order) => (
-                        <tr key={order.orderId} className="hover:bg-gray-50">
+                      {selectedStaff.orders.map((order, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
                           <td className="px-4 py-3 whitespace-nowrap">
-                            <span className="text-sm font-medium text-gray-900">{order.orderId}</span>
+                            <span className="text-sm font-medium text-gray-900">{order.orderId || 'N/A'}</span>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            <span className="text-sm text-gray-700">{order.customer}</span>
+                            <span className="text-sm text-gray-700">{order.customer || 'N/A'}</span>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span className="text-sm text-gray-700">{formatDate(order.date)}</span>

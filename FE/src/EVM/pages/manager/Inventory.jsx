@@ -201,15 +201,6 @@ const Inventory = () => {
             onChange={(e) => { setQuery(e.target.value); setPage(1) }} 
             className="flex-1 px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
           />
-          <select 
-            value={dealer} 
-            onChange={(e) => setDealer(e.target.value)} 
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option>All</option>
-            <option>Dealer A</option>
-            <option>Dealer B</option>
-          </select>
         </div>
       </div>
 

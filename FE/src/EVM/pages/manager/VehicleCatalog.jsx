@@ -5,27 +5,75 @@ import axios from 'axios'
 import Modal from '../../components/Modal'
 import ConfirmModal from '../../components/ConfirmModal'
 import SuccessModal from '../../components/SuccessModal'
+import { getImageByModelId, getImageByVariantId, getImageByModelAndVariant, getImageByIndex } from '../../../assets/ListOfCar'
 
 const API_URL = import.meta.env.VITE_API_URL
 
-// Helper function to fix image URL
-const fixImageUrl = (imageUrl) => {
-  if (!imageUrl) return null;
+// Helper function to fix image URL with fallback to ListOfCar
+const fixImageUrl = (imageUrl, modelId = null, variantId = null) => {
+  console.log('🖼️ fixImageUrl called:', { imageUrl, modelId, variantId });
   
-  // Nếu đã có http/https thì giữ nguyên
-  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-    return imageUrl;
+  // First, try to get image from ListOfCar.js (Google Drive) by modelId/variantId
+  if (modelId && variantId) {
+    const driveImage = getImageByModelAndVariant(modelId, variantId);
+    if (driveImage) {
+      console.log('✅ Found image by modelId + variantId:', driveImage);
+      return driveImage;
+    }
+  }
+  if (variantId) {
+    const driveImage = getImageByVariantId(variantId);
+    if (driveImage) {
+      console.log('✅ Found image by variantId:', driveImage);
+      return driveImage;
+    }
+  }
+  if (modelId) {
+    const driveImage = getImageByModelId(modelId);
+    if (driveImage) {
+      console.log('✅ Found image by modelId:', driveImage);
+      return driveImage;
+    }
   }
   
-  // Nếu là relative path (bắt đầu bằng /), thêm base URL
-  if (imageUrl.startsWith('/')) {
+  // If backend has image, use it
+  if (imageUrl) {
+    console.log('📦 Using backend image:', imageUrl);
+    
+    // Check if it's a Google Drive share link - convert it
+    if (imageUrl.includes('drive.google.com/file/d/')) {
+      const fileIdMatch = imageUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      if (fileIdMatch && fileIdMatch[1]) {
+        const fileId = fileIdMatch[1];
+        // Convert to lh3.googleusercontent.com format (more reliable)
+        const convertedUrl = `https://lh3.googleusercontent.com/d/${fileId}`;
+        console.log('🔄 Converted Google Drive share link to:', convertedUrl);
+        return convertedUrl;
+      }
+    }
+    
+    // Nếu đã có http/https thì giữ nguyên
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return imageUrl;
+    }
+    
+    // Nếu là relative path (bắt đầu bằng /), thêm base URL
+    if (imageUrl.startsWith('/')) {
+      const baseUrl = API_URL.replace('/api', '');
+      return `${baseUrl}${imageUrl}`;
+    }
+    
+    // Nếu chỉ là filename, thêm base URL + /images/
     const baseUrl = API_URL.replace('/api', '');
-    return `${baseUrl}${imageUrl}`;
+    return `${baseUrl}/images/${imageUrl}`;
   }
   
-  // Nếu chỉ là filename, thêm base URL + /images/
-  const baseUrl = API_URL.replace('/api', '');
-  return `${baseUrl}/images/${imageUrl}`;
+  // Google Drive has CORS restrictions - cannot use as fallback
+  // Only use images from backend or explicitly mapped in ListOfCar
+  // (ListOfCar mapping requires modelId/variantId to match)
+  
+  console.log('❌ No image found (backend image is null/empty)');
+  return null;
 };
 
 const VehicleCatalog = () => {
@@ -101,7 +149,6 @@ export default VehicleCatalog
 const ModelsSection = () => {
   const [rows, setRows] = useState([])
   const [query, setQuery] = useState('')
-  const [brand, setBrand] = useState('All')
   const [sortKey, setSortKey] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
   const [page, setPage] = useState(1)
@@ -109,7 +156,7 @@ const ModelsSection = () => {
   const [showAdd, setShowAdd] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [form, setForm] = useState({ name: '', brand: 'EVM', year: 2025, description: '' })
+  const [form, setForm] = useState({ name: '', year: 2025, description: '' })
   const [editing, setEditing] = useState(null)
   const [deletingModel, setDeletingModel] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -135,13 +182,14 @@ const ModelsSection = () => {
         const models = (response.data.data || []).map(model => {
           // Lấy image từ variant đầu tiên (nếu có)
           const firstVariant = model.lists && model.lists.length > 0 ? model.lists[0] : null;
-          const imageUrl = firstVariant?.image ? fixImageUrl(firstVariant.image) : null;
+          const imageUrl = firstVariant?.image 
+            ? fixImageUrl(firstVariant.image, model.modelId, firstVariant?.variantId) 
+            : fixImageUrl(null, model.modelId, null);
           
           return {
             id: model.modelId,
             name: model.modelName,
             description: model.description,
-            brand: 'EVM',
             year: 2025,
             variants: model.lists ? model.lists.length : 0,
             active: model.isActive,
@@ -164,9 +212,8 @@ const ModelsSection = () => {
 
 
   const filtered = useMemo(() => rows.filter(m =>
-    (brand === 'All' || m.brand === brand) &&
     (!query || m.name.toLowerCase().includes(query.toLowerCase()))
-  ), [rows, query, brand])
+  ), [rows, query])
 
   const sorted = useMemo(() => {
     const copy = [...filtered]
@@ -184,8 +231,8 @@ const ModelsSection = () => {
   const paged = useMemo(() => sorted.slice((page - 1) * pageSize, page * pageSize), [sorted, page])
   const toggleSort = (key) => { if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortKey(key); setSortDir('asc') } }
 
-  const handleAdd = () => { setForm({ name: '', brand: 'EVM', year: 2025, description: '' }); setShowAdd(true) }
-  const handleEdit = (row) => { setEditing(row); setForm({ name: row.name, brand: row.brand, year: row.year, description: row.description || '' }); setShowEdit(true) }
+  const handleAdd = () => { setForm({ name: '', year: 2025, description: '' }); setShowAdd(true) }
+  const handleEdit = (row) => { setEditing(row); setForm({ name: row.name, year: row.year, description: row.description || '' }); setShowEdit(true) }
   const handleDelete = (row) => { setDeletingModel(row); setShowDeleteModal(true) }
   const handleToggleStatus = async (row) => {
     try {
@@ -317,11 +364,6 @@ const ModelsSection = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input placeholder="Search models..." value={query} onChange={(e) => { setQuery(e.target.value); setPage(1) }} className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
           </div>
-          <select value={brand} onChange={(e) => setBrand(e.target.value)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-            <option>All</option>
-            <option>EVM</option>
-            <option>Neo</option>
-          </select>
         </div>
       </div>
 
@@ -333,14 +375,8 @@ const ModelsSection = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onClick={() => toggleSort('id')}>
                   ID {sortKey === 'id' && (sortDir === 'asc' ? '▲' : '▼')}
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  PHOTO
-                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onClick={() => toggleSort('name')}>
                   Name {sortKey === 'name' && (sortDir === 'asc' ? '▲' : '▼')}
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onClick={() => toggleSort('brand')}>
-                  Brand
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onClick={() => toggleSort('variants')}>
                   Variants
@@ -354,13 +390,13 @@ const ModelsSection = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
                     Loading...
                   </td>
                 </tr>
               ) : paged.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
                     No models found
                   </td>
                 </tr>
@@ -369,26 +405,9 @@ const ModelsSection = () => {
                 <tr key={row.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.id}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {row.image ? (
-                      <img 
-                        src={row.image} 
-                        alt={row.name}
-                        className="w-16 h-16 object-cover rounded-lg border border-gray-200"
-                        onError={(e) => {
-                          e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"%3E%3Crect fill="%23e5e7eb" width="64" height="64"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%239ca3af" font-size="10"%3ENo Image%3C/text%3E%3C/svg%3E';
-                        }}
-                      />
-                    ) : (
-                      <div className="w-16 h-16 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
-                        <span className="text-xs text-gray-400">No Image</span>
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">{row.name}</div>
                     <div className="text-xs text-gray-500">{row.description}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.brand}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.variants}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${row.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
@@ -480,8 +499,6 @@ const ModelsSection = () => {
             <textarea className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Description" rows="3" value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Brand</label>
-            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Brand" value={form.brand} onChange={(e) => setForm(f => ({ ...f, brand: e.target.value }))} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
@@ -538,8 +555,6 @@ const ModelsSection = () => {
             <textarea className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Description" rows="3" value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Brand</label>
-            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Brand" value={form.brand} onChange={(e) => setForm(f => ({ ...f, brand: e.target.value }))} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
@@ -583,7 +598,7 @@ const VariantsSection = () => {
   const [showAdd, setShowAdd] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [form, setForm] = useState({ modelId: '', version: '', color: 'White', price: 30000 })
+  const [form, setForm] = useState({ modelId: '', version: '', color: 'White', price: 30000, image: '' })
   const [editing, setEditing] = useState(null)
   const [deletingVariant, setDeletingVariant] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -680,15 +695,26 @@ const VariantsSection = () => {
                   normalizedColor = normalizedColor.charAt(0).toUpperCase() + normalizedColor.slice(1).toLowerCase()
                 }
                 
+                const modelId = variant.modelId || model.modelId;
+                const variantId = variant.variantId;
+                const imageUrl = fixImageUrl(variant.image, modelId, variantId);
+                
+                console.log('📋 Variant processed:', {
+                  variantId,
+                  modelId,
+                  backendImage: variant.image,
+                  finalImageUrl: imageUrl
+                });
+                
                 allVariants.push({
                   id: variant.variantId,
-                  modelId: variant.modelId || model.modelId,
-                  model: modelsMap.get(variant.modelId || model.modelId) || 'N/A',
+                  modelId: modelId,
+                  model: modelsMap.get(modelId) || 'N/A',
                   version: variant.versionName || '',
                   color: normalizedColor,
                   price: variant.price || 0,
                   active: variant.isActive !== undefined ? variant.isActive : true,
-                  image: variant.image ? fixImageUrl(variant.image) : null
+                  image: imageUrl
                 })
               })
             }
@@ -831,7 +857,8 @@ const VariantsSection = () => {
   const handleAdd = async () => {
     // Fetch models trước khi mở modal để đảm bảo có danh sách models mới nhất
     const modelsList = await fetchModels()
-    setForm({ modelId: modelsList.length > 0 ? modelsList[0].id.toString() : '', version: '', color: 'White', price: 30000 })
+    const activeModels = modelsList.filter(m => m.isActive)
+    setForm({ modelId: activeModels.length > 0 ? activeModels[0].id.toString() : '', version: '', color: 'White', price: 30000, image: '' })
     setShowAdd(true)
   }
   const handleEdit = async (row) => {
@@ -842,7 +869,8 @@ const VariantsSection = () => {
       modelId: row.modelId ? row.modelId.toString() : '', 
       version: row.version || '', 
       color: row.color || '', 
-      price: row.price || 0 
+      price: row.price || 0,
+      image: row.image || ''
     })
     setShowEdit(true)
   }
@@ -1015,8 +1043,16 @@ const VariantsSection = () => {
                         src={v.image} 
                         alt={`${v.model} ${v.version}`}
                         className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                        loading="lazy"
+                        crossOrigin="anonymous"
                         onError={(e) => {
+                          console.error('❌ Image load error (CORS/403):', v.image);
+                          // Google Drive has CORS restrictions - cannot load directly
+                          // Fallback to placeholder immediately
                           e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"%3E%3Crect fill="%23e5e7eb" width="64" height="64"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%239ca3af" font-size="10"%3ENo Image%3C/text%3E%3C/svg%3E';
+                        }}
+                        onLoad={() => {
+                          console.log('✅ Image loaded successfully:', v.image);
                         }}
                       />
                     ) : (
@@ -1092,7 +1128,7 @@ const VariantsSection = () => {
               model_id: modelIdInt,
               version_name: form.version,
               color: form.color,
-              image: '', // Image không có trong form, để trống
+              image: form.image || '', // Use image from form
               price: parseFloat(form.price)
             }, {
               headers: {
@@ -1122,8 +1158,19 @@ const VariantsSection = () => {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Model ID <span className="text-red-500">*</span></label>
-            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Model ID" type="number" value={form.modelId} onChange={(e) => setForm(f => ({ ...f, modelId: parseInt(e.target.value, 10) }))} />
+            <label className="block text-sm font-medium text-gray-700 mb-2">Model <span className="text-red-500">*</span></label>
+            <select 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              value={form.modelId} 
+              onChange={(e) => setForm(f => ({ ...f, modelId: e.target.value }))}
+            >
+              <option value="">Select a model</option>
+              {models.filter(m => m.isActive).map(model => (
+                <option key={model.id} value={model.id}>
+                  {model.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Version <span className="text-red-500">*</span></label>
@@ -1136,6 +1183,10 @@ const VariantsSection = () => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Price <span className="text-red-500">*</span></label>
             <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Price" type="number" value={form.price} onChange={(e) => setForm(f => ({ ...f, price: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Image URL</label>
+            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Enter image URL" type="text" value={form.image} onChange={(e) => setForm(f => ({ ...f, image: e.target.value }))} />
           </div>
         </div>
       </Modal>
@@ -1167,7 +1218,7 @@ const VariantsSection = () => {
               model_id: modelIdInt,
               version_name: form.version,
               color: form.color,
-              image: '', // Image không có trong form, để trống
+              image: form.image || '', // Use image from form
               price: parseFloat(form.price)
             }, {
               headers: {
@@ -1221,6 +1272,10 @@ const VariantsSection = () => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Price <span className="text-red-500">*</span></label>
             <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Price" type="number" value={form.price} onChange={(e) => setForm(f => ({ ...f, price: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Image URL</label>
+            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Enter image URL" type="text" value={form.image} onChange={(e) => setForm(f => ({ ...f, image: e.target.value }))} />
           </div>
         </div>
       </Modal>

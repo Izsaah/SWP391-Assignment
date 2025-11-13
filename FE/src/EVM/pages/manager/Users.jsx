@@ -12,6 +12,7 @@ const Users = () => {
   const [editingUser, setEditingUser] = useState(null)
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
+  const [dealers, setDealers] = useState([]) // Store dealers list
 
   // Fetch users from API
   const fetchUsers = useCallback(async () => {
@@ -44,7 +45,7 @@ const Users = () => {
             email: user.email || '',
             phone: user.phoneNumber || user.phone || '',
             dealer: user.dealerName || `Dealer ${user.dealerId || 'A'}`,
-            role: user.roleName || (user.roleId === 2 ? 'Dealer Admin' : 'Dealer Staff'),
+            role: user.roleName ? (user.roleName === 'Dealer Manager' || user.roleName === 'Dealer Admin' ? 'Manager' : user.roleName === 'Dealer Staff' ? 'Staff' : user.roleName) : (user.roleId === 2 ? 'Manager' : 'Staff'),
             status: isActive ? 'Active' : 'Suspended'
           }
         })
@@ -59,9 +60,30 @@ const Users = () => {
     }
   }, [])
 
+  // Fetch dealers from API
+  const fetchDealers = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await axios.post(`${API_URL}/EVM/viewAllDealer`, {}, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        }
+      })
+
+      if (response.data && response.data.status === 'success' && response.data.data) {
+        setDealers(response.data.data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching dealers:', error)
+    }
+  }, [])
+
   useEffect(() => {
     fetchUsers()
-  }, [fetchUsers])
+    fetchDealers()
+  }, [fetchUsers, fetchDealers])
 
   // Form state for new user
   const [newUser, setNewUser] = useState({
@@ -70,8 +92,9 @@ const Users = () => {
     phone: '',
     password: '',
     confirmPassword: '',
-    dealer: 'Dealer A',
-    role: 'Dealer Staff',
+    dealer: '',
+    dealerId: '',
+    role: 'Staff',
     status: 'Active'
   })
 
@@ -81,41 +104,52 @@ const Users = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
-    setNewUser(prev => ({
-      ...prev,
-      [name]: value
-    }))
+    if (name === 'dealer') {
+      // Find dealer by name and set both dealer name and dealerId
+      const selectedDealer = dealers.find(d => d.dealerName === value)
+      setNewUser(prev => ({
+        ...prev,
+        dealer: value,
+        dealerId: selectedDealer ? selectedDealer.dealerId.toString() : ''
+      }))
+    } else {
+      setNewUser(prev => ({
+        ...prev,
+        [name]: value
+      }))
+    }
   }
 
   const handleCreate = useCallback(() => {
+    const firstDealer = dealers.length > 0 ? dealers[0] : null
     setNewUser({
       name: '',
       email: '',
       phone: '',
       password: '',
       confirmPassword: '',
-      dealer: 'Dealer A',
-      role: 'Dealer Staff',
+      dealer: firstDealer ? firstDealer.dealerName : '',
+      dealerId: firstDealer ? firstDealer.dealerId.toString() : '',
+      role: 'Staff',
       status: 'Active'
     })
     setShowCreateModal(true)
-  }, [])
+  }, [dealers])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
       const token = localStorage.getItem('token')
       
-      // Map role string to roleId: "Dealer Admin" -> 2, "Dealer Staff" -> 3
+      // Map role string to roleId: "Manager" -> 2, "Staff" -> 3
       const roleIdMap = {
-        'Dealer Admin': 2,
-        'Dealer Staff': 3
+        'Manager': 2,
+        'Staff': 3
       }
       const roleId = roleIdMap[newUser.role] || 3
       
-      // Map dealer string to dealerId: "Dealer A" -> 1, "Dealer B" -> 2, etc.
-      const dealerIdMatch = newUser.dealer.match(/Dealer\s+([A-Z])/i)
-      const dealerId = dealerIdMatch ? dealerIdMatch[1].charCodeAt(0) - 64 : 1 // A=1, B=2, etc.
+      // Get dealerId from dealerId field (already set when dealer is selected)
+      const dealerId = parseInt(newUser.dealerId, 10) || 1
       
       if (editingUser) {
         // Validate password if provided
@@ -197,14 +231,16 @@ const Users = () => {
           alert(response.data?.message || 'Failed to create user')
         }
       }
+      const firstDealer = dealers.length > 0 ? dealers[0] : null
       setNewUser({
         name: '',
         email: '',
         phone: '',
         password: '',
         confirmPassword: '',
-        dealer: 'Dealer A',
-        role: 'Dealer Staff',
+        dealer: firstDealer ? firstDealer.dealerName : '',
+        dealerId: firstDealer ? firstDealer.dealerId.toString() : '',
+        role: 'Staff',
         status: 'Active'
       })
     } catch (error) {
@@ -215,6 +251,14 @@ const Users = () => {
 
   const handleEdit = useCallback((row) => {
     setEditingUser(row)
+    // Find dealer by name to get dealerId
+    const dealer = dealers.find(d => d.dealerName === row.dealer)
+    // Map role: "Dealer Admin" -> "Manager", "Dealer Staff" -> "Staff"
+    const roleMap = {
+      'Dealer Admin': 'Manager',
+      'Dealer Staff': 'Staff'
+    }
+    const mappedRole = roleMap[row.role] || row.role
     setNewUser({
       name: row.name,
       email: row.email || '',
@@ -222,11 +266,12 @@ const Users = () => {
       password: '',
       confirmPassword: '',
       dealer: row.dealer,
-      role: row.role,
+      dealerId: dealer ? dealer.dealerId.toString() : '',
+      role: mappedRole,
       status: row.status
     })
     setShowEditModal(true)
-  }, [])
+  }, [dealers])
   const handleToggleStatus = useCallback(async (row) => {
     try {
       const token = localStorage.getItem('token')
@@ -337,8 +382,8 @@ const Users = () => {
             className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option>All</option>
-            <option>Dealer Admin</option>
-            <option>Dealer Staff</option>
+            <option>Manager</option>
+            <option>Staff</option>
           </select>
         </div>
       </div>
@@ -545,9 +590,12 @@ const Users = () => {
                       required
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      <option value="Dealer A">Dealer A</option>
-                      <option value="Dealer B">Dealer B</option>
-                      <option value="Dealer C">Dealer C</option>
+                      <option value="">Select a dealer</option>
+                      {dealers.map(dealer => (
+                        <option key={dealer.dealerId} value={dealer.dealerName}>
+                          {dealer.dealerName}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -562,27 +610,10 @@ const Users = () => {
                       required
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      <option value="Dealer Admin">Dealer Admin</option>
-                      <option value="Dealer Staff">Dealer Staff</option>
+                      <option value="Staff">Staff</option>
+                      <option value="Manager">Manager</option>
                     </select>
                   </div>
-                </div>
-
-                {/* Status */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Status <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="status"
-                    value={newUser.status}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Suspended">Suspended</option>
-                  </select>
                 </div>
 
                 {/* Info Box */}
@@ -752,9 +783,12 @@ const Users = () => {
                       required
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      <option value="Dealer A">Dealer A</option>
-                      <option value="Dealer B">Dealer B</option>
-                      <option value="Dealer C">Dealer C</option>
+                      <option value="">Select a dealer</option>
+                      {dealers.map(dealer => (
+                        <option key={dealer.dealerId} value={dealer.dealerName}>
+                          {dealer.dealerName}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -769,27 +803,10 @@ const Users = () => {
                       required
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      <option value="Dealer Admin">Dealer Admin</option>
-                      <option value="Dealer Staff">Dealer Staff</option>
+                      <option value="Staff">Staff</option>
+                      <option value="Manager">Manager</option>
                     </select>
                   </div>
-                </div>
-
-                {/* Status */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Status <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="status"
-                    value={newUser.status}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Suspended">Suspended</option>
-                  </select>
                 </div>
 
                 {/* Info Box */}

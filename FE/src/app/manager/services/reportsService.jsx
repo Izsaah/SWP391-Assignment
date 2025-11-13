@@ -22,12 +22,12 @@ export async function fetchDealerSalesRecords({ startDate, endDate }) {
     );
     const payload = res?.data;
     const list = payload?.data || [];
-    // The backend returns SaleRecordDTO: { saleId, dealerStaffId, saleDate, saleAmount }
-    // We normalize to a structure the UI can render without guessing extra fields.
-    // Aggregate by dealerStaffId to compute totals and counts; keep records as details.
-    const byStaff = new Map();
+    
+    // Get unique staff IDs from sales records
+    const staffIds = new Set();
+    const staffInfoMap = new Map(); // Map staffId to staff info
+    
     for (const r of list) {
-      // Support multiple BE shapes for staff id and username
       const resolvedStaffId =
         r.dealerStaffId ??
         r.staffId ??
@@ -38,52 +38,132 @@ export async function fetchDealerSalesRecords({ startDate, endDate }) {
         r.userAccount?.userId ??
         r.user?.id ??
         '';
-      const staffId = String(resolvedStaffId);
-
-      const nestedUsername =
-        r.username ??
-        r.userName ??
-        r.dealername ??
-        r.staffUsername ??
-        r.dealerStaffUsername ??
-        r.dealerStaffName ??
-        r.staffName ??
-        r.dealerStaff?.username ??
-        r.dealerStaff?.userName ??
-        r.dealerStaff?.account?.username ??
-        r.staff?.username ??
-        r.staff?.userName ??
-        r.staff?.account?.username ??
-        r.userAccount?.username ??
-        r.user?.username ??
-        null;
-      if (!byStaff.has(staffId)) {
-        byStaff.set(staffId, {
-          staffId,
-          // Only use username provided by BE; do not fallback to "Staff <id>"
-          staffName: nestedUsername || '',
-          username: nestedUsername || '',
-          totalOrders: 0,
-          totalRevenue: 0,
-          orders: [],
+      
+      if (resolvedStaffId) {
+        const staffIdNum = Number(resolvedStaffId);
+        staffIds.add(staffIdNum);
+        
+        // Store staff info
+        if (!staffInfoMap.has(staffIdNum)) {
+          const nestedUsername =
+            r.username ??
+            r.userName ??
+            r.dealername ??
+            r.staffUsername ??
+            r.dealerStaffUsername ??
+            r.dealerStaffName ??
+            r.staffName ??
+            r.dealerStaff?.username ??
+            r.dealerStaff?.userName ??
+            r.dealerStaff?.account?.username ??
+            r.staff?.username ??
+            r.staff?.userName ??
+            r.staff?.account?.username ??
+            r.userAccount?.username ??
+            r.user?.username ??
+            '';
+          
+          staffInfoMap.set(staffIdNum, {
+            staffId: String(staffIdNum),
+            staffName: nestedUsername || '',
+            username: nestedUsername || '',
+          });
+        }
+      }
+    }
+    
+    // Fetch customers to get customer names
+    const customerMap = new Map();
+    try {
+      const customersRes = await axios.post(
+        `${API_URL}/staff/viewAllCustomer`,
+        {},
+        { headers: { Authorization: `Bearer ${token}`, ...(API_URL?.includes('ngrok') ? { 'ngrok-skip-browser-warning': 'true' } : {}) } }
+      );
+      if (customersRes?.data?.data) {
+        customersRes.data.data.forEach(c => {
+          const customerId = c.customerId || c.customer_id || c.id;
+          const customerName = c.name || c.customerName || '';
+          if (customerId && customerName) {
+            customerMap.set(Number(customerId), customerName);
+          }
         });
+        console.log(`✅ Loaded ${customerMap.size} customers for mapping`);
       }
-      const entry = byStaff.get(staffId);
-      // If later records contain a username and the current label is a fallback, upgrade it
-      if (nestedUsername && !entry.username) {
-        entry.username = nestedUsername;
-        entry.staffName = nestedUsername;
+    } catch (err) {
+      console.warn('Failed to fetch customers:', err);
+    }
+    
+    // Fetch all orders for the dealer (manager role will return all dealer orders)
+    // Then filter by staffId on frontend
+    let allOrders = [];
+    try {
+      const ordersRes = await axios.post(
+        `${API_URL}/staff/viewOrdersByStaffId`,
+        {},
+        { headers: { Authorization: `Bearer ${token}`, ...(API_URL?.includes('ngrok') ? { 'ngrok-skip-browser-warning': 'true' } : {}) } }
+      );
+      if (ordersRes?.data?.data) {
+        allOrders = ordersRes.data.data;
       }
-      entry.totalOrders += 1;
-      entry.totalRevenue += Number(r.saleAmount || 0);
-      entry.orders.push({
-        orderId: r.saleId,
-        customer: '', // BE does not provide; leave blank
-        date: r.saleDate,
-        totalAmount: Number(r.saleAmount || 0),
+    } catch (err) {
+      console.warn('Failed to fetch orders:', err);
+    }
+    
+    // Group orders by staff ID and filter by date range
+    const ordersByStaff = new Map();
+    for (const staffId of staffIds) {
+      const staffOrders = allOrders
+        .filter(order => {
+          // Filter by staffId
+          const orderStaffId = order.dealerStaffId || order.dealer_staff_id || order.dealerStaff?.dealerStaffId || order.dealerStaff?.id;
+          if (Number(orderStaffId) !== staffId) return false;
+          
+          // Filter by date range
+          const orderDate = order.orderDate || order.order_date;
+          if (!orderDate) return false;
+          const dateStr = orderDate.split(' ')[0]; // Get date part only
+          return dateStr >= startDate && dateStr <= endDate;
+        })
+        .map(order => {
+          const orderId = order.orderId || order.order_id || 0;
+          const customerId = order.customerId || order.customer_id;
+          // Get customer name from map, fallback to 'N/A' if not found
+          const customerName = customerMap.get(Number(customerId));
+          if (!customerName && customerId) {
+            console.warn(`Customer name not found for customerId: ${customerId}`);
+          }
+          const orderDate = order.orderDate || order.order_date;
+          const detail = order.detail || order.orderDetail;
+          const totalAmount = detail ? (Number(detail.quantity || 1) * Number(detail.unitPrice || 0)) : 0;
+          
+          return {
+            orderId: orderId,
+            customer: customerName || 'N/A',
+            date: orderDate,
+            totalAmount: totalAmount
+          };
+        });
+      ordersByStaff.set(staffId, staffOrders);
+    }
+    
+    // Build result with orders for each staff
+    const result = [];
+    for (const staffId of staffIds) {
+      const staffInfo = staffInfoMap.get(staffId);
+      const orders = ordersByStaff.get(staffId) || [];
+      
+      result.push({
+        staffId: staffInfo.staffId,
+        staffName: staffInfo.staffName,
+        username: staffInfo.username,
+        totalOrders: orders.length,
+        totalRevenue: orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0),
+        orders: orders,
       });
     }
-    return { success: true, data: Array.from(byStaff.values()) };
+    
+    return { success: true, data: result };
   } catch (error) {
     const handled = handleAuthError(error);
     if (handled) return handled;
