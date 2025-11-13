@@ -22,38 +22,13 @@ import model.dto.VehicleModelDTO;
 public class ViewConsumptionRateService {
 
     private VehicleModelDAO modelDAO = new VehicleModelDAO();
-    private OrderDAO orderDAO = new OrderDAO();
-    private OrderDetailDAO orderDetailDAO = new OrderDetailDAO();
-
-    public double handleCalculateConsumptionRate(int modelId) throws SQLException, ClassNotFoundException {
-        double totalQuantity = 0;
-
-        List<OrderDTO> orders = orderDAO.retrieve("model_id = ?", modelId);
-        if (orders == null || orders.isEmpty()) {
-            return 0;
-        }
-
-        for (OrderDTO order : orders) {
-            List<OrderDetailDTO> details = orderDetailDAO.getOrderDetailListByOrderId(order.getOrderId());
-            for (OrderDetailDTO detail : details) {
-                try {
-                    totalQuantity += Integer.parseInt(detail.getQuantity());
-                } catch (NumberFormatException e) {
-                }
-            }
-        }
-
-        int daysInMonth = YearMonth.now().lengthOfMonth();
-
-        return totalQuantity / daysInMonth;
-    }
-
+    
     public List<String> viewModelConsumptionRate() throws SQLException, ClassNotFoundException {
         List<String> result = new ArrayList<>();
 
         List<VehicleModelDTO> models = modelDAO.viewVehicleModelIsActive();
         for (VehicleModelDTO model : models) {
-            double rate = handleCalculateConsumptionRate(model.getModelId());
+            double rate = modelDAO.handleCalculateConsumptionRate(model.getModelId());
             result.add(model.getModelName() + " Consumption Rate: " + String.format("%.2f", rate));
         }
 

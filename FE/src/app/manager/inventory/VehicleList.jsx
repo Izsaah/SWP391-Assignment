@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import Layout from '../layout/Layout';
 import { useNavigate } from 'react-router';
 import { 
-  Search, Car as CarIcon, ArrowUpDown, BarChart3, ArrowUpRight, ArrowDownRight
+  Search, Car as CarIcon, ArrowUpDown, ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
 import { getVehicles, getStockOverview } from '../services/inventoryService';
 import VehicleDetailModal from './components/VehicleDetailModal';
@@ -104,13 +104,6 @@ const ManagerVehicleList = () => {
             <h1 className="text-3xl font-bold text-gray-900">Vehicle List</h1>
             <p className="text-sm text-gray-600 mt-1">Vehicle models and variants inventory</p>
           </div>
-          <button
-            onClick={() => navigate('/manager/inventory/stock')}
-            className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            <BarChart3 className="w-4 h-4" />
-            <span>View Stock Overview</span>
-          </button>
         </div>
 
         {/* Loading State */}

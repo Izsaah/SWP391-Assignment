@@ -44,11 +44,6 @@ export default function VehicleCard({ vehicle, onViewDetails }) {
             <span className="ml-2 font-medium">{vehicle.color}</span>
           </div>
         )}
-        {vehicle.quantity && (
-          <div className="flex items-center text-xs text-gray-500 mt-2">
-            <span>Stock: {vehicle.quantity} units</span>
-          </div>
-        )}
       </div>
     </div>
   );

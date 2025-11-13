@@ -29,7 +29,7 @@ export default function LoginPage() {
                 // Backend returns "Dealer Manager" and "Dealer Staff" (from database role_name column)
                 // Support both backend format and short format for flexibility
                 if (userRole === 'Dealer Manager' || upper === 'MANAGER') {
-                    navigate('/manager/dashboard');
+                    navigate('/manager/inventory/vehicles');
                 } else if (userRole === 'Dealer Staff' || upper === 'STAFF') {
                     navigate('/staff/dashboard');
                 } else if (upper === 'EVM' || upper === 'ADMIN') {
