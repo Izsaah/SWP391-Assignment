@@ -96,7 +96,7 @@ const VehicleComparisonCard = ({ vehicle, onRemove, onReplace, onAdd }) => {
           {vehicle.quantity !== undefined && (
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Available</span>
-              <span className="font-medium text-gray-900">{vehicle.quantity} units</span>
+              <span className="font-medium text-gray-900">{vehicle.quantity} {vehicle.quantity === 1 ? 'unit' : 'units'}</span>
             </div>
           )}
         </div>
