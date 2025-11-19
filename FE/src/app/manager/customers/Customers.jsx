@@ -195,15 +195,6 @@ const Customers = () => {
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Breadcrumb */}
-        <div className="flex items-center text-sm text-gray-600 mb-2">
-          <span className="hover:text-blue-600 cursor-pointer" onClick={() => navigate('/manager/dashboard')}>
-            Dashboard
-          </span>
-          <ChevronRight className="w-4 h-4 mx-2" />
-          <span className="text-gray-900 font-medium">Customers</span>
-        </div>
-
         {/* Page Header */}
         <div className="flex items-center justify-between mb-6">
           <div>

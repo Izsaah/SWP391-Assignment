@@ -6,16 +6,16 @@ const DataTable = ({
   data, 
   columns, 
   onViewDetail,
-  emptyMessage = "Không có dữ liệu"
+  emptyMessage = "No data available"
 }) => {
   const getStatusBadge = (status) => {
     const statusConfig = {
-      'pending': { color: 'bg-yellow-100 text-yellow-800', label: 'Chờ xử lý' },
-      'processing': { color: 'bg-blue-100 text-blue-800', label: 'Đang xử lý' },
-      'completed': { color: 'bg-green-100 text-green-800', label: 'Hoàn thành' },
-      'cancelled': { color: 'bg-red-100 text-red-800', label: 'Đã hủy' },
-      'scheduled': { color: 'bg-purple-100 text-purple-800', label: 'Đã lên lịch' },
-      'confirmed': { color: 'bg-green-100 text-green-800', label: 'Đã xác nhận' },
+      'pending': { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
+      'processing': { color: 'bg-blue-100 text-blue-800', label: 'Processing' },
+      'completed': { color: 'bg-green-100 text-green-800', label: 'Completed' },
+      'cancelled': { color: 'bg-red-100 text-red-800', label: 'Cancelled' },
+      'scheduled': { color: 'bg-purple-100 text-purple-800', label: 'Scheduled' },
+      'confirmed': { color: 'bg-green-100 text-green-800', label: 'Confirmed' },
     };
     
     const config = statusConfig[status] || { color: 'bg-gray-100 text-gray-800', label: status };
@@ -57,7 +57,7 @@ const DataTable = ({
                 </th>
               ))}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Thao tác
+                Actions
               </th>
             </tr>
           </thead>
@@ -82,7 +82,7 @@ const DataTable = ({
                     <button
                       onClick={() => onViewDetail(row)}
                       className="text-blue-600 hover:text-blue-900 mr-3"
-                      title="Xem chi tiết"
+                      title="View details"
                     >
                       <Eye className="w-4 h-4" />
                     </button>

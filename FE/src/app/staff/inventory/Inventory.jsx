@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Eye } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import Layout from '../layout/Layout';
 import InventoryControlBar from './components/InventoryControlBar';
 import VehicleCard from './components/VehicleCard';
-import CarDetailModal from './components/CarDetailModal';
+import CarDetailModal from '../modals/CarDetailModal';
 import { useInventoryControls } from './hooks/useInventoryControls';
 import { fetchInventory, transformInventoryData } from '../services/inventoryService';
 
@@ -15,6 +15,8 @@ const Inventory = () => {
   const [inventoryData, setInventoryData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
 
   // Fetch inventory data from API when component mounts
   useEffect(() => {
@@ -54,6 +56,19 @@ const Inventory = () => {
   const controls = useInventoryControls(inventoryData);
   const data = controls.data;
 
+  // Pagination calculations
+  const totalPages = Math.max(1, Math.ceil(data.length / itemsPerPage));
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedData = useMemo(() => {
+    return data.slice(startIndex, endIndex);
+  }, [data, startIndex, endIndex]);
+
+  // Reset to page 1 when filters/search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [controls.searchQuery, controls.statusFilter, controls.sortKey, data.length]);
+
   const handleViewDetails = (vehicle) => {
     setSelectedVehicle(vehicle);
     setIsModalOpen(true);
@@ -62,6 +77,13 @@ const Inventory = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedVehicle(null);
+  };
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   return (
@@ -129,10 +151,36 @@ const Inventory = () => {
               </h3>
             </div>
             <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-              {data.map((v) => (
+              {paginatedData.map((v) => (
                 <VehicleCard key={v.id} vehicle={v} onViewDetails={handleViewDetails} />
               ))}
             </div>
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 px-6 py-4 flex items-center justify-between">
+                <div className="text-sm text-gray-600">
+                  Page {currentPage} of {totalPages} • Showing {startIndex + 1}-{Math.min(endIndex, data.length)} of {data.length}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1 transition-colors"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Prev
+                  </button>
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1 transition-colors"
+                  >
+                    Next
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ) : !loading && !error ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200">
@@ -154,7 +202,7 @@ const Inventory = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {data.map((vehicle) => (
+                  {paginatedData.map((vehicle) => (
                     <tr key={vehicle.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{vehicle.id}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{vehicle.model}</td>
@@ -178,6 +226,32 @@ const Inventory = () => {
                 </tbody>
               </table>
             </div>
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex items-center justify-between">
+                <div className="text-sm text-gray-600">
+                  Page {currentPage} of {totalPages} • Showing {startIndex + 1}-{Math.min(endIndex, data.length)} of {data.length}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1 transition-colors"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Prev
+                  </button>
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1 transition-colors"
+                  >
+                    Next
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ) : null}
 

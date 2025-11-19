@@ -1,8 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react'
 import { RefreshCw, TrendingUp, Package, BarChart3, AlertTriangle, Clock } from 'lucide-react'
-import axios from 'axios'
-
-const API_URL = import.meta.env.VITE_API_URL
+import { fetchInventory } from '../../services/inventoryService'
 
 const Metric = ({ label, value, icon: Icon, iconColor }) => (
   <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
@@ -27,34 +25,22 @@ const Inventory = () => {
   const [loading, setLoading] = useState(false)
 
   // Fetch inventory from API
-  const fetchInventory = useCallback(async () => {
+  const fetchInventoryData = useCallback(async () => {
     setLoading(true)
     try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        alert('No authentication token found. Please login again.')
+      const result = await fetchInventory()
+      
+      if (!result.success) {
+        alert(result.message || 'No authentication token found. Please login again.')
         return
       }
       
-      console.log('Fetching inventory from:', `${API_URL}/EVM/viewInventory`)
-      const response = await axios.post(
-        `${API_URL}/EVM/viewInventory`,
-        { _empty: true },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'ngrok-skip-browser-warning': 'true'
-          }
-        }
-      )
-
       // Backend trả về {status: 'success', message: 'success', data: Array}
-      if (response.data && response.data.status === 'success' && response.data.data) {
+      if (result.data) {
         // Transform backend data to frontend format
         // handleViewActiveInventory() trả về List<InventoryDTO> với list là modelList (không có variants)
         const inventoryList = []
-        const backendData = response.data.data || []
+        const backendData = result.data || []
         
         backendData.forEach((inventory) => {
           if (inventory.list && Array.isArray(inventory.list) && inventory.list.length > 0) {
@@ -125,8 +111,8 @@ const Inventory = () => {
   }, [])
 
   useEffect(() => {
-    fetchInventory()
-  }, [fetchInventory])
+    fetchInventoryData()
+  }, [fetchInventoryData])
 
   const [lastRefreshed, setLastRefreshed] = useState(null)
 
@@ -161,7 +147,7 @@ const Inventory = () => {
 
   const handleRefresh = useCallback(async () => {
     setLastRefreshed(new Date().toLocaleTimeString())
-    await fetchInventory()
+    await fetchInventoryData()
   }, [fetchInventory])
 
 
@@ -201,15 +187,6 @@ const Inventory = () => {
             onChange={(e) => { setQuery(e.target.value); setPage(1) }} 
             className="flex-1 px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
           />
-          <select 
-            value={dealer} 
-            onChange={(e) => setDealer(e.target.value)} 
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option>All</option>
-            <option>Dealer A</option>
-            <option>Dealer B</option>
-          </select>
         </div>
       </div>
 

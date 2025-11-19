@@ -1103,7 +1103,7 @@ const Payment = () => {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
                               {payment.currentTermMonth !== null && payment.currentTermMonth !== undefined 
-                                ? `${payment.currentTermMonth} tháng`
+                                ? `${payment.currentTermMonth} months`
                                 : 'N/A'}
                             </div>
                           </td>
@@ -1382,10 +1382,6 @@ const Payment = () => {
                         <span className="text-base font-semibold text-gray-900">#{selectedPayment.orderId || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Payment ID</span>
-                        <span className="text-base font-semibold text-gray-900">#{selectedPayment.paymentId || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">Total Amount</span>
                         <span className="text-lg font-bold text-green-600">
                           {formatCurrency(selectedPayment.totalAmount || 0)}
@@ -1450,7 +1446,7 @@ const Payment = () => {
                           <span className="text-sm text-gray-600">Remaining Months</span>
                           <span className="text-base font-semibold text-gray-900">
                             {selectedPayment.currentTermMonth !== null && selectedPayment.currentTermMonth !== undefined 
-                              ? `${selectedPayment.currentTermMonth} tháng`
+                              ? `${selectedPayment.currentTermMonth} months`
                               : 'N/A'}
                           </span>
                         </div>
@@ -1598,10 +1594,10 @@ const Payment = () => {
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Số tháng còn lại:</span>
+                      <span className="text-sm text-gray-600">Remaining Months:</span>
                       <span className="text-sm font-semibold text-gray-900">
                         {selectedPayment.currentTermMonth !== null && selectedPayment.currentTermMonth !== undefined 
-                          ? `${selectedPayment.currentTermMonth} tháng`
+                          ? `${selectedPayment.currentTermMonth} months`
                           : 'N/A'}
                       </span>
                     </div>
@@ -1628,7 +1624,7 @@ const Payment = () => {
                   {/* Record Payment Input */}
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Số tháng cần ghi nhận thanh toán <span className="text-red-500">*</span>
+                      Number of months to record payment <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="number"
@@ -1650,11 +1646,11 @@ const Payment = () => {
                     {selectedPayment.currentTermMonth && selectedPayment.currentTermMonth > 0 ? (
                       <div className="mt-2 space-y-1">
                         <p className="text-xs text-gray-500">
-                          Tối đa: {selectedPayment.currentTermMonth} tháng
+                          Maximum: {selectedPayment.currentTermMonth} months
                         </p>
                         {selectedPayment.monthlyPay && monthsToDeduct > 0 && (
                           <p className="text-xs font-semibold text-blue-600">
-                            Số tiền sẽ ghi nhận: {formatCurrency(selectedPayment.monthlyPay * monthsToDeduct)}
+                            Amount to be recorded: {formatCurrency(selectedPayment.monthlyPay * monthsToDeduct)}
                           </p>
                         )}
                       </div>
@@ -1846,7 +1842,7 @@ const Payment = () => {
                         {invoiceModal.data?.payment?.remainingMonths != null && (
                           <div>
                             <span className="font-medium text-gray-900">Remaining Months:</span>{' '}
-                            {invoiceModal.data?.payment?.remainingMonths} tháng
+                            {invoiceModal.data?.payment?.remainingMonths} months
                           </div>
                         )}
                         {invoiceModal.data?.payment?.interestRate != null && (

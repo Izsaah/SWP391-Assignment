@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Layout from '../layout/Layout';
-import { Plus, Eye, Edit2, Trash2, FileText, CheckCircle, Loader2, RefreshCw, AlertTriangle, X, Search, Sparkles, CreditCard, Calendar, DollarSign, Building2 } from 'lucide-react';
+import { Plus, Eye, Edit2, FileText, CheckCircle, Loader2, RefreshCw, AlertTriangle, X, Search, Sparkles, CreditCard, Calendar, DollarSign, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router';
 import { createOrder, viewOrdersByStaffId } from '../services/orderService';
 import { createPayment } from '../services/paymentService';
@@ -31,6 +31,8 @@ const OrderForm = () => {
   const [orderForms, setOrderForms] = useState([]);
   const [loadingOrderForms, setLoadingOrderForms] = useState(false);
   const [orderFormsError, setOrderFormsError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
   const [vehicles, setVehicles] = useState([]);
   const [loadingVehicles, setLoadingVehicles] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState(null);
@@ -217,6 +219,26 @@ const deactivateCustomMode = useCallback(() => {
   // Filter order forms (only by special orders now)
   const filteredOrderForms = orderForms;
 
+  // Pagination calculations
+  const totalPages = Math.max(1, Math.ceil(filteredOrderForms.length / itemsPerPage));
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedOrderForms = useMemo(() => {
+    return filteredOrderForms.slice(startIndex, endIndex);
+  }, [filteredOrderForms, startIndex, endIndex]);
+
+  // Reset to page 1 when order forms change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filteredOrderForms.length]);
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   // Format currency
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -233,56 +255,6 @@ const deactivateCustomMode = useCallback(() => {
   const handleView = (orderForm) => {
     setSelectedOrderForm(orderForm);
     setIsViewModalOpen(true);
-  };
-
-  // Handle delete order
-  const handleDelete = async (orderFormId) => {
-    // Extract order ID from orderFormId (it might be in format "ORD-123" or just "123")
-    const orderIdMatch = String(orderFormId).match(/(\d+)/);
-    const orderId = orderIdMatch ? parseInt(orderIdMatch[1]) : null;
-    
-    if (!orderId) {
-      alert('❌ Could not extract order ID from order form ID.');
-      return;
-    }
-    
-    if (!window.confirm(`Are you sure you want to delete order ${orderId}?\n\nThis will permanently remove the order from the database.`)) {
-      return;
-    }
-    
-    try {
-      // TODO: Backend endpoint needed: DELETE /api/staff/deleteOrder
-      // For now, show message that backend needs to implement this
-      alert('⚠️ Delete order functionality requires backend endpoint:\n\n' +
-            'POST /api/staff/deleteOrder\n' +
-            'Body: { "orderId": ' + orderId + ' }\n\n' +
-            'Please implement this endpoint in the backend to enable order deletion.');
-      
-      // Once backend is implemented, uncomment this:
-      /*
-      const { deleteOrder } = await import('../services/orderService');
-      const result = await deleteOrder(orderId);
-      
-      if (result.success) {
-        alert(`✅ Order ${orderId} deleted successfully.`);
-        // Refresh order list
-        if (selectedCustomerForOrders) {
-          await fetchOrderForms(
-            selectedCustomerForOrders.customerId || selectedCustomerForOrders.id,
-            selectedCustomerForOrders.name
-          );
-        } else {
-          // Reload all orders
-          window.location.reload();
-        }
-      } else {
-        alert(`❌ Failed to delete order: ${result.message}`);
-      }
-      */
-    } catch (error) {
-      console.error('Error deleting order:', error);
-      alert(`❌ Error: ${error.message || 'Failed to delete order'}`);
-    }
   };
 
 
@@ -478,18 +450,33 @@ const deactivateCustomMode = useCallback(() => {
     }
     setSelectedPromotion(promotion);
     applyPromotionToForm(promotion, formData.basePrice, formData.quantity);
+    
+    // If promotion 100% is applied, automatically switch to Full Payment
+    const isPromotion100 = (promotion.type === 'PERCENTAGE' && promotion.rate === 1) ||
+                          (promotion.type === 'PERCENTAGE' && promotion.rate === 100);
+    if (isPromotion100 && formData.paymentMethod === 'Installment') {
+      setFormData(prev => ({ ...prev, paymentMethod: 'Full Payment' }));
+    }
   };
 
   useEffect(() => {
     if (selectedPromotion) {
       applyPromotionToForm(selectedPromotion, formData.basePrice, formData.quantity);
+      
+      // If promotion 100% is applied, automatically switch to Full Payment
+      const isPromotion100 = (selectedPromotion.type === 'PERCENTAGE' && selectedPromotion.rate === 1) ||
+                            (selectedPromotion.type === 'PERCENTAGE' && selectedPromotion.rate === 100);
+      if (isPromotion100 && formData.paymentMethod === 'Installment') {
+        setFormData(prev => ({ ...prev, paymentMethod: 'Full Payment' }));
+      }
     }
-  }, [selectedPromotion, formData.basePrice, formData.quantity, applyPromotionToForm]);
+  }, [selectedPromotion, formData.basePrice, formData.quantity, formData.paymentMethod, applyPromotionToForm]);
 
   // Calculate installment details (remaining amount and monthly payment)
   useEffect(() => {
     if (isCustomOrder) return;
-    if (formData.paymentMethod === 'Installment' && formData.totalPrice) {
+    if (formData.paymentMethod === 'Installment') {
+      // Use totalPrice (after discount) even if it's 0
       const totalPriceNum = parseFloat(formData.totalPrice) || 0;
       const months = parseInt(formData.installmentMonths) || 12;
       
@@ -574,7 +561,9 @@ const deactivateCustomMode = useCallback(() => {
           ...baseOrderData
         };
       } else {
-        const totalPrice = parseFloat(formData.totalPrice || formData.basePrice || 0);
+        // Use totalPrice (after discount) - if it's 0, use 0 (don't fallback to basePrice)
+        // This ensures promotion discounts are properly applied
+        const totalPrice = parseFloat(formData.totalPrice) || 0;
         const unitPrice = quantity > 0 ? totalPrice / quantity : totalPrice;
         orderData = {
           ...baseOrderData,
@@ -1417,7 +1406,7 @@ const deactivateCustomMode = useCallback(() => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredOrderForms.map((orderForm) => (
+                  {paginatedOrderForms.map((orderForm) => (
                   <tr 
                     key={orderForm.id} 
                     onClick={() => handleView(orderForm)}
@@ -1501,6 +1490,32 @@ const deactivateCustomMode = useCallback(() => {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+          {/* Pagination Controls */}
+          {!loadingOrderForms && !orderFormsError && filteredOrderForms.length > 0 && totalPages > 1 && (
+            <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                Page {currentPage} of {totalPages} • Showing {startIndex + 1}-{Math.min(endIndex, filteredOrderForms.length)} of {filteredOrderForms.length}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1 transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Prev
+                </button>
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1 transition-colors"
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -1989,28 +2004,65 @@ const deactivateCustomMode = useCallback(() => {
                       Payment Method <span className="text-red-500">*</span>
                     </label>
                     <div className="grid grid-cols-2 gap-3">
-                      {['Full Payment', 'Installment'].map((method) => (
-                        <button
-                          key={method}
-                          type="button"
-                          onClick={() => setFormData(prev => ({ ...prev, paymentMethod: method }))}
-                          disabled={isCustomOrder}
-                          className={`p-4 rounded-lg border-2 font-semibold transition-all ${
-                            formData.paymentMethod === method && !isCustomOrder
-                              ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
-                              : 'border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50'
-                          } ${isCustomOrder ? 'bg-gray-100 text-gray-400 cursor-not-allowed hover:border-gray-300 hover:bg-gray-100' : ''}`}
-                        >
-                          <div className="flex items-center justify-center space-x-2">
-                            <span className="text-2xl">{method === 'Full Payment' ? '💵' : '🏦'}</span>
-                            <span>{method}</span>
-                          </div>
-                        </button>
-                      ))}
+                      {['Full Payment', 'Installment'].map((method) => {
+                        // Check if promotion 100% is applied
+                        const isPromotion100 = selectedPromotion && (
+                          (selectedPromotion.type === 'PERCENTAGE' && selectedPromotion.rate === 1) ||
+                          (selectedPromotion.type === 'PERCENTAGE' && selectedPromotion.rate === 100) ||
+                          (parseFloat(formData.totalPrice || 0) === 0 && parseFloat(formData.basePrice || 0) > 0)
+                        );
+                        // Disable Installment if promotion 100% is applied
+                        const isDisabled = isCustomOrder || (method === 'Installment' && isPromotion100);
+                        
+                        return (
+                          <button
+                            key={method}
+                            type="button"
+                            onClick={() => {
+                              if (!isDisabled) {
+                                setFormData(prev => ({ ...prev, paymentMethod: method }));
+                              }
+                            }}
+                            disabled={isDisabled}
+                            className={`p-4 rounded-lg border-2 font-semibold transition-all ${
+                              formData.paymentMethod === method && !isDisabled
+                                ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
+                                : 'border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50'
+                            } ${isDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed hover:border-gray-300 hover:bg-gray-100' : ''}`}
+                            title={method === 'Installment' && isPromotion100 ? 'Installment is not available with 100% promotion. Please use Full Payment.' : ''}
+                          >
+                            <div className="flex items-center justify-center space-x-2">
+                              <span className="text-2xl">{method === 'Full Payment' ? '💵' : '🏦'}</span>
+                              <span>{method}</span>
+                            </div>
+                            {method === 'Installment' && isPromotion100 && (
+                              <div className="text-xs text-red-600 mt-1">Not available</div>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
+                    {/* Warning message if promotion 100% is applied */}
+                    {selectedPromotion && (
+                      (selectedPromotion.type === 'PERCENTAGE' && selectedPromotion.rate === 1) ||
+                      (selectedPromotion.type === 'PERCENTAGE' && selectedPromotion.rate === 100) ||
+                      (parseFloat(formData.totalPrice || 0) === 0 && parseFloat(formData.basePrice || 0) > 0)
+                    ) && (
+                      <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-sm text-yellow-800">
+                          <span className="font-semibold">⚠️ Note:</span> With 100% promotion, only Full Payment is available. Installment payment is not applicable.
+                        </p>
+                      </div>
+                    )}
                     
                     {/* Installment Payment Details */}
-                    {formData.paymentMethod === 'Installment' && (
+                    {formData.paymentMethod === 'Installment' && !isCustomOrder && (
+                      // Check if promotion 100% is applied - if so, don't show installment details
+                      !(selectedPromotion && (
+                        (selectedPromotion.type === 'PERCENTAGE' && selectedPromotion.rate === 1) ||
+                        (selectedPromotion.type === 'PERCENTAGE' && selectedPromotion.rate === 100) ||
+                        (parseFloat(formData.totalPrice || 0) === 0 && parseFloat(formData.basePrice || 0) > 0)
+                      )) && (
                       <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg space-y-4">
                         <div className="flex items-start space-x-3 mb-4">
                           <span className="text-2xl">💳</span>
@@ -2076,7 +2128,7 @@ const deactivateCustomMode = useCallback(() => {
                           </div>
                         )}
                       </div>
-                    )}
+                    ))}
                     {isCustomOrder && (
                       <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-800">
                         Payment details will be entered after the EVM team approves the custom build.
@@ -2326,12 +2378,6 @@ const deactivateCustomMode = useCallback(() => {
                         Create Payment
                       </button>
                     )}
-                    <button
-                      onClick={() => handleDelete(selectedOrderForm.id)}
-                      className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors text-xs whitespace-nowrap"
-                    >
-                      🗑️ Delete
-                    </button>
                   </div>
                 </div>
               </div>

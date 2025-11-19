@@ -29,7 +29,7 @@ export default function LoginPage() {
                 // Backend returns "Dealer Manager" and "Dealer Staff" (from database role_name column)
                 // Support both backend format and short format for flexibility
                 if (userRole === 'Dealer Manager' || upper === 'MANAGER') {
-                    navigate('/manager/dashboard');
+                    navigate('/manager/inventory/vehicles');
                 } else if (userRole === 'Dealer Staff' || upper === 'STAFF') {
                     navigate('/staff/dashboard');
                 } else if (upper === 'EVM' || upper === 'ADMIN') {
@@ -80,11 +80,6 @@ export default function LoginPage() {
                                 disabled={loading}
                                 className="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                             />
-                        </div>
-                        <div className="mb-4">
-                            <a href="#" className="text-sm font-medium text-black hover:underline">
-                                Forget Your Password?
-                            </a>
                         </div>
                         {error && (
                             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm">
