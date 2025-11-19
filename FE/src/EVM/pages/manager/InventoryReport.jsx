@@ -1,9 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react'
 import { AlertTriangle, TrendingUp } from 'lucide-react'
-import axios from 'axios'
-import { fetchConsumptionRate } from '../../services/inventoryService'
-
-const API_URL = import.meta.env.VITE_API_URL
+import { fetchInventory, fetchConsumptionRate } from '../../services/inventoryService'
 
 const InventoryReport = () => {
   const [model, setModel] = useState('All')
@@ -15,28 +12,17 @@ const InventoryReport = () => {
   const fetchInventoryData = useCallback(async () => {
     setLoading(true)
     try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        alert('No authentication token found. Please login again.')
+      const result = await fetchInventory()
+      
+      if (!result.success) {
+        alert(result.message || 'No authentication token found. Please login again.')
         return
       }
 
-      const response = await axios.post(
-        `${API_URL}/EVM/viewInventory`,
-        { _empty: true },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'ngrok-skip-browser-warning': 'true'
-          }
-        }
-      )
-
       // Backend trả về {status: 'success', message: 'success', data: Array}
       // handleViewActiveInventory() trả về List<InventoryDTO>
-      if (response.data && response.data.status === 'success' && response.data.data) {
-        const backendData = response.data.data || []
+      if (result.data) {
+        const backendData = result.data || []
         const inventoryList = []
 
         backendData.forEach((inventory) => {
@@ -85,19 +71,12 @@ const InventoryReport = () => {
         const groupedData = Array.from(modelMap.values())
         setRows(groupedData)
       } else {
-        console.log('Response not successful or no data:', response.data)
+        console.log('Response not successful or no data')
         setRows([])
       }
     } catch (error) {
       console.error('Error fetching inventory data:', error)
-      console.error('Error details:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        url: `${API_URL}/EVM/viewInventory`,
-        message: error.message
-      })
-      alert(error.response?.data?.message || 'Failed to fetch inventory data')
+      alert(error.message || 'Failed to fetch inventory data')
       setRows([])
     } finally {
       setLoading(false)

@@ -11,40 +11,44 @@ const API_URL = import.meta.env.VITE_API_URL;
  * @returns {string} - URL ảnh đã fix
  */
 const fixImageUrl = (imageUrl, modelId = null, variantId = null) => {
-  // First, try to get image from ListOfCar.js (Google Drive) by modelId/variantId
-  if (modelId && variantId) {
-    const driveImage = getImageByModelAndVariant(modelId, variantId);
-    if (driveImage) {
-      console.log('✅ Using image from ListOfCar (model + variant):', driveImage);
-      return driveImage;
-    }
-  }
-  if (variantId) {
-    const driveImage = getImageByVariantId(variantId);
-    if (driveImage) {
-      console.log('✅ Using image from ListOfCar (variant):', driveImage);
-      return driveImage;
-    }
-  }
-  if (modelId) {
-    const driveImage = getImageByModelId(modelId);
-    if (driveImage) {
-      console.log('✅ Using image from ListOfCar (model):', driveImage);
-      return driveImage;
-    }
-  }
-  
-  // If backend has image, use it
+  // PRIORITY 1: If backend has image, use it first (database has priority)
   if (imageUrl) {
-    console.log('🖼️ Original image URL from BE:', imageUrl);
+    console.log('📦 Using backend image from database:', imageUrl);
     
-    // Nếu đã có http/https thì giữ nguyên
+    // Check if it's a Google Drive share link - convert it to direct view URL
+    if (imageUrl.includes('drive.google.com')) {
+      // Extract file ID from various Google Drive link formats
+      let fileId = null;
+      
+      // Format 1: https://drive.google.com/file/d/FILE_ID/view?usp=sharing
+      const fileIdMatch1 = imageUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      if (fileIdMatch1 && fileIdMatch1[1]) {
+        fileId = fileIdMatch1[1];
+      }
+      
+      // Format 2: https://drive.google.com/open?id=FILE_ID
+      if (!fileId) {
+        const fileIdMatch2 = imageUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+        if (fileIdMatch2 && fileIdMatch2[1]) {
+          fileId = fileIdMatch2[1];
+        }
+      }
+      
+      if (fileId) {
+        // Convert to Google Drive direct view URL (official method)
+        const convertedUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
+        console.log('🔄 Converted Google Drive share link to direct view URL:', convertedUrl);
+        return convertedUrl;
+      }
+    }
+    
+    // If already a direct URL (http/https), return as is
     if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
       console.log('✅ URL already has protocol, keeping as is:', imageUrl);
       return imageUrl;
     }
     
-    // Nếu là relative path (bắt đầu bằng /), thêm base URL
+    // If relative path, add base URL
     if (imageUrl.startsWith('/')) {
       const baseUrl = API_URL.replace('/api', ''); // Remove /api
       const fixedUrl = `${baseUrl}${imageUrl}`;
@@ -52,7 +56,7 @@ const fixImageUrl = (imageUrl, modelId = null, variantId = null) => {
       return fixedUrl;
     }
     
-    // Nếu chỉ là filename (không có / và không có http), thêm base URL + /images/
+    // If just filename, add base URL + /images/
     // Ví dụ: "tesla-model3-white.jpg" -> "https://.../images/tesla-model3-white.jpg"
     const baseUrl = API_URL.replace('/api', ''); // Remove /api
     const fixedUrl = `${baseUrl}/images/${imageUrl}`;
@@ -60,8 +64,30 @@ const fixImageUrl = (imageUrl, modelId = null, variantId = null) => {
     return fixedUrl;
   }
   
-  // If no backend image, use fallback from ListOfCar
-  // Use modelId or variantId as index (modulo to stay within bounds)
+  // PRIORITY 2: Fallback to ListOfCar.js only if backend has no image
+  if (modelId && variantId) {
+    const driveImage = getImageByModelAndVariant(modelId, variantId);
+    if (driveImage) {
+      console.log('✅ Using fallback image from ListOfCar (model + variant):', driveImage);
+      return driveImage;
+    }
+  }
+  if (variantId) {
+    const driveImage = getImageByVariantId(variantId);
+    if (driveImage) {
+      console.log('✅ Using fallback image from ListOfCar (variant):', driveImage);
+      return driveImage;
+    }
+  }
+  if (modelId) {
+    const driveImage = getImageByModelId(modelId);
+    if (driveImage) {
+      console.log('✅ Using fallback image from ListOfCar (model):', driveImage);
+      return driveImage;
+    }
+  }
+  
+  // Last resort: use index-based fallback
   if (modelId || variantId) {
     const index = ((modelId || 0) + (variantId || 0)) % 17; // 17 is the number of images
     const fallbackImage = getImageByIndex(index);
@@ -286,6 +312,16 @@ export const transformInventoryData = (backendData) => {
           return;
         }
 
+        // Get image from variant - check multiple possible field names
+        const variantImage = variant.image || variant.imageUrl || variant.img || null;
+        
+        console.log('🔍 Processing variant (Staff):', {
+          variantId: variant.variantId,
+          modelId: model.modelId,
+          variantImage: variantImage,
+          variantKeys: Object.keys(variant)
+        });
+
         transformedData.push({
           // Basic IDs
           id: `${model.modelName}-${variant.variantId}`,
@@ -305,7 +341,7 @@ export const transformInventoryData = (backendData) => {
           priceUsd: variant.price || 0,
           
           // Image - Fix URL nếu cần, với fallback to ListOfCar
-          imageUrl: fixImageUrl(variant.image, model.modelId, variant.variantId),
+          imageUrl: fixImageUrl(variantImage, model.modelId, variant.variantId),
           
           // Status - luôn là "available" vì đã filter active
           status: 'available',

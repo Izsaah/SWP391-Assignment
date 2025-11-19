@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Layout from '../layout/Layout';
-import { Plus, Eye, Edit2, Trash2, FileText, CheckCircle, Loader2, RefreshCw, AlertTriangle, X, Search, Sparkles, CreditCard, Calendar, DollarSign, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Eye, Edit2, FileText, CheckCircle, Loader2, RefreshCw, AlertTriangle, X, Search, Sparkles, CreditCard, Calendar, DollarSign, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router';
 import { createOrder, viewOrdersByStaffId } from '../services/orderService';
 import { createPayment } from '../services/paymentService';
@@ -133,7 +133,6 @@ const deactivateCustomMode = useCallback(() => {
 }, []);
 
   // Transform backend OrderDTO to order form format
-  const transformOrderToOrderForm = (order, customerName = null, modelNameMap = null) => {
   const transformOrderToOrderForm = (order, customerName = null, modelNameMap = null) => {
     // Parse order date from backend (format: "yyyy-MM-dd HH:mm:ss" or ISO string)
     let orderDate = new Date().toISOString().split('T')[0];
@@ -451,18 +450,33 @@ const deactivateCustomMode = useCallback(() => {
     }
     setSelectedPromotion(promotion);
     applyPromotionToForm(promotion, formData.basePrice, formData.quantity);
+    
+    // If promotion 100% is applied, automatically switch to Full Payment
+    const isPromotion100 = (promotion.type === 'PERCENTAGE' && promotion.rate === 1) ||
+                          (promotion.type === 'PERCENTAGE' && promotion.rate === 100);
+    if (isPromotion100 && formData.paymentMethod === 'Installment') {
+      setFormData(prev => ({ ...prev, paymentMethod: 'Full Payment' }));
+    }
   };
 
   useEffect(() => {
     if (selectedPromotion) {
       applyPromotionToForm(selectedPromotion, formData.basePrice, formData.quantity);
+      
+      // If promotion 100% is applied, automatically switch to Full Payment
+      const isPromotion100 = (selectedPromotion.type === 'PERCENTAGE' && selectedPromotion.rate === 1) ||
+                            (selectedPromotion.type === 'PERCENTAGE' && selectedPromotion.rate === 100);
+      if (isPromotion100 && formData.paymentMethod === 'Installment') {
+        setFormData(prev => ({ ...prev, paymentMethod: 'Full Payment' }));
+      }
     }
-  }, [selectedPromotion, formData.basePrice, formData.quantity, applyPromotionToForm]);
+  }, [selectedPromotion, formData.basePrice, formData.quantity, formData.paymentMethod, applyPromotionToForm]);
 
   // Calculate installment details (remaining amount and monthly payment)
   useEffect(() => {
     if (isCustomOrder) return;
-    if (formData.paymentMethod === 'Installment' && formData.totalPrice) {
+    if (formData.paymentMethod === 'Installment') {
+      // Use totalPrice (after discount) even if it's 0
       const totalPriceNum = parseFloat(formData.totalPrice) || 0;
       const months = parseInt(formData.installmentMonths) || 12;
       
@@ -547,7 +561,9 @@ const deactivateCustomMode = useCallback(() => {
           ...baseOrderData
         };
       } else {
-        const totalPrice = parseFloat(formData.totalPrice || formData.basePrice || 0);
+        // Use totalPrice (after discount) - if it's 0, use 0 (don't fallback to basePrice)
+        // This ensures promotion discounts are properly applied
+        const totalPrice = parseFloat(formData.totalPrice) || 0;
         const unitPrice = quantity > 0 ? totalPrice / quantity : totalPrice;
         orderData = {
           ...baseOrderData,
@@ -1988,28 +2004,65 @@ const deactivateCustomMode = useCallback(() => {
                       Payment Method <span className="text-red-500">*</span>
                     </label>
                     <div className="grid grid-cols-2 gap-3">
-                      {['Full Payment', 'Installment'].map((method) => (
-                        <button
-                          key={method}
-                          type="button"
-                          onClick={() => setFormData(prev => ({ ...prev, paymentMethod: method }))}
-                          disabled={isCustomOrder}
-                          className={`p-4 rounded-lg border-2 font-semibold transition-all ${
-                            formData.paymentMethod === method && !isCustomOrder
-                              ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
-                              : 'border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50'
-                          } ${isCustomOrder ? 'bg-gray-100 text-gray-400 cursor-not-allowed hover:border-gray-300 hover:bg-gray-100' : ''}`}
-                        >
-                          <div className="flex items-center justify-center space-x-2">
-                            <span className="text-2xl">{method === 'Full Payment' ? '💵' : '🏦'}</span>
-                            <span>{method}</span>
-                          </div>
-                        </button>
-                      ))}
+                      {['Full Payment', 'Installment'].map((method) => {
+                        // Check if promotion 100% is applied
+                        const isPromotion100 = selectedPromotion && (
+                          (selectedPromotion.type === 'PERCENTAGE' && selectedPromotion.rate === 1) ||
+                          (selectedPromotion.type === 'PERCENTAGE' && selectedPromotion.rate === 100) ||
+                          (parseFloat(formData.totalPrice || 0) === 0 && parseFloat(formData.basePrice || 0) > 0)
+                        );
+                        // Disable Installment if promotion 100% is applied
+                        const isDisabled = isCustomOrder || (method === 'Installment' && isPromotion100);
+                        
+                        return (
+                          <button
+                            key={method}
+                            type="button"
+                            onClick={() => {
+                              if (!isDisabled) {
+                                setFormData(prev => ({ ...prev, paymentMethod: method }));
+                              }
+                            }}
+                            disabled={isDisabled}
+                            className={`p-4 rounded-lg border-2 font-semibold transition-all ${
+                              formData.paymentMethod === method && !isDisabled
+                                ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
+                                : 'border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50'
+                            } ${isDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed hover:border-gray-300 hover:bg-gray-100' : ''}`}
+                            title={method === 'Installment' && isPromotion100 ? 'Installment is not available with 100% promotion. Please use Full Payment.' : ''}
+                          >
+                            <div className="flex items-center justify-center space-x-2">
+                              <span className="text-2xl">{method === 'Full Payment' ? '💵' : '🏦'}</span>
+                              <span>{method}</span>
+                            </div>
+                            {method === 'Installment' && isPromotion100 && (
+                              <div className="text-xs text-red-600 mt-1">Not available</div>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
+                    {/* Warning message if promotion 100% is applied */}
+                    {selectedPromotion && (
+                      (selectedPromotion.type === 'PERCENTAGE' && selectedPromotion.rate === 1) ||
+                      (selectedPromotion.type === 'PERCENTAGE' && selectedPromotion.rate === 100) ||
+                      (parseFloat(formData.totalPrice || 0) === 0 && parseFloat(formData.basePrice || 0) > 0)
+                    ) && (
+                      <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-sm text-yellow-800">
+                          <span className="font-semibold">⚠️ Note:</span> With 100% promotion, only Full Payment is available. Installment payment is not applicable.
+                        </p>
+                      </div>
+                    )}
                     
                     {/* Installment Payment Details */}
-                    {formData.paymentMethod === 'Installment' && (
+                    {formData.paymentMethod === 'Installment' && !isCustomOrder && (
+                      // Check if promotion 100% is applied - if so, don't show installment details
+                      !(selectedPromotion && (
+                        (selectedPromotion.type === 'PERCENTAGE' && selectedPromotion.rate === 1) ||
+                        (selectedPromotion.type === 'PERCENTAGE' && selectedPromotion.rate === 100) ||
+                        (parseFloat(formData.totalPrice || 0) === 0 && parseFloat(formData.basePrice || 0) > 0)
+                      )) && (
                       <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg space-y-4">
                         <div className="flex items-start space-x-3 mb-4">
                           <span className="text-2xl">💳</span>
@@ -2075,7 +2128,7 @@ const deactivateCustomMode = useCallback(() => {
                           </div>
                         )}
                       </div>
-                    )}
+                    ))}
                     {isCustomOrder && (
                       <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-800">
                         Payment details will be entered after the EVM team approves the custom build.

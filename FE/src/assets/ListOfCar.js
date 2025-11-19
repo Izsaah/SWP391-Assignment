@@ -13,20 +13,32 @@ export const getDriveImageUrl = (driveLink) => {
   
   // Extract file ID from Google Drive link
   // Format: https://drive.google.com/file/d/FILE_ID/view?usp=drive_link
-  const fileIdMatch = driveLink.match(/\/d\/([a-zA-Z0-9_-]+)/);
-  if (fileIdMatch && fileIdMatch[1]) {
-    const fileId = fileIdMatch[1];
-    
-    // Google Drive images have CORS restrictions
-    // Use lh3.googleusercontent.com which is more reliable for public files
+  let fileId = null;
+  
+  // Format 1: https://drive.google.com/file/d/FILE_ID/view?usp=sharing
+  const fileIdMatch1 = driveLink.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (fileIdMatch1 && fileIdMatch1[1]) {
+    fileId = fileIdMatch1[1];
+  }
+  
+  // Format 2: https://drive.google.com/open?id=FILE_ID
+  if (!fileId) {
+    const fileIdMatch2 = driveLink.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (fileIdMatch2 && fileIdMatch2[1]) {
+      fileId = fileIdMatch2[1];
+    }
+  }
+  
+  if (fileId) {
+    // Convert to Google Drive direct view URL (official method)
     // This requires the file to be shared publicly ("Anyone with the link can view")
-    // Format: https://lh3.googleusercontent.com/d/FILE_ID
-    return `https://lh3.googleusercontent.com/d/${fileId}`;
+    // Format: https://drive.google.com/uc?export=view&id=FILE_ID
+    return `https://drive.google.com/uc?export=view&id=${fileId}`;
   }
   
   // If already a processed link, return as is
-  if (driveLink.includes('lh3.googleusercontent.com') || 
-      driveLink.includes('uc?export=view') || 
+  if (driveLink.includes('uc?export=view') || 
+      driveLink.includes('lh3.googleusercontent.com') || 
       driveLink.includes('thumbnail') || 
       driveLink.includes('uc?export=download')) {
     return driveLink;

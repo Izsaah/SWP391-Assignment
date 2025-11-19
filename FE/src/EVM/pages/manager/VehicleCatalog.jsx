@@ -1,80 +1,21 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { Car, Palette, Plus, Search, Edit2, Trash2, Power, PowerOff, ChevronLeft, ChevronDown } from 'lucide-react'
-import axios from 'axios'
-import Modal from '../../components/Modal'
-import ConfirmModal from '../../components/ConfirmModal'
-import SuccessModal from '../../components/SuccessModal'
-import { getImageByModelId, getImageByVariantId, getImageByModelAndVariant, getImageByIndex } from '../../../assets/ListOfCar'
-
-const API_URL = import.meta.env.VITE_API_URL
-
-// Helper function to fix image URL with fallback to ListOfCar
-const fixImageUrl = (imageUrl, modelId = null, variantId = null) => {
-  console.log('🖼️ fixImageUrl called:', { imageUrl, modelId, variantId });
-  
-  // First, try to get image from ListOfCar.js (Google Drive) by modelId/variantId
-  if (modelId && variantId) {
-    const driveImage = getImageByModelAndVariant(modelId, variantId);
-    if (driveImage) {
-      console.log('✅ Found image by modelId + variantId:', driveImage);
-      return driveImage;
-    }
-  }
-  if (variantId) {
-    const driveImage = getImageByVariantId(variantId);
-    if (driveImage) {
-      console.log('✅ Found image by variantId:', driveImage);
-      return driveImage;
-    }
-  }
-  if (modelId) {
-    const driveImage = getImageByModelId(modelId);
-    if (driveImage) {
-      console.log('✅ Found image by modelId:', driveImage);
-      return driveImage;
-    }
-  }
-  
-  // If backend has image, use it
-  if (imageUrl) {
-    console.log('📦 Using backend image:', imageUrl);
-    
-    // Check if it's a Google Drive share link - convert it
-    if (imageUrl.includes('drive.google.com/file/d/')) {
-      const fileIdMatch = imageUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
-      if (fileIdMatch && fileIdMatch[1]) {
-        const fileId = fileIdMatch[1];
-        // Convert to lh3.googleusercontent.com format (more reliable)
-        const convertedUrl = `https://lh3.googleusercontent.com/d/${fileId}`;
-        console.log('🔄 Converted Google Drive share link to:', convertedUrl);
-        return convertedUrl;
-      }
-    }
-    
-    // Nếu đã có http/https thì giữ nguyên
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-      return imageUrl;
-    }
-    
-    // Nếu là relative path (bắt đầu bằng /), thêm base URL
-    if (imageUrl.startsWith('/')) {
-      const baseUrl = API_URL.replace('/api', '');
-      return `${baseUrl}${imageUrl}`;
-    }
-    
-    // Nếu chỉ là filename, thêm base URL + /images/
-    const baseUrl = API_URL.replace('/api', '');
-    return `${baseUrl}/images/${imageUrl}`;
-  }
-  
-  // Google Drive has CORS restrictions - cannot use as fallback
-  // Only use images from backend or explicitly mapped in ListOfCar
-  // (ListOfCar mapping requires modelId/variantId to match)
-  
-  console.log('❌ No image found (backend image is null/empty)');
-  return null;
-};
+import Modal from '../../modals/Modal'
+import ConfirmModal from '../../modals/ConfirmModal'
+import SuccessModal from '../../modals/SuccessModal'
+import {
+  fetchVehicleModels,
+  createVehicleModel,
+  updateVehicleModel,
+  enableVehicleModel,
+  disableVehicleModel,
+  fetchVehicleVariants,
+  createVehicleVariant,
+  updateVehicleVariant,
+  enableVehicleVariant,
+  disableVehicleVariant
+} from '../../services/vehicleCatalogService'
 
 const VehicleCatalog = () => {
   const location = useLocation()
@@ -167,40 +108,25 @@ const ModelsSection = () => {
   const fetchModels = useCallback(async () => {
     setLoading(true)
     try {
-      const token = localStorage.getItem('token')
-      const response = await axios.post(`${API_URL}/EVM/viewVehicleForEVM`, { _empty: true }, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true'
-        }
-      })
-
-      // Backend trả về {status: 'success', message: 'success', data: Array}
-      if (response.data && response.data.status === 'success' && response.data.data) {
+      const result = await fetchVehicleModels()
+      
+      if (result.success && result.data) {
         // Transform backend data to frontend format
-        const models = (response.data.data || []).map(model => {
-          // Lấy image từ variant đầu tiên (nếu có)
-          const firstVariant = model.lists && model.lists.length > 0 ? model.lists[0] : null;
-          const imageUrl = firstVariant?.image 
-            ? fixImageUrl(firstVariant.image, model.modelId, firstVariant?.variantId) 
-            : fixImageUrl(null, model.modelId, null);
-          
+        const models = (result.data || []).map(model => {
           return {
             id: model.modelId,
             name: model.modelName,
             description: model.description,
             year: 2025,
             variants: model.lists ? model.lists.length : 0,
-            active: model.isActive,
-            image: imageUrl
+            active: model.isActive
           };
         })
         setRows(models)
       }
     } catch (error) {
       console.error('Error fetching models:', error)
-      alert(error.response?.data?.message || 'Failed to fetch models')
+      alert(error.message || 'Failed to fetch models')
     } finally {
       setLoading(false)
     }
@@ -236,41 +162,30 @@ const ModelsSection = () => {
   const handleDelete = (row) => { setDeletingModel(row); setShowDeleteModal(true) }
   const handleToggleStatus = async (row) => {
     try {
-      const token = localStorage.getItem('token')
       const modelId = parseInt(row.id, 10)
       
       if (isNaN(modelId)) {
-        setSuccessMessage('ID model không hợp lệ')
+        setSuccessMessage('Invalid model ID')
         setShowSuccessModal(true)
         return
       }
       
-      const endpoint = row.active 
-        ? `${API_URL}/EVM/disableVehicleModel`
-        : `${API_URL}/EVM/enableVehicleModel`
+      const result = row.active 
+        ? await disableVehicleModel(modelId)
+        : await enableVehicleModel(modelId)
       
-      const response = await axios.post(endpoint, {
-        model_id: modelId
-      }, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true'
-        }
-      })
-      
-      if (response.data && response.data.status === 'success') {
+      if (result.success) {
         // Fetch lại models sau khi toggle thành công
         await fetchModels()
-        setSuccessMessage(row.active ? 'Đã vô hiệu hóa' : 'Đã kích hoạt')
+        setSuccessMessage(result.message || (row.active ? 'Deactivated successfully' : 'Activated successfully'))
         setShowSuccessModal(true)
       } else {
-        setSuccessMessage(response.data?.message || 'Thay đổi trạng thái thất bại')
+        setSuccessMessage(result.message || 'Failed to change status')
         setShowSuccessModal(true)
       }
     } catch (error) {
       console.error('Error toggling model status:', error)
-      setSuccessMessage(error.response?.data?.message || 'Thay đổi trạng thái thất bại')
+      setSuccessMessage(error.message || 'Failed to change status')
       setShowSuccessModal(true)
     }
   }
@@ -278,68 +193,39 @@ const ModelsSection = () => {
     if (!deletingModel) return
     
     try {
-      const token = localStorage.getItem('token')
       const modelId = parseInt(deletingModel.id, 10)
       
       if (isNaN(modelId)) {
-        setSuccessMessage('ID model không hợp lệ')
+        setSuccessMessage('Invalid model ID')
         setShowSuccessModal(true)
         return
       }
       
-      console.log('Deleting model with ID:', modelId)
+      const result = await disableVehicleModel(modelId)
       
-      const response = await axios.post(`${API_URL}/EVM/disableVehicleModel`, {
-        model_id: modelId
-      }, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true'
-        }
-      })
-      
-      console.log('Delete response:', response.data)
-      
-      // Backend trả về 400 với error response, nhưng vẫn có thể là success nếu đã disabled
-      // Hoặc có thể là lỗi thật sự
-      if (response.data && response.data.status === 'success') {
+      if (result.success) {
         // Fetch lại models sau khi delete thành công
         await fetchModels()
         setShowDeleteModal(false)
         setDeletingModel(null)
-        setSuccessMessage('Xóa thành công')
+        setSuccessMessage(result.message || 'Deleted successfully')
         setShowSuccessModal(true)
-      } else if (response.status === 200 && response.data && response.data.status === 'error') {
-        // Backend trả về 200 với error status (có thể model đã disabled hoặc không tồn tại)
-        const errorMsg = response.data.message || 'Không thể xóa model này. Có thể model đã bị xóa hoặc không tồn tại.'
-        setSuccessMessage(errorMsg)
+      } else {
+        setSuccessMessage(result.message || 'Failed to delete')
         setShowSuccessModal(true)
         // Vẫn fetch lại để refresh UI
         await fetchModels()
         setShowDeleteModal(false)
         setDeletingModel(null)
-      } else {
-        setSuccessMessage(response.data?.message || 'Xóa thất bại')
-        setShowSuccessModal(true)
       }
     } catch (error) {
       console.error('Error deleting model:', error)
-      console.error('Error response:', error.response?.data)
-      
-      // Backend trả về 400 với error response
-      if (error.response?.status === 400 && error.response?.data) {
-        const errorMsg = error.response.data.message || 'Không thể xóa model này'
-        setSuccessMessage(errorMsg)
-        // Vẫn fetch lại để refresh UI (có thể model đã bị xóa bởi người khác)
-        await fetchModels()
-      } else {
-        setSuccessMessage(error.response?.data?.message || error.message || 'Xóa thất bại')
-      }
-      
+      setSuccessMessage(error.message || 'Failed to delete')
       setShowDeleteModal(false)
       setDeletingModel(null)
       setShowSuccessModal(true)
+      // Vẫn fetch lại để refresh UI
+      await fetchModels()
     }
   }
 
@@ -454,37 +340,30 @@ const ModelsSection = () => {
         onClose={() => setShowAdd(false)} 
         onSubmit={async () => {
           if (!form.name || !form.description) {
-            setSuccessMessage('Vui lòng điền đầy đủ thông tin')
+            setSuccessMessage('Please fill in all required fields')
             setShowSuccessModal(true)
             return
           }
           
           try {
-            const token = localStorage.getItem('token')
-            const response = await axios.post(`${API_URL}/EVM/createVehicleModel`, {
+            const result = await createVehicleModel({
               model_name: form.name,
               description: form.description || ''
-            }, {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-                'ngrok-skip-browser-warning': 'true'
-              }
             })
             
-            if (response.data && response.data.status === 'success') {
+            if (result.success) {
               // Fetch lại models sau khi create thành công
               await fetchModels()
               setShowAdd(false)
-              setSuccessMessage('Tạo mới thành công')
+              setSuccessMessage(result.message || 'Created successfully')
               setShowSuccessModal(true)
             } else {
-              setSuccessMessage(response.data?.message || 'Tạo mới thất bại')
+              setSuccessMessage(result.message || 'Failed to create')
               setShowSuccessModal(true)
             }
           } catch (error) {
             console.error('Error creating model:', error)
-            setSuccessMessage(error.response?.data?.message || 'Tạo mới thất bại')
+            setSuccessMessage(error.message || 'Failed to create')
             setShowSuccessModal(true)
           }
         }}
@@ -515,32 +394,25 @@ const ModelsSection = () => {
           if (!editing) return
           
           try {
-            const token = localStorage.getItem('token')
-            const response = await axios.post(`${API_URL}/EVM/updateVehicleModel`, {
+            const result = await updateVehicleModel({
               model_id: editing.id,
               model_name: form.name,
               description: form.description || ''
-            }, {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-                'ngrok-skip-browser-warning': 'true'
-              }
             })
             
-            if (response.data && response.data.status === 'success') {
+            if (result.success) {
               // Fetch lại models sau khi update thành công
               await fetchModels()
               setShowEdit(false)
-              setSuccessMessage('Cập nhật thành công')
+              setSuccessMessage(result.message || 'Updated successfully')
               setShowSuccessModal(true)
             } else {
-              setSuccessMessage(response.data?.message || 'Cập nhật thất bại')
+              setSuccessMessage(result.message || 'Failed to update')
               setShowSuccessModal(true)
             }
           } catch (error) {
             console.error('Error updating model:', error)
-            setSuccessMessage(error.response?.data?.message || 'Cập nhật thất bại')
+            setSuccessMessage(error.message || 'Failed to update')
             setShowSuccessModal(true)
           }
         }}
@@ -598,7 +470,7 @@ const VariantsSection = () => {
   const [showAdd, setShowAdd] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [form, setForm] = useState({ modelId: '', version: '', color: 'White', price: 30000, image: '' })
+  const [form, setForm] = useState({ modelId: '', version: '', color: 'White', price: 30000 })
   const [editing, setEditing] = useState(null)
   const [deletingVariant, setDeletingVariant] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -659,7 +531,7 @@ const VariantsSection = () => {
         const modelsMap = new Map()
         const allVariants = []
         
-        // Tạo map model_id -> modelName và cập nhật state models
+        // Create map model_id -> modelName and update state models
         const modelsList = modelsData.map(model => ({
           id: model.modelId,
           name: model.modelName,
@@ -697,14 +569,6 @@ const VariantsSection = () => {
                 
                 const modelId = variant.modelId || model.modelId;
                 const variantId = variant.variantId;
-                const imageUrl = fixImageUrl(variant.image, modelId, variantId);
-                
-                console.log('📋 Variant processed:', {
-                  variantId,
-                  modelId,
-                  backendImage: variant.image,
-                  finalImageUrl: imageUrl
-                });
                 
                 allVariants.push({
                   id: variant.variantId,
@@ -713,8 +577,7 @@ const VariantsSection = () => {
                   version: variant.versionName || '',
                   color: normalizedColor,
                   price: variant.price || 0,
-                  active: variant.isActive !== undefined ? variant.isActive : true,
-                  image: imageUrl
+                  active: variant.isActive !== undefined ? variant.isActive : true
                 })
               })
             }
@@ -744,15 +607,34 @@ const VariantsSection = () => {
     fetchVariants()
   }, [fetchModels, fetchVariants])
 
-  // Mapping giữa filter (tiếng Anh) và dữ liệu (tiếng Việt)
-  const colorMapping = useMemo(() => ({
-    'All': 'All',
+  // Mapping: Vietnamese (from DB) -> English (for display)
+  const colorToEnglish = useMemo(() => ({
+    'Trắng': 'White',
+    'Xanh dương': 'Blue',
+    'Đỏ': 'Red',
+    'Đen': 'Black',
+    'Bạc': 'Silver',
+    'trắng': 'White',
+    'xanh dương': 'Blue',
+    'đỏ': 'Red',
+    'đen': 'Black',
+    'bạc': 'Silver'
+  }), [])
+
+  // Mapping: English (from filter) -> Vietnamese (for DB query)
+  const colorToVietnamese = useMemo(() => ({
     'White': 'Trắng',
     'Blue': 'Xanh dương',
     'Red': 'Đỏ',
     'Black': 'Đen',
     'Silver': 'Bạc'
   }), [])
+  
+  // Convert color from Vietnamese (DB) to English (display)
+  const getDisplayColor = (color) => {
+    if (!color) return color
+    return colorToEnglish[color] || color
+  }
   
   // Lấy danh sách màu động từ data (bao gồm cả màu mới được thêm vào)
   const availableColors = useMemo(() => {
@@ -763,34 +645,20 @@ const VariantsSection = () => {
       }
     })
     
-    // Sắp xếp và trả về danh sách màu
+    // Sort and return color list
     const colors = Array.from(colorSet).sort()
     
-    // Tạo mapping ngược: tiếng Việt -> tiếng Anh để hiển thị trong dropdown
-    const reverseMapping = {
-      'Trắng': 'White',
-      'Xanh dương': 'Blue',
-      'Đỏ': 'Red',
-      'Đen': 'Black',
-      'Bạc': 'Silver'
-    }
-    
-    // Map các màu đã biết sang tiếng Anh, giữ nguyên màu mới
+    // Map known colors to English, keep new colors as is
     const mappedColors = colors.map(c => {
-      // Tìm trong colorMapping values (tiếng Việt)
-      const foundKey = Object.keys(colorMapping).find(key => colorMapping[key] === c)
-      if (foundKey) {
-        return { vietnamese: c, english: foundKey }
-      }
-      // Nếu không tìm thấy, giữ nguyên (màu mới)
-      return { vietnamese: c, english: c }
+      const english = colorToEnglish[c] || c
+      return { vietnamese: c, english: english }
     })
     
     return mappedColors
-  }, [rows, colorMapping])
+  }, [rows, colorToEnglish])
 
   const filtered = useMemo(() => {
-    // Tạo reverse mapping: tiếng Việt -> tiếng Anh để search
+    // Create reverse mapping: Vietnamese -> English for search
     const reverseColorMapping = {
       'trắng': 'white',
       'xanh dương': 'blue',
@@ -834,14 +702,14 @@ const VariantsSection = () => {
         const variantColor = (v.color || '').trim().toLowerCase()
         const filterColor = (color || '').trim().toLowerCase()
         
-        // Kiểm tra nếu color là một trong các màu đã mapping (tiếng Anh)
-        const mappedColor = colorMapping[color] // Lấy màu tiếng Việt từ mapping
+        // Check if color filter is English, convert to Vietnamese for comparison
+        const mappedColor = colorToVietnamese[color] // Get Vietnamese color from English filter
         const mappedColorLower = mappedColor ? (mappedColor || '').trim().toLowerCase() : null
         
-        // So sánh với:
-        // 1. Mapped color (tiếng Việt) nếu có
-        // 2. Original color (tiếng Anh) từ filter
-        // 3. Trực tiếp với variant color (cho màu mới không có trong mapping)
+        // Compare with:
+        // 1. Mapped color (Vietnamese) if exists
+        // 2. Original color (English) from filter
+        // 3. Directly with variant color (for new colors not in mapping)
         colorMatch = variantColor === mappedColorLower || 
                     variantColor === filterColor ||
                     variantColor.includes(filterColor) ||
@@ -850,7 +718,7 @@ const VariantsSection = () => {
       
       return queryMatch && colorMatch
     })
-  }, [rows, query, color, colorMapping])
+  }, [rows, query, color, colorToVietnamese])
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page])
 
@@ -858,7 +726,7 @@ const VariantsSection = () => {
     // Fetch models trước khi mở modal để đảm bảo có danh sách models mới nhất
     const modelsList = await fetchModels()
     const activeModels = modelsList.filter(m => m.isActive)
-    setForm({ modelId: activeModels.length > 0 ? activeModels[0].id.toString() : '', version: '', color: 'White', price: 30000, image: '' })
+    setForm({ modelId: activeModels.length > 0 ? activeModels[0].id.toString() : '', version: '', color: 'White', price: 30000 })
     setShowAdd(true)
   }
   const handleEdit = async (row) => {
@@ -869,8 +737,7 @@ const VariantsSection = () => {
       modelId: row.modelId ? row.modelId.toString() : '', 
       version: row.version || '', 
       color: row.color || '', 
-      price: row.price || 0,
-      image: row.image || ''
+      price: row.price || 0
     })
     setShowEdit(true)
   }
@@ -881,7 +748,7 @@ const VariantsSection = () => {
       const variantId = parseInt(row.id, 10)
       
       if (isNaN(variantId)) {
-        setSuccessMessage('ID variant không hợp lệ')
+        setSuccessMessage('Invalid variant ID')
         setShowSuccessModal(true)
         return
       }
@@ -903,10 +770,10 @@ const VariantsSection = () => {
       if (response.data && response.data.status === 'success') {
         // Fetch lại variants sau khi toggle thành công
         await fetchVariants()
-        setSuccessMessage(row.active ? 'Đã vô hiệu hóa' : 'Đã kích hoạt')
+        setSuccessMessage(row.active ? 'Deactivated successfully' : 'Activated successfully')
         setShowSuccessModal(true)
       } else {
-        setSuccessMessage(response.data?.message || 'Thay đổi trạng thái thất bại')
+        setSuccessMessage(response.data?.message || 'Failed to change status')
         setShowSuccessModal(true)
       }
     } catch (error) {
@@ -923,7 +790,7 @@ const VariantsSection = () => {
       const variantId = parseInt(deletingVariant.id, 10)
       
       if (isNaN(variantId)) {
-        setSuccessMessage('ID variant không hợp lệ')
+        setSuccessMessage('Invalid variant ID')
         setShowSuccessModal(true)
         return
       }
@@ -947,10 +814,10 @@ const VariantsSection = () => {
         await fetchVariants()
         setShowDeleteModal(false)
         setDeletingVariant(null)
-        setSuccessMessage('Xóa thành công')
+        setSuccessMessage('Deleted successfully')
         setShowSuccessModal(true)
       } else {
-        setSuccessMessage(response.data?.message || 'Xóa thất bại')
+        setSuccessMessage(response.data?.message || 'Failed to delete')
         setShowSuccessModal(true)
       }
     } catch (error) {
@@ -959,12 +826,12 @@ const VariantsSection = () => {
       
       // Backend trả về 400 với error response
       if (error.response?.status === 400 && error.response?.data) {
-        const errorMsg = error.response.data.message || 'Không thể xóa variant này'
+        const errorMsg = error.response.data.message || 'Cannot delete this variant'
         setSuccessMessage(errorMsg)
         // Vẫn fetch lại để refresh UI (có thể variant đã bị xóa bởi người khác)
         await fetchVariants()
       } else {
-        setSuccessMessage(error.response?.data?.message || error.message || 'Xóa thất bại')
+        setSuccessMessage(error.response?.data?.message || error.message || 'Failed to delete')
       }
       
       setShowDeleteModal(false)
@@ -998,7 +865,7 @@ const VariantsSection = () => {
             <option value="All">All</option>
             {availableColors.map(colorOption => (
               <option key={colorOption.vietnamese} value={colorOption.english}>
-                {colorOption.vietnamese} {colorOption.vietnamese !== colorOption.english ? `(${colorOption.english})` : ''}
+                {colorOption.english}
               </option>
             ))}
           </select>
@@ -1011,8 +878,6 @@ const VariantsSection = () => {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PHOTO</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PHOTO</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Model</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Version</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Color</th>
@@ -1024,13 +889,13 @@ const VariantsSection = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan="8" className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan="7" className="px-6 py-4 text-center text-sm text-gray-500">
                     Loading...
                   </td>
                 </tr>
               ) : paged.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan="7" className="px-6 py-4 text-center text-sm text-gray-500">
                     No variants found
                   </td>
                 </tr>
@@ -1038,34 +903,12 @@ const VariantsSection = () => {
                 paged.map(v => (
                 <tr key={v.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.id}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {v.image ? (
-                      <img 
-                        src={v.image} 
-                        alt={`${v.model} ${v.version}`}
-                        className="w-16 h-16 object-cover rounded-lg border border-gray-200"
-                        loading="lazy"
-                        crossOrigin="anonymous"
-                        onError={(e) => {
-                          console.error('❌ Image load error (CORS/403):', v.image);
-                          // Google Drive has CORS restrictions - cannot load directly
-                          // Fallback to placeholder immediately
-                          e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"%3E%3Crect fill="%23e5e7eb" width="64" height="64"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%239ca3af" font-size="10"%3ENo Image%3C/text%3E%3C/svg%3E';
-                        }}
-                        onLoad={() => {
-                          console.log('✅ Image loaded successfully:', v.image);
-                        }}
-                      />
-                    ) : (
-                      <div className="w-16 h-16 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
-                        <span className="text-xs text-gray-400">No Image</span>
-                      </div>
-                    )}
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{v.model}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.version}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.color}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${v.price.toLocaleString()}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{getDisplayColor(v.color)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {v.price ? new Intl.NumberFormat('vi-VN').format(v.price) + ' ₫' : '0 ₫'}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${v.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                       {v.active ? 'Active' : 'Inactive'}
@@ -1111,14 +954,14 @@ const VariantsSection = () => {
         onClose={() => setShowAdd(false)} 
         onSubmit={async () => {
           if (!form.modelId || !form.version || !form.color || !form.price) {
-            setSuccessMessage('Vui lòng điền đầy đủ thông tin')
+            setSuccessMessage('Please fill in all required fields')
             setShowSuccessModal(true)
             return
           }
           
           const modelIdInt = parseInt(form.modelId, 10)
           if (isNaN(modelIdInt) || modelIdInt <= 0) {
-            setSuccessMessage('Vui lòng chọn model hợp lệ')
+            setSuccessMessage('Please select a valid model')
             setShowSuccessModal(true)
             return
           }
@@ -1129,7 +972,7 @@ const VariantsSection = () => {
               model_id: modelIdInt,
               version_name: form.version,
               color: form.color,
-              image: form.image || '', // Use image from form
+              image: '', // Image field removed
               price: parseFloat(form.price)
             }, {
               headers: {
@@ -1144,15 +987,15 @@ const VariantsSection = () => {
               await fetchModels()
               await fetchVariants()
               setShowAdd(false)
-              setSuccessMessage('Tạo mới thành công')
+              setSuccessMessage('Created successfully')
               setShowSuccessModal(true)
             } else {
-              setSuccessMessage(response.data?.message || 'Tạo mới thất bại')
+              setSuccessMessage(response.data?.message || 'Failed to create')
               setShowSuccessModal(true)
             }
           } catch (error) {
             console.error('Error creating variant:', error)
-            setSuccessMessage(error.response?.data?.message || 'Tạo mới thất bại')
+            setSuccessMessage(error.response?.data?.message || 'Failed to create')
             setShowSuccessModal(true)
           }
         }}
@@ -1185,10 +1028,6 @@ const VariantsSection = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">Price <span className="text-red-500">*</span></label>
             <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Price" type="number" value={form.price} onChange={(e) => setForm(f => ({ ...f, price: e.target.value }))} />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Image URL</label>
-            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Enter image URL" type="text" value={form.image} onChange={(e) => setForm(f => ({ ...f, image: e.target.value }))} />
-          </div>
         </div>
       </Modal>
 
@@ -1200,14 +1039,14 @@ const VariantsSection = () => {
           if (!editing) return
           
           if (!form.modelId || !form.version || !form.color || !form.price) {
-            setSuccessMessage('Vui lòng điền đầy đủ thông tin')
+            setSuccessMessage('Please fill in all required fields')
             setShowSuccessModal(true)
             return
           }
           
           const modelIdInt = parseInt(form.modelId, 10)
           if (isNaN(modelIdInt) || modelIdInt <= 0) {
-            setSuccessMessage('Vui lòng chọn model hợp lệ')
+            setSuccessMessage('Please select a valid model')
             setShowSuccessModal(true)
             return
           }
@@ -1219,7 +1058,7 @@ const VariantsSection = () => {
               model_id: modelIdInt,
               version_name: form.version,
               color: form.color,
-              image: form.image || '', // Use image from form
+              image: '', // Image field removed
               price: parseFloat(form.price)
             }, {
               headers: {
@@ -1274,21 +1113,17 @@ const VariantsSection = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">Price <span className="text-red-500">*</span></label>
             <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Price" type="number" value={form.price} onChange={(e) => setForm(f => ({ ...f, price: e.target.value }))} />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Image URL</label>
-            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Enter image URL" type="text" value={form.image} onChange={(e) => setForm(f => ({ ...f, image: e.target.value }))} />
-          </div>
         </div>
       </Modal>
 
       {/* Modal để tạo Model mới */}
       <Modal 
-        title="Tạo Model Mới" 
+        title="Create New Model" 
         open={showAddModel} 
         onClose={() => { setShowAddModel(false); setNewModelForm({ name: '', description: '' }) }} 
         onSubmit={async () => {
           if (!newModelForm.name || !newModelForm.description) {
-            setSuccessMessage('Vui lòng điền đầy đủ thông tin')
+            setSuccessMessage('Please fill in all required fields')
             setShowSuccessModal(true)
             return
           }
@@ -1311,7 +1146,7 @@ const VariantsSection = () => {
               await fetchModels()
               setShowAddModel(false)
               setNewModelForm({ name: '', description: '' })
-              setSuccessMessage('Tạo model mới thành công')
+              setSuccessMessage('Model created successfully')
               setShowSuccessModal(true)
               
               // Tự động chọn model vừa tạo trong form Add Variant (nếu có modelId trong response)
@@ -1325,12 +1160,12 @@ const VariantsSection = () => {
                 }
               }
             } else {
-              setSuccessMessage(response.data?.message || 'Tạo model thất bại')
+              setSuccessMessage(response.data?.message || 'Failed to create model')
               setShowSuccessModal(true)
             }
           } catch (error) {
             console.error('Error creating model:', error)
-            setSuccessMessage(error.response?.data?.message || 'Tạo model thất bại')
+            setSuccessMessage(error.response?.data?.message || 'Failed to create model')
             setShowSuccessModal(true)
           }
         }}

@@ -1,8 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react'
-import axios from 'axios'
 import { RefreshCw, Search } from 'lucide-react'
-
-const API_URL = import.meta.env.VITE_API_URL
+import { fetchDealerSaleRecords } from '../../services/salesReportService'
 
 const SalesReport = () => {
   const [rows, setRows] = useState([])
@@ -25,27 +23,10 @@ const SalesReport = () => {
     setLoading(true)
     setError('')
     try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        setError('Không tìm thấy token đăng nhập. Vui lòng đăng nhập lại.')
-        setRows([])
-        return
-      }
-
-      const response = await axios.post(
-        `${API_URL}/EVM/dealerSaleRecords`,
-        { _empty: true },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'ngrok-skip-browser-warning': 'true'
-          }
-        }
-      )
-
-      if (response.data && response.data.status === 'success' && Array.isArray(response.data.data)) {
-        const salesData = response.data.data.map((dealer) => ({
+      const result = await fetchDealerSaleRecords()
+      
+      if (result.success && Array.isArray(result.data)) {
+        const salesData = result.data.map((dealer) => ({
           dealerId: dealer.dealerId ?? dealer.dealer_id ?? null,
           dealerName: dealer.dealerName ?? dealer.dealer_name ?? 'Unknown dealer',
           address: dealer.address ?? '',
@@ -56,11 +37,11 @@ const SalesReport = () => {
         setRows(salesData)
       } else {
         setRows([])
-        setError(response.data?.message || 'Không lấy được dữ liệu doanh số.')
+        setError(result.message || 'Failed to fetch sales data.')
       }
     } catch (error) {
       console.error('Error fetching sales data:', error)
-      setError(error.response?.data?.message || 'Không lấy được dữ liệu doanh số.')
+      setError(error.message || 'Failed to fetch sales data.')
       setRows([])
     } finally {
       setLoading(false)
@@ -148,16 +129,16 @@ const SalesReport = () => {
                   Dealer
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Tổng doanh số
+                  Total Sales
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Tổng đơn hàng
+                  Total Orders
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Số điện thoại
+                  Phone Number
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Địa chỉ
+                  Address
                 </th>
               </tr>
             </thead>
@@ -165,13 +146,13 @@ const SalesReport = () => {
               {loading ? (
                 <tr>
                   <td colSpan="6" className="px-6 py-8 text-center text-sm text-gray-500">
-                    Đang tải dữ liệu...
+                    Loading data...
                   </td>
                 </tr>
               ) : filteredRows.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="px-6 py-8 text-center text-sm text-gray-500">
-                    Không có dữ liệu doanh số
+                    No sales data available
                   </td>
                 </tr>
               ) : (

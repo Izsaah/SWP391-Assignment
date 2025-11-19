@@ -1,8 +1,12 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react'
 import { Search, Plus, Edit2, X, UserPlus, Users as UsersIcon, Power, PowerOff } from 'lucide-react'
-import axios from 'axios'
-
-const API_URL = import.meta.env.VITE_API_URL
+import {
+  fetchAllDealerAccounts,
+  fetchAllDealers,
+  createDealerAccount,
+  updateDealerAccount,
+  toggleUserStatus
+} from '../../services/usersService'
 
 const Users = () => {
   const [role, setRole] = useState('All')
@@ -18,20 +22,12 @@ const Users = () => {
   const fetchUsers = useCallback(async () => {
     setLoading(true)
     try {
-      const token = localStorage.getItem('token')
-      const response = await axios.post(`${API_URL}/EVM/viewAllDealerAccounts`, { _empty: true }, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true'
-        }
-      })
-
-      // Backend trả về {status: 'success', message: 'success', data: Array}
-      if (response.data && response.data.status === 'success' && response.data.data) {
+      const result = await fetchAllDealerAccounts()
+      
+      if (result.success && result.data) {
         // Transform backend data to frontend format
         // Backend đã trả về isActive từ database
-        const users = (response.data.data || []).map(user => {
+        const users = (result.data || []).map(user => {
           const userId = user.userId || user.id
           // Backend trả về isActive (true/false) từ database
           // Database: 1 = true (Active), 0 = false (Suspended)
@@ -54,7 +50,7 @@ const Users = () => {
       }
     } catch (error) {
       console.error('Error fetching users:', error)
-      alert(error.response?.data?.message || 'Failed to fetch users')
+      alert(error.message || 'Failed to fetch users')
     } finally {
       setLoading(false)
     }
@@ -63,17 +59,9 @@ const Users = () => {
   // Fetch dealers from API
   const fetchDealers = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token')
-      const response = await axios.post(`${API_URL}/EVM/viewAllDealer`, {}, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true'
-        }
-      })
-
-      if (response.data && response.data.status === 'success' && response.data.data) {
-        setDealers(response.data.data || [])
+      const result = await fetchAllDealers()
+      if (result.success && result.data) {
+        setDealers(result.data || [])
       }
     } catch (error) {
       console.error('Error fetching dealers:', error)
@@ -167,31 +155,23 @@ const Users = () => {
         }
         
         // Update existing user
-        const response = await axios.post(
-          `${API_URL}/EVM/updateDealerAccount`,
-          {
-            userId: editingUser.id,
-            email: newUser.email,
-            username: newUser.name,
-            phoneNumber: newUser.phone,
-            password: passwordToUpdate, // Update password if provided, otherwise null
-            roleId: roleId
-          },
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-              'ngrok-skip-browser-warning': 'true'
-            }
-          }
-        )
-        // Backend trả về {status: 'success', message: 'success', data: ...}
-        if (response.data && response.data.status === 'success') {
+        const result = await updateDealerAccount({
+          userId: editingUser.id,
+          email: newUser.email,
+          username: newUser.name,
+          phoneNumber: newUser.phone,
+          password: passwordToUpdate, // Update password if provided, otherwise null
+          roleId: roleId,
+          dealerId: editingUser.dealerId || null,
+          isActive: editingUser.status === 'Active'
+        })
+        
+        if (result.success) {
           await fetchUsers()
           setShowEditModal(false)
           setEditingUser(null)
         } else {
-          alert(response.data?.message || 'Failed to update user')
+          alert(result.message || 'Failed to update user')
         }
       } else {
         // Validate password match
@@ -205,30 +185,20 @@ const Users = () => {
         }
         
         // Create new user
-        const response = await axios.post(
-          `${API_URL}/EVM/createDealerAccount`,
-          {
-            dealerId: dealerId,
-            email: newUser.email,
-            username: newUser.name,
-            password: newUser.password,
-            phoneNumber: newUser.phone,
-            roleId: roleId
-          },
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-              'ngrok-skip-browser-warning': 'true'
-            }
-          }
-        )
+        const result = await createDealerAccount({
+          dealerId: dealerId,
+          email: newUser.email,
+          username: newUser.name,
+          password: newUser.password,
+          phoneNumber: newUser.phone,
+          roleId: roleId
+        })
         // Backend trả về {status: 'success', message: 'success', data: ...}
-        if (response.data && response.data.status === 'success') {
+        if (result.success) {
           await fetchUsers()
           setShowCreateModal(false)
         } else {
-          alert(response.data?.message || 'Failed to create user')
+          alert(result.message || 'Failed to create user')
         }
       }
       const firstDealer = dealers.length > 0 ? dealers[0] : null
@@ -245,7 +215,7 @@ const Users = () => {
       })
     } catch (error) {
       console.error('Error saving user:', error)
-      alert(error.response?.data?.message || 'Failed to save user')
+      alert(error.message || 'Failed to save user')
     }
   }
 

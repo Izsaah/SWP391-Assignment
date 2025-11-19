@@ -3,7 +3,7 @@ import { Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import Layout from '../layout/Layout';
 import InventoryControlBar from './components/InventoryControlBar';
 import VehicleCard from './components/VehicleCard';
-import CarDetailModal from './components/CarDetailModal';
+import CarDetailModal from '../modals/CarDetailModal';
 import { useInventoryControls } from './hooks/useInventoryControls';
 import { fetchInventory, transformInventoryData } from '../services/inventoryService';
 

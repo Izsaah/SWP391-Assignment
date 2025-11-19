@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../layout/Layout';
 import VehicleComparisonCard from './components/VehicleComparisonCard';
-import VehicleSelectorModal from './components/VehicleSelectorModal';
+import VehicleSelectorModal from '../modals/VehicleSelectorModal';
 import { FileText, Download, RefreshCw, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { fetchInventory, transformInventoryData } from '../services/inventoryService';
@@ -51,7 +51,7 @@ const CompareModels = () => {
         { label: 'Status', key: 'status', type: 'status' },
       ]},
       { category: 'Pricing', items: [
-        { label: 'Price (USD)', key: 'priceUsd', type: 'currency-usd' },
+        { label: 'Price (VND)', key: 'priceUsd', type: 'currency-vnd' },
         { label: 'Condition', key: 'condition', type: 'text' },
       ]},
       { category: 'Inventory', items: [
@@ -71,11 +71,9 @@ const CompareModels = () => {
 
     switch (type) {
       case 'currency-usd':
-        return new Intl.NumberFormat('en-US', {
-          style: 'currency',
-          currency: 'USD',
-          minimumFractionDigits: 0,
-        }).format(value);
+      case 'currency-vnd':
+        if (!value || value === 0) return '0 ₫';
+        return new Intl.NumberFormat('vi-VN').format(value) + ' ₫';
       case 'number':
         return value;
       case 'boolean':
