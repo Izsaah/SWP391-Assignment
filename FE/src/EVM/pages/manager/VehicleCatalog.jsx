@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { Car, Palette, Plus, Search, Edit2, Trash2, Power, PowerOff, ChevronLeft, ChevronDown } from 'lucide-react'
+import axios from 'axios'
 import Modal from '../../modals/Modal'
 import ConfirmModal from '../../modals/ConfirmModal'
 import SuccessModal from '../../modals/SuccessModal'
@@ -16,6 +17,8 @@ import {
   enableVehicleVariant,
   disableVehicleVariant
 } from '../../services/vehicleCatalogService'
+
+const API_URL = import.meta.env.VITE_API_URL
 
 const VehicleCatalog = () => {
   const location = useLocation()
@@ -112,16 +115,14 @@ const ModelsSection = () => {
       
       if (result.success && result.data) {
         // Transform backend data to frontend format
-        const models = (result.data || []).map(model => {
-          return {
-            id: model.modelId,
-            name: model.modelName,
-            description: model.description,
-            year: 2025,
-            variants: model.lists ? model.lists.length : 0,
-            active: model.isActive
-          };
-        })
+        const models = (result.data || []).map(model => ({
+          id: model.modelId,
+          name: model.modelName,
+          description: model.description,
+          year: 2025,
+          variants: model.lists ? model.lists.length : 0,
+          active: model.isActive
+        }))
         setRows(models)
       }
     } catch (error) {

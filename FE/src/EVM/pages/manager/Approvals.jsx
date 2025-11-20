@@ -317,9 +317,9 @@ const Approvals = () => {
                 const date = row.date || row.date_time || '';
                 const isPending = row.isPending !== undefined ? row.isPending :
                   (!agreementRaw || agreementRaw.toString().toLowerCase() === 'pending');
-                const agreementLower = agreementRaw ? agreementRaw.toString().toLowerCase().trim() : '';
+              const agreementLower = agreementRaw ? agreementRaw.toString().toLowerCase().trim() : '';
                 const isApproved = row.isApproved ?? (agreementLower === 'agree' || agreementLower === 'approved');
-                const isRejected = row.isRejected ?? (agreementLower === 'reject' || agreementLower === 'rejected' || agreementLower === 'disagree' || agreementLower === 'disagreed');
+              const isRejected = row.isRejected ?? (agreementLower === 'reject' || agreementLower === 'rejected' || agreementLower === 'disagree' || agreementLower === 'disagreed');
                 const isCustomOrder = isStaffCustomOrder(row);
 
               if (isRejected) {
@@ -411,7 +411,7 @@ const Approvals = () => {
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td className="px-6 py-10 text-center text-sm text-gray-500" colSpan={9}>
+                  <td className="px-6 py-10 text-center text-sm text-gray-500" colSpan={8}>
                     No requests found
                   </td>
                 </tr>
@@ -488,15 +488,32 @@ const Approvals = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Color <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  value={customApprovalModal.color}
-                  onChange={(e) =>
-                    setCustomApprovalModal((prev) => ({ ...prev, color: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter color (e.g., Red, Blue, White)"
-                />
+                {customApprovalModal.availableColors?.length ? (
+                  <select
+                    value={customApprovalModal.color}
+                    onChange={(e) =>
+                      setCustomApprovalModal((prev) => ({ ...prev, color: e.target.value }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select a color...</option>
+                    {customApprovalModal.availableColors.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={customApprovalModal.color}
+                    onChange={(e) =>
+                      setCustomApprovalModal((prev) => ({ ...prev, color: e.target.value }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter color"
+                  />
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

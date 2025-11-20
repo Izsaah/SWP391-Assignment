@@ -1,6 +1,8 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react'
-import { RefreshCw, TrendingUp, Package, BarChart3, AlertTriangle, Clock } from 'lucide-react'
+import { RefreshCw, TrendingUp, Package, Building2, BarChart3, AlertTriangle, Clock } from 'lucide-react'
 import { fetchInventory } from '../../services/inventoryService'
+
+const API_URL = import.meta.env.VITE_API_URL
 
 const Metric = ({ label, value, icon: Icon, iconColor }) => (
   <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
@@ -79,7 +81,7 @@ const Inventory = () => {
         
         setRows(inventoryList)
       } else {
-        console.log('Response not successful or no data:', response.data)
+        console.log('Response not successful or no data:', result)
       }
     } catch (error) {
       console.error('Error fetching inventory:', error)
@@ -148,7 +150,7 @@ const Inventory = () => {
   const handleRefresh = useCallback(async () => {
     setLastRefreshed(new Date().toLocaleTimeString())
     await fetchInventoryData()
-  }, [fetchInventory])
+  }, [fetchInventoryData])
 
 
   return (
@@ -173,8 +175,9 @@ const Inventory = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Metric label="Total Units" value={summary.totalUnits} icon={Package} />
+        <Metric label="Dealers" value={summary.dealers} icon={Building2} />
         <Metric label="Models" value={summary.models} icon={BarChart3} />
       </div>
 

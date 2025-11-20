@@ -17,6 +17,7 @@ import TestDrives from './app/staff/pages/TestDrives';
 import Reports from './app/staff/pages/Reports';
 
 // Manager imports
+import { Dashboard as ManagerDashboard } from './app/manager/Dashboard';
 import ManagerVehicleList from './app/manager/inventory/VehicleList';
 import StockOverview from './app/manager/inventory/StockOverview';
 import ModelDetail from './app/manager/inventory/ModelDetail';
@@ -55,7 +56,7 @@ const RoleRedirect = () => {
       const user = JSON.parse(savedUser);
       const role = user?.roles?.[0]?.roleName;
       const normalized = role === 'Dealer Manager' ? 'MANAGER' : role === 'Dealer Staff' ? 'STAFF' : (role ? role.toUpperCase() : role);
-      if (normalized === 'MANAGER') return <Navigate to="/manager/inventory/vehicles" />;
+      if (normalized === 'MANAGER') return <Navigate to="/manager/dashboard" />;
       if (normalized === 'STAFF') return <Navigate to="/staff/dashboard" />;
       if (normalized === 'EVM' || normalized === 'ADMIN') return <Navigate to="/evm" />;
     }
@@ -164,6 +165,14 @@ function App() {
         />
 
         {/* Manager Routes - Only accessible by MANAGER role */}
+        <Route 
+          path="/manager/dashboard" 
+          element={
+            <ProtectedRoute allowRoles={['MANAGER']}>
+              <ManagerDashboard />
+            </ProtectedRoute>
+          } 
+        />
         <Route 
           path="/manager/inventory/vehicles" 
           element={

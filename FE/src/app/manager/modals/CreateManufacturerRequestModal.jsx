@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Send, AlertCircle, DollarSign } from 'lucide-react';
-import { getCachedVehicleModels, createManufacturerRequest } from '../../services/inventoryService';
+import { getCachedVehicleModels, createManufacturerRequest } from '../services/inventoryService';
 
 const normalizeBrand = (brandName, modelName) => {
   if (brandName && typeof brandName === 'string') {

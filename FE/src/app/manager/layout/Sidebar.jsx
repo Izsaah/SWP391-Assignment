@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState } from "react";
 import {
+  LayoutDashboard,
   Package,
   Users,
   ShoppingCart,
@@ -196,6 +197,12 @@ function SidebarItem({ icon, text, active, onClick, alert, subItems, dropdownId 
 }
 
 const menuItems = [
+  {
+    id: "dashboard",
+    label: "Dealer Overview",
+    icon: LayoutDashboard,
+    path: "/manager/dashboard",
+  },
   { 
     id: "inventory", 
     label: "Inventory", 
