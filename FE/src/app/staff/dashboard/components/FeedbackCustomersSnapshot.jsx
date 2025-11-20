@@ -97,10 +97,10 @@ const FeedbackCustomersSnapshot = ({ newCustomers, recentFeedbacks, onViewCustom
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-900 flex items-center">
             <Users className="w-5 h-5 mr-2 text-blue-600" />
-            Latest Customers
+            Khách hàng mới nhất
           </h3>
           <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-            View All
+            Xem tất cả
           </button>
         </div>
         
@@ -120,7 +120,7 @@ const FeedbackCustomersSnapshot = ({ newCustomers, recentFeedbacks, onViewCustom
               <button
                 onClick={() => onViewCustomerDetail(customer)}
                 className="text-gray-400 hover:text-gray-600"
-                title="View details"
+                title="Xem chi tiết"
               >
                 <ExternalLink className="w-4 h-4" />
               </button>
@@ -134,10 +134,10 @@ const FeedbackCustomersSnapshot = ({ newCustomers, recentFeedbacks, onViewCustom
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-900 flex items-center">
             <MessageSquare className="w-5 h-5 mr-2 text-green-600" />
-            Latest Feedback
+            Phản hồi mới nhất
           </h3>
           <button className="text-green-600 hover:text-green-800 text-sm font-medium">
-            View All
+            Xem tất cả
           </button>
         </div>
         
@@ -154,7 +154,7 @@ const FeedbackCustomersSnapshot = ({ newCustomers, recentFeedbacks, onViewCustom
                 <button
                   onClick={() => onViewFeedbackDetail(feedback)}
                   className="text-gray-400 hover:text-gray-600"
-                  title="View details"
+                  title="Xem chi tiết"
                 >
                   <ExternalLink className="w-4 h-4" />
                 </button>

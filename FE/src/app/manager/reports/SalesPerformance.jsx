@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import Layout from '../layout/Layout';
 import {
   TrendingUp,
   Search,
+  ChevronRight,
   Calendar,
   Eye,
   X,
@@ -21,7 +22,16 @@ const SalesPerformance = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const loadData = useCallback(async () => {
+  useEffect(() => {
+    // Default: load current month
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+    setDateFrom(first);
+    setDateTo(last);
+  }, []);
+
+  const loadData = async () => {
     if (!dateFrom || !dateTo) return;
     setLoading(true);
     setError('');
@@ -34,23 +44,7 @@ const SalesPerformance = () => {
       setError(res.message || 'Failed to load sales data');
     }
     setLoading(false);
-  }, [dateFrom, dateTo]);
-
-  useEffect(() => {
-    // Default: load current month
-    const now = new Date();
-    const first = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
-    setDateFrom(first);
-    setDateTo(last);
-  }, []);
-
-  // Auto-load data when dateFrom and dateTo are set
-  useEffect(() => {
-    if (dateFrom && dateTo) {
-      loadData();
-    }
-  }, [loadData]);
+  };
 
   // Helper functions
   const formatCurrency = (amount) => {
@@ -92,6 +86,14 @@ const SalesPerformance = () => {
   return (
     <Layout>
       <div className="space-y-6">
+        {/* Breadcrumb */}
+        <div className="flex items-center text-sm text-gray-600 mb-2">
+          <span className="hover:text-blue-600 cursor-pointer">Dashboard</span>
+          <ChevronRight className="w-4 h-4 mx-2" />
+          <span className="hover:text-blue-600 cursor-pointer">Reports</span>
+          <ChevronRight className="w-4 h-4 mx-2" />
+          <span className="text-gray-900 font-medium">Sales Performance</span>
+        </div>
 
         {/* Page Header */}
         <div className="flex items-center justify-between mb-6">
@@ -258,13 +260,13 @@ const SalesPerformance = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {selectedStaff.orders.map((order, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
+                      {selectedStaff.orders.map((order) => (
+                        <tr key={order.orderId} className="hover:bg-gray-50">
                           <td className="px-4 py-3 whitespace-nowrap">
-                            <span className="text-sm font-medium text-gray-900">{order.orderId || 'N/A'}</span>
+                            <span className="text-sm font-medium text-gray-900">{order.orderId}</span>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            <span className="text-sm text-gray-700">{order.customer || 'N/A'}</span>
+                            <span className="text-sm text-gray-700">{order.customer}</span>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span className="text-sm text-gray-700">{formatDate(order.date)}</span>

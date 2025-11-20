@@ -18,7 +18,6 @@ import { useLocation } from 'react-router';
 import { getAllCustomers } from '../services/customerService';
 import { fetchInventory, fetchVariantsForModel, fetchAvailableSerialsByVariant } from '../services/inventoryService';
 import { createTestDrive, updateTestDriveStatus, getTestDrivesByCustomerId, getDealerTestDrives } from '../services/testDriveService';
-import SuccessModal from '../../../components/SuccessModal';
 
 const TestDrives = () => {
   const location = useLocation();
@@ -42,8 +41,6 @@ const TestDrives = () => {
   const [existingSchedule, setExistingSchedule] = useState(null);
   const [allowReplace, setAllowReplace] = useState(false);
   const [duplicateError, setDuplicateError] = useState('');
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [successModalData, setSuccessModalData] = useState(null);
 
   const parseStatus = useCallback((status) => {
     if (!status) {
@@ -123,18 +120,9 @@ const TestDrives = () => {
       }).filter(Boolean);
 
       allTestDrives.sort((a, b) => {
-        // Handle invalid dates by putting them at the end
-        const dateA = a.date && a.date !== 'N/A' ? new Date(a.date) : null;
-        const dateB = b.date && b.date !== 'N/A' ? new Date(b.date) : null;
-        
-        if (!dateA || isNaN(dateA.getTime())) {
-          return 1; // Put invalid dates at the end
-        }
-        if (!dateB || isNaN(dateB.getTime())) {
-          return -1; // Put invalid dates at the end
-        }
-        
-        return dateB - dateA; // Most recent first
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return dateB - dateA;
       });
       
       setTestDrives(allTestDrives);
@@ -332,18 +320,10 @@ const TestDrives = () => {
     }
 
     // Client-side duplicate check (same serial + date already listed)
-    const hasDuplicate = testDrives.some(d => {
-      if (!d.date || d.date === 'N/A' || !formData.date) return false;
-      try {
-        const dateA = new Date(d.date);
-        const dateB = new Date(formData.date);
-        if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) return false;
-        return String(d.serialId) === String(formData.serialId) &&
-          dateA.toISOString().slice(0,10) === dateB.toISOString().slice(0,10);
-      } catch {
-        return false;
-      }
-    });
+    const hasDuplicate = testDrives.some(d =>
+      String(d.serialId) === String(formData.serialId) &&
+      new Date(d.date).toISOString().slice(0,10) === new Date(formData.date).toISOString().slice(0,10)
+    );
     if (hasDuplicate) {
       setDuplicateError('A test drive with this serial ID and date already exists. Choose a different date or serial.');
       return;
@@ -359,33 +339,7 @@ const TestDrives = () => {
       });
 
       if (result.success) {
-        // Get customer name for display
-        const customer = customers.find(c => {
-          const id = c.customerId || c.customer_id || c.id;
-          return String(id) === String(formData.customerId);
-        });
-        const customerName = customer?.name || formData.customerName || 'N/A';
-        
-        // Format date for display
-        const dateObj = new Date(formData.date);
-        const formattedDate = dateObj.toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
-        });
-        
-        setSuccessModalData({
-          title: 'Test Drive Scheduled Successfully!',
-          message: 'Test drive scheduled successfully!',
-          details: {
-            'Customer': customerName,
-            'Serial ID': formData.serialId || 'N/A',
-            'Date': formattedDate,
-            'Status': formData.status || 'Pending'
-          },
-          footerMessage: 'The test drive will now appear in the test drive schedule list.'
-        });
-        setShowSuccessModal(true);
+        alert('✅ Test drive scheduled successfully!');
         setShowCreateModal(false);
         setFormData({
           customerId: '',
@@ -472,22 +426,15 @@ const TestDrives = () => {
 
   // Format date
   const formatDate = (dateString) => {
-    if (!dateString || dateString === '' || dateString === 'N/A' || dateString === 'null' || dateString === 'undefined') {
-      return '0';
-    }
+    if (!dateString || dateString === 'N/A') return 'N/A';
     try {
-      const dateObj = new Date(dateString);
-      // Check if date is valid
-      if (isNaN(dateObj.getTime())) {
-        return '0'; // Return 0 if invalid
-      }
-      return dateObj.toLocaleDateString('en-US', {
+      return new Date(dateString).toLocaleDateString('en-US', {
         month: 'long',
         day: 'numeric',
         year: 'numeric'
       });
     } catch {
-      return '0';
+      return dateString;
     }
   };
 
@@ -1014,21 +961,6 @@ const TestDrives = () => {
               </form>
             </div>
           </div>
-        )}
-
-        {/* Success Modal */}
-        {successModalData && (
-          <SuccessModal
-            open={showSuccessModal}
-            onClose={() => {
-              setShowSuccessModal(false);
-              setSuccessModalData(null);
-            }}
-            title={successModalData.title}
-            message={successModalData.message}
-            details={successModalData.details}
-            footerMessage={successModalData.footerMessage}
-          />
         )}
       </div>
     </Layout>

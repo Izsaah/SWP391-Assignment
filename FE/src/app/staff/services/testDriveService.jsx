@@ -232,48 +232,6 @@ export const createTestDrive = async (testDriveData) => {
 };
 
 /**
- * Search customers for schedule by name
- * @param {string} name - Customer name to search
- * @returns {Promise} - Promise containing the result
- */
-export const searchCustomerForSchedule = async (name) => {
-  try {
-    const token = localStorage.getItem('token');
-    const response = await axios.post(
-      `${API_URL}/staff/searchCustomerForSchedule`,
-      { name: String(name || '').trim() },
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    if (response.data?.status === 'success') {
-      const payload = Array.isArray(response.data.data) ? response.data.data : [];
-      return {
-        success: true,
-        data: payload
-      };
-    } else {
-      return {
-        success: false,
-        message: response.data?.message || 'Failed to search customers',
-        data: []
-      };
-    }
-  } catch (error) {
-    console.error('Error searching customers:', error);
-    return {
-      success: false,
-      message: error.response?.data?.message || 'Failed to search customers',
-      data: []
-    };
-  }
-};
-
-/**
  * Update test drive status
  * @param {number} appointmentId - Appointment ID
  * @param {string} status - New status

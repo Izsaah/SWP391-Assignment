@@ -135,14 +135,14 @@ const DataTablesSection = ({ onViewOrderDetail, onViewQuoteDetail, onViewTestDri
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      'pending': { color: 'bg-yellow-100 text-yellow-800', label: 'Pending Approval', icon: Clock },
-      'approved': { color: 'bg-green-100 text-green-800', label: 'Approved', icon: CheckCircle },
-      'rejected': { color: 'bg-red-100 text-red-800', label: 'Rejected', icon: AlertCircle },
-      'processing': { color: 'bg-blue-100 text-blue-800', label: 'Processing', icon: Clock },
-      'delivery': { color: 'bg-purple-100 text-purple-800', label: 'In Delivery', icon: Clock },
-      'completed': { color: 'bg-green-100 text-green-800', label: 'Completed', icon: CheckCircle },
-      'scheduled': { color: 'bg-purple-100 text-purple-800', label: 'Scheduled', icon: Clock },
-      'confirmed': { color: 'bg-green-100 text-green-800', label: 'Confirmed', icon: CheckCircle },
+      'pending': { color: 'bg-yellow-100 text-yellow-800', label: 'Chờ duyệt', icon: Clock },
+      'approved': { color: 'bg-green-100 text-green-800', label: 'Đã duyệt', icon: CheckCircle },
+      'rejected': { color: 'bg-red-100 text-red-800', label: 'Từ chối', icon: AlertCircle },
+      'processing': { color: 'bg-blue-100 text-blue-800', label: 'Đang xử lý', icon: Clock },
+      'delivery': { color: 'bg-purple-100 text-purple-800', label: 'Đang giao', icon: Clock },
+      'completed': { color: 'bg-green-100 text-green-800', label: 'Hoàn thành', icon: CheckCircle },
+      'scheduled': { color: 'bg-purple-100 text-purple-800', label: 'Đã lên lịch', icon: Clock },
+      'confirmed': { color: 'bg-green-100 text-green-800', label: 'Đã xác nhận', icon: CheckCircle },
     };
     
     const config = statusConfig[status] || { color: 'bg-gray-100 text-gray-800', label: status, icon: Clock };

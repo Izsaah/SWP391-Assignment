@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Layout from '../layout/Layout';
 import { Plus, Search, Clock, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
-import CreateManufacturerRequestModal from '../modals/CreateManufacturerRequestModal';
+import CreateManufacturerRequestModal from './components/CreateManufacturerRequestModal';
 import { fetchManufacturerRequests } from '../services/inventoryService';
 
 const ManufacturerRequestsList = () => {
@@ -130,13 +130,15 @@ const ManufacturerRequestsList = () => {
   };
 
   const formatPrice = (price) => {
-    if (!price || price === 0) return '0 ₫';
-    return new Intl.NumberFormat('vi-VN').format(price) + ' ₫';
+    if (!price) return 'N/A';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+    }).format(price);
   };
 
   const filteredRequests = requests.filter((r) => {
-
-    
     if (statusFilter !== 'all' && (r.status || '').toLowerCase() !== statusFilter) return false;
     if (query) {
       const q = query.toLowerCase();

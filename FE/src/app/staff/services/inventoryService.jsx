@@ -1,110 +1,37 @@
 import axios from 'axios';
-import { getImageByModelId, getImageByVariantId, getImageByModelAndVariant, getImageByIndex } from '../../../assets/ListOfCar';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
 /**
- * Fix image URL - Thêm base URL nếu cần, với fallback to ListOfCar
+ * Fix image URL - Thêm base URL nếu cần
  * @param {string} imageUrl - URL ảnh từ BE
- * @param {number} modelId - Model ID (optional)
- * @param {number} variantId - Variant ID (optional)
  * @returns {string} - URL ảnh đã fix
  */
-const fixImageUrl = (imageUrl, modelId = null, variantId = null) => {
-  // PRIORITY 1: If backend has image, use it first (database has priority)
-  if (imageUrl) {
-    console.log('📦 Using backend image from database:', imageUrl);
-    
-    // Check if it's a Google Drive share link - convert it to direct view URL
-    if (imageUrl.includes('drive.google.com')) {
-      // Extract file ID from various Google Drive link formats
-      let fileId = null;
-      
-      // Format 1: https://drive.google.com/file/d/FILE_ID/view?usp=sharing
-      const fileIdMatch1 = imageUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
-      if (fileIdMatch1 && fileIdMatch1[1]) {
-        fileId = fileIdMatch1[1];
-      }
-      
-      // Format 2: https://drive.google.com/open?id=FILE_ID
-      if (!fileId) {
-        const fileIdMatch2 = imageUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-        if (fileIdMatch2 && fileIdMatch2[1]) {
-          fileId = fileIdMatch2[1];
-        }
-      }
-      
-      if (fileId) {
-        // Convert to Google Drive direct view URL (official method)
-        const convertedUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
-        console.log('🔄 Converted Google Drive share link to direct view URL:', convertedUrl);
-        return convertedUrl;
-      }
-    }
-    
-    // If already a direct URL (http/https), return as is
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-      console.log('✅ URL already has protocol, keeping as is:', imageUrl);
-      return imageUrl;
-    }
-    
-    // If relative path, add base URL
-    if (imageUrl.startsWith('/')) {
-      const baseUrl = API_URL.replace('/api', ''); // Remove /api
-      const fixedUrl = `${baseUrl}${imageUrl}`;
-      console.log('🔧 Fixed relative path:', fixedUrl);
-      return fixedUrl;
-    }
-    
-    // If just filename, add base URL + /images/
-    // Ví dụ: "tesla-model3-white.jpg" -> "https://.../images/tesla-model3-white.jpg"
+const fixImageUrl = (imageUrl) => {
+  if (!imageUrl) return null;
+  
+  console.log('🖼️ Original image URL from BE:', imageUrl);
+  
+  // Nếu đã có http/https thì giữ nguyên
+  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+    console.log('✅ URL already has protocol, keeping as is:', imageUrl);
+    return imageUrl;
+  }
+  
+  // Nếu là relative path (bắt đầu bằng /), thêm base URL
+  if (imageUrl.startsWith('/')) {
     const baseUrl = API_URL.replace('/api', ''); // Remove /api
-    const fixedUrl = `${baseUrl}/images/${imageUrl}`;
-    console.log('🔧 Fixed filename with /images/ path:', fixedUrl);
+    const fixedUrl = `${baseUrl}${imageUrl}`;
+    console.log('🔧 Fixed relative path:', fixedUrl);
     return fixedUrl;
   }
   
-  // PRIORITY 2: Fallback to ListOfCar.js only if backend has no image
-  if (modelId && variantId) {
-    const driveImage = getImageByModelAndVariant(modelId, variantId);
-    if (driveImage) {
-      console.log('✅ Using fallback image from ListOfCar (model + variant):', driveImage);
-      return driveImage;
-    }
-  }
-  if (variantId) {
-    const driveImage = getImageByVariantId(variantId);
-    if (driveImage) {
-      console.log('✅ Using fallback image from ListOfCar (variant):', driveImage);
-      return driveImage;
-    }
-  }
-  if (modelId) {
-    const driveImage = getImageByModelId(modelId);
-    if (driveImage) {
-      console.log('✅ Using fallback image from ListOfCar (model):', driveImage);
-      return driveImage;
-    }
-  }
-  
-  // Last resort: use index-based fallback
-  if (modelId || variantId) {
-    const index = ((modelId || 0) + (variantId || 0)) % 17; // 17 is the number of images
-    const fallbackImage = getImageByIndex(index);
-    if (fallbackImage) {
-      console.log('✅ Using fallback image from ListOfCar (index):', fallbackImage);
-      return fallbackImage;
-    }
-  }
-  
-  // Last resort: get first image
-  const firstImage = getImageByIndex(0);
-  if (firstImage) {
-    console.log('✅ Using first image from ListOfCar as fallback:', firstImage);
-    return firstImage;
-  }
-  
-  return null;
+  // Nếu chỉ là filename (không có / và không có http), thêm base URL + /images/
+  // Ví dụ: "tesla-model3-white.jpg" -> "https://.../images/tesla-model3-white.jpg"
+  const baseUrl = API_URL.replace('/api', ''); // Remove /api
+  const fixedUrl = `${baseUrl}/images/${imageUrl}`;
+  console.log('🔧 Fixed filename with /images/ path:', fixedUrl);
+  return fixedUrl;
 };
 
 /**
@@ -312,16 +239,6 @@ export const transformInventoryData = (backendData) => {
           return;
         }
 
-        // Get image from variant - check multiple possible field names
-        const variantImage = variant.image || variant.imageUrl || variant.img || null;
-        
-        console.log('🔍 Processing variant (Staff):', {
-          variantId: variant.variantId,
-          modelId: model.modelId,
-          variantImage: variantImage,
-          variantKeys: Object.keys(variant)
-        });
-
         transformedData.push({
           // Basic IDs
           id: `${model.modelName}-${variant.variantId}`,
@@ -340,8 +257,8 @@ export const transformInventoryData = (backendData) => {
           price: variant.price || 0,
           priceUsd: variant.price || 0,
           
-          // Image - Fix URL nếu cần, với fallback to ListOfCar
-          imageUrl: fixImageUrl(variantImage, model.modelId, variant.variantId),
+          // Image - Fix URL nếu cần
+          imageUrl: variant.image ? fixImageUrl(variant.image) : null,
           
           // Status - luôn là "available" vì đã filter active
           status: 'available',

@@ -7,6 +7,7 @@ import { createFeedback } from '../services/feedbackService';
 import { fetchInventory } from '../../staff/services/inventoryService';
 import { getCompletedPayments, getCustomersWithActiveInstallments } from '../../staff/services/paymentService';
 import {
+  ChevronRight,
   Phone,
   Mail,
   MapPin,
@@ -821,6 +822,19 @@ const CustomerDetail = () => {
   return (
     <Layout>
       <div className="space-y-3">
+        {/* Breadcrumb */}
+        <div className="flex items-center text-xs text-gray-600">
+          <button onClick={() => navigate('/manager/dashboard')} className="hover:text-blue-600">
+            Dashboard
+          </button>
+          <ChevronRight className="w-3 h-3 mx-1" />
+          <button onClick={() => navigate('/manager/customers/list')} className="hover:text-blue-600">
+            Customers
+          </button>
+          <ChevronRight className="w-3 h-3 mx-1" />
+          <span className="text-gray-900 font-medium">Customer Detail</span>
+        </div>
+
         {/* Back Button */}
         <button
           onClick={() => navigate('/manager/customers/list')}

@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { getImageByModelId, getImageByVariantId, getImageByModelAndVariant, getImageByIndex } from '../../../assets/ListOfCar';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -28,81 +27,22 @@ export const handleAuthError = (error) => {
 };
 
 /**
- * Fix image URL - Thêm base URL nếu cần, với fallback to ListOfCar
- * @param {string} imageUrl - URL ảnh từ BE
- * @param {number} modelId - Model ID (optional)
- * @param {number} variantId - Variant ID (optional)
- * @returns {string} - URL ảnh đã fix
+ * Fix image URL - Thêm base URL nếu cần
  */
-const fixImageUrl = (imageUrl, modelId = null, variantId = null) => {
-  // PRIORITY 1: If backend has image, use it first (database has priority)
-  if (imageUrl) {
-    // Check if it's a Google Drive share link - convert it to direct view URL
-    if (imageUrl.includes('drive.google.com')) {
-      // Extract file ID from various Google Drive link formats
-      let fileId = null;
-      
-      // Format 1: https://drive.google.com/file/d/FILE_ID/view?usp=sharing
-      const fileIdMatch1 = imageUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
-      if (fileIdMatch1 && fileIdMatch1[1]) {
-        fileId = fileIdMatch1[1];
-      }
-      
-      // Format 2: https://drive.google.com/open?id=FILE_ID
-      if (!fileId) {
-        const fileIdMatch2 = imageUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-        if (fileIdMatch2 && fileIdMatch2[1]) {
-          fileId = fileIdMatch2[1];
-        }
-      }
-      
-      if (fileId) {
-        // Convert to Google Drive direct view URL (official method)
-        const convertedUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
-        console.log('🔄 Converted Google Drive share link to direct view URL:', convertedUrl);
-        return convertedUrl;
-      }
-    }
-    
-    // If already a direct URL (http/https), return as is
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-      return imageUrl;
-    }
-    
-    // If relative path, add base URL
-    if (imageUrl.startsWith('/')) {
-      const baseUrl = API_URL.replace('/api', '');
-      return `${baseUrl}${imageUrl}`;
-    }
-    
-    // If just filename, add base URL + /images/
+const fixImageUrl = (imageUrl) => {
+  if (!imageUrl) return null;
+  
+  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+    return imageUrl;
+  }
+  
+  if (imageUrl.startsWith('/')) {
     const baseUrl = API_URL.replace('/api', '');
-    return `${baseUrl}/images/${imageUrl}`;
+    return `${baseUrl}${imageUrl}`;
   }
   
-  // PRIORITY 2: Fallback to ListOfCar.js only if backend has no image
-  if (modelId && variantId) {
-    const driveImage = getImageByModelAndVariant(modelId, variantId);
-    if (driveImage) return driveImage;
-  }
-  if (variantId) {
-    const driveImage = getImageByVariantId(variantId);
-    if (driveImage) return driveImage;
-  }
-  if (modelId) {
-    const driveImage = getImageByModelId(modelId);
-    if (driveImage) return driveImage;
-  }
-  
-  // Last resort: use index-based fallback
-  if (modelId || variantId) {
-    const index = ((modelId || 0) + (variantId || 0)) % 17; // 17 is the number of images
-    const fallbackImage = getImageByIndex(index);
-    if (fallbackImage) return fallbackImage;
-  }
-  
-  // Last resort: get first image
-  return getImageByIndex(0);
+  const baseUrl = API_URL.replace('/api', '');
+  return `${baseUrl}/images/${imageUrl}`;
 };
 
 /**
@@ -186,16 +126,6 @@ export const getVehicles = async (filters = {}) => {
         // Only use real data from database
         const modelName = `${model.modelName} ${variant.versionName || ''}`.trim();
         
-        // Get image from variant - check multiple possible field names
-        const variantImage = variant.image || variant.imageUrl || variant.img || null;
-        
-        console.log('🔍 Processing variant:', {
-          variantId: variant.variantId,
-          modelId: model.modelId,
-          variantImage: variantImage,
-          variantKeys: Object.keys(variant)
-        });
-        
         vehicles.push({
           modelId: model.modelId,
           variantId: variant.variantId,
@@ -204,7 +134,7 @@ export const getVehicles = async (filters = {}) => {
           versionName: variant.versionName || '',
           color: variant.color || 'N/A',
           price: variant.price || 0,
-          image: fixImageUrl(variantImage, model.modelId, variant.variantId),
+          image: variant.image ? fixImageUrl(variant.image) : null,
           isActive: variant.isActive,
           description: model.description || '',
         });

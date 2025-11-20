@@ -5,8 +5,8 @@ const QuickActions = ({ onCreateQuote, onCreateOrder, viewInventory }) => {
   const actions = [
     {
       id: 'quote',
-      title: 'Create New Quote',
-      description: 'Create a quote for potential customers',
+      title: 'Tạo báo giá mới',
+      description: 'Tạo báo giá cho khách hàng tiềm năng',
       icon: FileText,
       color: 'bg-blue-600 hover:bg-blue-700',
       iconColor: 'text-blue-600',
@@ -15,8 +15,8 @@ const QuickActions = ({ onCreateQuote, onCreateOrder, viewInventory }) => {
     },
     {
       id: 'order',
-      title: 'Create New Order',
-      description: 'Create an order for customers',
+      title: 'Tạo đơn hàng mới',
+      description: 'Tạo đơn hàng cho khách hàng',
       icon: ShoppingCart,
       color: 'bg-green-600 hover:bg-green-700',
       iconColor: 'text-green-600',
@@ -25,8 +25,8 @@ const QuickActions = ({ onCreateQuote, onCreateOrder, viewInventory }) => {
     },
     {
       id: 'inventory',
-      title: 'View Vehicle Catalog',
-      description: 'Manage and view current vehicle inventory',
+      title: 'Xem danh mục xe',
+      description: 'Quản lý và xem kho xe hiện có',
       icon: Car,
       color: 'bg-orange-600 hover:bg-orange-700',
       iconColor: 'text-orange-600',
@@ -39,10 +39,10 @@ const QuickActions = ({ onCreateQuote, onCreateOrder, viewInventory }) => {
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="mb-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Quick Actions
+          Thao tác nhanh
         </h3>
         <p className="text-gray-600">
-          Common actions to improve work efficiency
+          Các thao tác thường dùng để tăng hiệu quả công việc
         </p>
       </div>
 
@@ -78,15 +78,15 @@ const QuickActions = ({ onCreateQuote, onCreateOrder, viewInventory }) => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
           <div className="p-4 bg-gray-50 rounded-lg">
             <p className="text-2xl font-bold text-gray-900">24</p>
-            <p className="text-sm text-gray-600">Unsent Quotes</p>
+            <p className="text-sm text-gray-600">Báo giá chưa gửi</p>
           </div>
           <div className="p-4 bg-gray-50 rounded-lg">
             <p className="text-2xl font-bold text-gray-900">8</p>
-            <p className="text-sm text-gray-600">Pending Orders</p>
+            <p className="text-sm text-gray-600">Đơn hàng chờ xử lý</p>
           </div>
           <div className="p-4 bg-gray-50 rounded-lg">
             <p className="text-2xl font-bold text-gray-900">156</p>
-            <p className="text-sm text-gray-600">Available Vehicles</p>
+            <p className="text-sm text-gray-600">Xe có sẵn</p>
           </div>
         </div>
       </div>

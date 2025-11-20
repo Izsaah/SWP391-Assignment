@@ -99,6 +99,21 @@ const VehicleSelectorModal = ({ isOpen, onClose, onSelect, vehicles = [], select
                   onClick={() => handleSelect(vehicle)}
                   className="flex items-center space-x-4 p-4 bg-white border border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all text-left w-full"
                 >
+                  {/* Image */}
+                  <div className="flex-shrink-0 w-20 h-16 bg-white rounded-lg overflow-hidden border border-gray-200">
+                    {vehicle.imageUrl ? (
+                      <img
+                        src={vehicle.imageUrl}
+                        alt={vehicle.title}
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-2xl">
+                        🚗
+                      </div>
+                    )}
+                  </div>
+
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-gray-900 text-base mb-1">
@@ -122,7 +137,7 @@ const VehicleSelectorModal = ({ isOpen, onClose, onSelect, vehicles = [], select
                   <div className="text-right flex-shrink-0 mr-4">
                     <div className="text-lg font-bold text-gray-900 mb-1">
                       {vehicle.priceUsd 
-                        ? new Intl.NumberFormat('vi-VN').format(vehicle.priceUsd) + ' ₫'
+                        ? `$${vehicle.priceUsd.toLocaleString()}`
                         : '—'
                       }
                     </div>
