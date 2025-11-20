@@ -14,50 +14,6 @@ const authHeaders = () => {
 };
 
 /**
- * Fetch inventory data
- * Backend endpoint: POST /api/EVM/viewInventory
- * @returns {Promise} Promise containing inventory data
- */
-export const fetchInventory = async () => {
-  try {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      return {
-        success: false,
-        message: 'No authentication token found. Please login again.',
-        data: []
-      };
-    }
-
-    const response = await axios.post(
-      `${API_URL}/EVM/viewInventory`,
-      { _empty: true },
-      { headers: authHeaders() }
-    );
-
-    if (response.data && response.data.status === 'success' && response.data.data) {
-      return {
-        success: true,
-        data: response.data.data
-      };
-    } else {
-      return {
-        success: false,
-        message: response.data?.message || 'Failed to fetch inventory',
-        data: []
-      };
-    }
-  } catch (error) {
-    console.error('Error fetching inventory:', error);
-    return {
-      success: false,
-      message: error.response?.data?.message || 'Failed to fetch inventory',
-      data: []
-    };
-  }
-};
-
-/**
  * Fetch consumption rate data from BE
  * Backend endpoint: POST /api/EVM/viewConsumptionRate
  * Returns: List<String> with format "ModelName Consumption Rate: X.XX"

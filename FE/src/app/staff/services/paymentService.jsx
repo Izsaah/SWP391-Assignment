@@ -4,16 +4,16 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 /**
  * Create a payment
- * NOTE: Backend automatically calculates totalAmount = unitPrice * quantity and applies discount in PaymentService.processPayment()
- * Only need to pass orderId and method, no need to pass totalAmount
+ * NOTE: Backend tự động tính totalAmount = unitPrice * quantity và apply discount trong PaymentService.processPayment()
+ * Chỉ cần truyền orderId và method, không cần truyền totalAmount
  * 
  * @param {Object} paymentData - Payment data:
  *   - orderId (required): Order ID
- *   - method (required): "TT" (Full Payment) or "TG" (Installment)
- *   - interestRate (optional): Interest rate for installment (default: "0")
- *   - termMonth (optional): Number of months for installment (default: "12")
- *   - monthlyPay (optional): Monthly payment amount (default: "0" - backend calculates automatically)
- *   - status (optional): Status for installment plan (default: "Active")
+ *   - method (required): "TT" (Full Payment) hoặc "TG" (Installment)
+ *   - interestRate (optional): Lãi suất cho trả góp (default: "0")
+ *   - termMonth (optional): Số tháng trả góp (default: "12")
+ *   - monthlyPay (optional): Số tiền trả hàng tháng (default: "0" - backend tự tính)
+ *   - status (optional): Status cho installment plan (default: "Active")
  * @returns {Promise} - Promise containing the result
  */
 export const createPayment = async (paymentData) => {

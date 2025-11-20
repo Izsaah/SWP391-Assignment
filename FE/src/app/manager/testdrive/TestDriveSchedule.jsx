@@ -3,15 +3,21 @@ import Layout from '../layout/Layout';
 import {
   Calendar,
   Search,
+  Filter,
   X,
+  XCircle,
+  CheckCircle,
+  ChevronRight,
   Users,
   Car,
   Plus
 } from 'lucide-react';
-import { createTestDrive, updateTestDriveStatus, getDealerTestDrives, searchCustomerForSchedule } from '../../staff/services/testDriveService';
+import axios from 'axios';
+import { createTestDrive, updateTestDriveStatus, getDealerTestDrives } from '../../staff/services/testDriveService';
 import { getAllCustomers } from '../../staff/services/customerService';
 import { fetchInventory, fetchVariantsForModel, fetchAvailableSerialsByVariant } from '../../staff/services/inventoryService';
-import SuccessModal from '../../../components/SuccessModal';
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 const TestDriveSchedule = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -31,8 +37,6 @@ const TestDriveSchedule = () => {
   const [selectedVariantId, setSelectedVariantId] = useState('');
   const [creating, setCreating] = useState(false);
   const [formData, setFormData] = useState({ customerId: '', serialId: '', date: '' });
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [successModalData, setSuccessModalData] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -42,10 +46,10 @@ const TestDriveSchedule = () => {
         if (inv.success) setVehicles(inv.data || []);
         // Initial load: fetch all dealer schedules
         const dealer = await getDealerTestDrives();
-        if (dealer.success && Array.isArray(dealer.data)) {
-          // Only set schedules if we have actual test drive data
-          // Don't fallback to customers - they are not test drives
+        if (dealer.success && Array.isArray(dealer.data) && dealer.data.length > 0) {
           setRawSchedules(dealer.data);
+        } else if (cust.success) {
+          setRawSchedules(cust.data || []);
         } else {
           setRawSchedules([]);
         }
@@ -58,18 +62,10 @@ const TestDriveSchedule = () => {
 
   // Helper functions
   const formatDate = (date) => {
-    if (!date || date === '' || date === 'N/A' || date === 'null' || date === 'undefined') {
-      return '0';
-    }
     try {
-      const dateObj = new Date(date);
-      // Check if date is valid
-      if (isNaN(dateObj.getTime())) {
-        return '0'; // Return 0 if invalid
-      }
-      return dateObj.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     } catch {
-      return '0';
+      return date;
     }
   };
 
@@ -113,9 +109,12 @@ const TestDriveSchedule = () => {
   };
 
   const scheduleRows = useMemo(() => {
-    // Only use rawSchedules - don't fallback to customers
-    // Customers are not test drive schedules
-    const baseEntries = Array.isArray(rawSchedules) ? rawSchedules : [];
+    const baseEntries =
+      Array.isArray(rawSchedules) && rawSchedules.length > 0
+        ? rawSchedules
+        : Array.isArray(customers)
+        ? customers
+        : [];
 
     return baseEntries
       .map((entry) => {
@@ -164,6 +163,16 @@ const TestDriveSchedule = () => {
     );
   }, [scheduleRows, statusFilter]);
 
+  // Handle cancel appointment
+  const handleCancelAppointment = () => {
+    if (window.confirm('Are you sure you want to cancel this appointment?')) {
+      updateTestDriveStatus(selectedAppointment.appointmentId, 'Cancelled').then(() => {
+        setIsDrawerOpen(false);
+        handleSearch();
+      });
+    }
+  };
+
   // Handle mark as completed
   const handleMarkCompleted = () => {
     updateTestDriveStatus(selectedAppointment.appointmentId, 'Completed').then(() => {
@@ -176,15 +185,20 @@ const TestDriveSchedule = () => {
   const handleSearch = async () => {
     setLoading(true);
     try {
-      const result = await searchCustomerForSchedule(searchQuery);
-      if (result.success && result.data) {
-        setRawSchedules(result.data);
+      const token = localStorage.getItem('token');
+      const res = await axios.post(
+        `${API_URL}/staff/searchCustomerForSchedule`,
+        { name: String(searchQuery || '').trim() },
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+      );
+      if (res.data?.status === 'success') {
+        const payload = Array.isArray(res.data.data) ? res.data.data : [];
+        setRawSchedules(payload.length > 0 ? payload : customers);
       } else {
-        setRawSchedules([]);
+        setRawSchedules(customers);
       }
-    } catch (error) {
-      console.error('Error searching customers:', error);
-      setRawSchedules([]);
+    } catch {
+      setRawSchedules(customers);
     } finally {
       setLoading(false);
     }
@@ -206,6 +220,13 @@ const TestDriveSchedule = () => {
   return (
     <Layout>
       <div className="space-y-6">
+        {/* Breadcrumb */}
+        <div className="flex items-center text-sm text-gray-600 mb-2">
+          <span className="hover:text-blue-600 cursor-pointer">Dashboard</span>
+          <ChevronRight className="w-4 h-4 mx-2" />
+          <span className="text-gray-900 font-medium">Test Drive Schedule</span>
+        </div>
+
         {/* Page Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -265,15 +286,16 @@ const TestDriveSchedule = () => {
               onClick={async () => {
                 setLoading(true);
                 const dealer = await getDealerTestDrives();
-                if (dealer.success && Array.isArray(dealer.data)) {
+                if (dealer.success && Array.isArray(dealer.data) && dealer.data.length > 0) {
                   setRawSchedules(dealer.data);
                 } else {
-                  setRawSchedules([]);
-                }
-                // Refresh customers list separately (for dropdown, not for schedules)
-                const allCustomers = await getAllCustomers();
-                if (allCustomers.success) {
-                  setCustomers(allCustomers.data || []);
+                  const allCustomers = await getAllCustomers();
+                  if (allCustomers.success) {
+                    setCustomers(allCustomers.data || []);
+                    setRawSchedules(allCustomers.data || []);
+                  } else {
+                    setRawSchedules([]);
+                  }
                 }
                 setLoading(false);
               }}
@@ -343,6 +365,17 @@ const TestDriveSchedule = () => {
                         >
                           View
                         </button>
+                        {row.status && row.status.toLowerCase() !== 'completed' && row.status.toLowerCase() !== 'cancelled' && (
+                          <button
+                            onClick={() => {
+                              setSelectedAppointment(row);
+                              handleCancelAppointment();
+                            }}
+                            className="text-red-600 hover:text-red-900 text-xs font-medium"
+                          >
+                            Cancel
+                          </button>
+                        )}
                         {row.status && row.status.toLowerCase() === 'confirmed' && (
                           <button
                             onClick={() => {
@@ -486,51 +519,9 @@ const TestDriveSchedule = () => {
                 });
                 setCreating(false);
                 if (res.success) {
-                  // Get customer name for display
-                  const customer = customers.find(c => {
-                    const id = c.customerId || c.customer_id || c.id;
-                    return String(id) === String(formData.customerId);
-                  });
-                  const customerName = customer?.name || 'N/A';
-                  
-                  // Format date for display
-                  const dateObj = new Date(formData.date);
-                  const formattedDate = dateObj.toLocaleDateString('en-US', { 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  });
-                  
-                  setSuccessModalData({
-                    title: 'Test Drive Scheduled Successfully!',
-                    message: 'Test drive scheduled successfully!',
-                    details: {
-                      'Customer': customerName,
-                      'Serial ID': formData.serialId || 'N/A',
-                      'Date': formattedDate,
-                      'Status': 'Pending'
-                    },
-                    footerMessage: 'The test drive will now appear in the test drive schedule list.'
-                  });
-                  setShowSuccessModal(true);
                   setShowCreateModal(false);
                   setFormData({ customerId: '', serialId: '', date: '' });
-                  // Refresh all test drives after a short delay to allow backend to process
-                  setTimeout(async () => {
-                    setLoading(true);
-                    const dealer = await getDealerTestDrives();
-                    if (dealer.success && Array.isArray(dealer.data)) {
-                      setRawSchedules(dealer.data);
-                    } else {
-                      setRawSchedules([]);
-                    }
-                    // Refresh customers list separately
-                    const allCustomers = await getAllCustomers();
-                    if (allCustomers.success) {
-                      setCustomers(allCustomers.data || []);
-                    }
-                    setLoading(false);
-                  }, 500);
+                  await handleSearch();
                 } else {
                   alert(res.message || 'Failed to create schedule');
                 }
@@ -689,21 +680,6 @@ const TestDriveSchedule = () => {
             </form>
           </div>
         </div>
-      )}
-
-      {/* Success Modal */}
-      {successModalData && (
-        <SuccessModal
-          open={showSuccessModal}
-          onClose={() => {
-            setShowSuccessModal(false);
-            setSuccessModalData(null);
-          }}
-          title={successModalData.title}
-          message={successModalData.message}
-          details={successModalData.details}
-          footerMessage={successModalData.footerMessage}
-        />
       )}
     </Layout>
   );

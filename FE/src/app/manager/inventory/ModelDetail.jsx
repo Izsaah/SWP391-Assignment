@@ -88,8 +88,11 @@ const ModelDetail = () => {
   };
 
   const formatPrice = (price) => {
-    if (!price || price === 0) return '0 ₫';
-    return new Intl.NumberFormat('vi-VN').format(price) + ' ₫';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+    }).format(price);
   };
 
   if (loading) {

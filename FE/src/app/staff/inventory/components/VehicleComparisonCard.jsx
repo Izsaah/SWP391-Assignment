@@ -51,6 +51,27 @@ const VehicleComparisonCard = ({ vehicle, onRemove, onReplace, onAdd }) => {
         </button>
       </div>
 
+      {/* Vehicle Image */}
+      <div className="bg-white flex items-center justify-center p-6 relative border-b border-gray-200">
+        {vehicle.imageUrl ? (
+          <img
+            src={vehicle.imageUrl}
+            alt={vehicle.title}
+            className="w-full h-32 object-contain"
+          />
+        ) : (
+          <div className="text-gray-400 text-4xl">🚗</div>
+        )}
+        
+        {/* Status Badge on Image */}
+        <div className="absolute top-2 left-2">
+          <span className="inline-flex items-center space-x-1 px-2 py-1 bg-gray-100/90 backdrop-blur-sm rounded-full text-xs font-medium shadow-sm border border-gray-300">
+            <span>{statusInfo.emoji}</span>
+            <span>{statusInfo.label}</span>
+          </span>
+        </div>
+      </div>
+
       {/* Vehicle Info */}
       <div className="p-4">
         {/* Model Name */}
@@ -75,7 +96,7 @@ const VehicleComparisonCard = ({ vehicle, onRemove, onReplace, onAdd }) => {
           {vehicle.quantity !== undefined && (
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Available</span>
-              <span className="font-medium text-gray-900">{vehicle.quantity} {vehicle.quantity === 1 ? 'unit' : 'units'}</span>
+              <span className="font-medium text-gray-900">{vehicle.quantity} units</span>
             </div>
           )}
         </div>
@@ -86,7 +107,7 @@ const VehicleComparisonCard = ({ vehicle, onRemove, onReplace, onAdd }) => {
             <span className="text-xs text-gray-500 uppercase">Price</span>
             <span className="text-lg font-bold text-gray-900">
               {vehicle.priceUsd 
-                ? new Intl.NumberFormat('vi-VN').format(vehicle.priceUsd) + ' ₫'
+                ? `$${vehicle.priceUsd.toLocaleString()}`
                 : '—'
               }
             </span>

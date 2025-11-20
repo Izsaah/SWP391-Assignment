@@ -20,7 +20,6 @@ import {
   ChevronLeft
 } from 'lucide-react';
 import { searchCustomersByName, createCustomer, getAllCustomers } from '../services/customerService';
-import SuccessModal from '../../../components/SuccessModal';
 
 const Customers = () => {
   const navigate = useNavigate();
@@ -44,8 +43,6 @@ const Customers = () => {
     address: ''
   });
   const [creating, setCreating] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [successModalData, setSuccessModalData] = useState(null);
 
   // Handle search - call API when user searches
   const handleSearch = async () => {
@@ -138,21 +135,7 @@ const Customers = () => {
       });
 
       if (result.success) {
-        // Get customer ID from result if available
-        const customerId = result.data?.customerId || result.data?.customer_id || result.data?.id || 'N/A';
-        
-        setSuccessModalData({
-          title: 'Customer Created Successfully!',
-          message: 'Customer created successfully!',
-          details: {
-            'Customer Name': newCustomer.name || 'N/A',
-            'Email': newCustomer.email || 'N/A',
-            'Phone': newCustomer.phoneNumber || 'N/A',
-            'Address': newCustomer.address || 'N/A'
-          },
-          footerMessage: 'The customer will now appear in the customers list.'
-        });
-        setShowSuccessModal(true);
+        alert(result.message || 'Customer created successfully!');
         // Reset form and close modal
         setNewCustomer({
           name: '',
@@ -673,21 +656,6 @@ const Customers = () => {
               </form>
             </div>
           </div>
-        )}
-
-        {/* Success Modal */}
-        {successModalData && (
-          <SuccessModal
-            open={showSuccessModal}
-            onClose={() => {
-              setShowSuccessModal(false);
-              setSuccessModalData(null);
-            }}
-            title={successModalData.title}
-            message={successModalData.message}
-            details={successModalData.details}
-            footerMessage={successModalData.footerMessage}
-          />
         )}
       </div>
     </Layout>
