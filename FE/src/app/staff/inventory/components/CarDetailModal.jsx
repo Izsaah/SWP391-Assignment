@@ -1,7 +1,6 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import defaultVehicleImage from '../../../../assets/car1.jpg';
 
 const CarDetailModal = ({ vehicle, isOpen, onClose }) => {
   const navigate = useNavigate();
@@ -39,9 +38,6 @@ const CarDetailModal = ({ vehicle, isOpen, onClose }) => {
   };
 
   const actionButtons = getActionButtons(vehicle.status);
-  const title = vehicle.title || vehicle.model || vehicle.modelName || 'Vehicle';
-  const vehicleImage = vehicle.imageUrl || vehicle.media?.[0]?.url || defaultVehicleImage;
-  const formattedPrice = vehicle.priceUsd || vehicle.price || vehicle.dealerPrice || 0;
 
   // Handle create order - navigate to order form page with vehicle data
   const handleCreateOrder = () => {
@@ -109,103 +105,108 @@ const CarDetailModal = ({ vehicle, isOpen, onClose }) => {
         </div>
 
         {/* Content */}
-        <div className="h-[calc(95vh-100px)] flex flex-col lg:flex-row bg-white">
-          {/* Image Column */}
-          <div className="lg:w-1/2 h-1/2 lg:h-full relative bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white flex items-center justify-center p-10">
-            <div className="absolute top-6 left-6 text-xs uppercase tracking-[0.3em] text-white/70">
-              Vehicle Preview
-            </div>
-            <img
-              src={vehicleImage}
-              alt={title}
-              className="w-full max-h-full object-contain drop-shadow-[0_25px_35px_rgba(0,0,0,0.45)]"
-            />
-            <div className="absolute bottom-6 left-6">
-              <p className="text-sm text-white/70">Color</p>
-              <p className="text-2xl font-semibold">{vehicle.color || 'Updating'}</p>
-            </div>
-            {vehicle.range && (
-              <div className="absolute bottom-6 right-6 text-right">
-                <p className="text-sm text-white/70">Range</p>
-                <p className="text-2xl font-semibold">{vehicle.range}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Detail Column */}
-          <div className="lg:w-1/2 h-1/2 lg:h-full overflow-y-auto p-8 space-y-8">
-            {/* Title & Price */}
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
-              <p className="text-sm text-gray-500 mt-2">Vehicle Configuration</p>
-              <div className="mt-6">
-                <p className="text-xs uppercase text-gray-500 tracking-wide">Price</p>
-                <p className="text-4xl font-bold text-gray-900 mt-2">
-                  {new Intl.NumberFormat('vi-VN').format(formattedPrice)} ₫
-                </p>
-              </div>
-            </div>
-
-            {/* Quick Stats */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="rounded-2xl border border-gray-100 p-4 bg-gray-50">
-                <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">Variant</p>
-                <p className="text-base font-semibold text-gray-900">{vehicle.variant || 'Updating'}</p>
-              </div>
-              <div className="rounded-2xl border border-gray-100 p-4 bg-gray-50">
-                <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">Status</p>
-                <p className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                  {vehicle.modelActive ? '✓ Active' : '✗ Inactive'}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-gray-100 p-4 bg-gray-50">
-                <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">Model ID</p>
-                <p className="text-base font-semibold text-gray-900">{vehicle.modelId || '—'}</p>
-              </div>
-              <div className="rounded-2xl border border-gray-100 p-4 bg-gray-50">
-                <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">Variant ID</p>
-                <p className="text-base font-semibold text-gray-900">{vehicle.variantId || '—'}</p>
-              </div>
-            </div>
-
-            {/* Availability */}
-            <div className="rounded-2xl border border-gray-100 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs uppercase text-gray-500 tracking-wide">Availability</p>
-                  <p className="text-lg font-semibold text-gray-900 mt-1">{statusInfo.label}</p>
+        <div className="h-[calc(95vh-100px)]">
+          {/* Vehicle Status */}
+          <div className="w-full bg-white overflow-y-auto">
+            <div className="p-8 space-y-8">
+              {/* Model Name & Price */}
+              <div className="pb-6 border-b border-gray-200">
+                <h1 className="text-3xl font-bold text-gray-900 mb-6">
+                  {vehicle.title}
+                </h1>
+                
+                {/* Price - Prominent Display */}
+                <div className="mb-6">
+                  <div className="text-sm text-gray-500 mb-1">Price</div>
+                  <div className="text-4xl font-bold text-gray-900">
+                    {vehicle.priceUsd ? new Intl.NumberFormat('vi-VN').format(vehicle.priceUsd) + ' ₫' : '0 ₫'}
+                  </div>
                 </div>
-                <span className={`text-2xl ${statusInfo.color}`}>{statusInfo.emoji}</span>
-              </div>
-            </div>
 
-            {/* Description */}
-            {vehicle.description && (
-              <div className="rounded-2xl border border-gray-100 p-4">
-                <p className="text-xs uppercase text-gray-500 tracking-wide mb-2">Description</p>
-                <p className="text-sm text-gray-700 leading-relaxed">{vehicle.description}</p>
+                {/* Vehicle Details Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  {vehicle.variant && (
+                    <div>
+                      <div className="text-xs text-gray-500 uppercase mb-1">Variant</div>
+                      <div className="text-sm font-medium text-gray-900">{vehicle.variant}</div>
+                    </div>
+                  )}
+                  {vehicle.color && (
+                    <div>
+                      <div className="text-xs text-gray-500 uppercase mb-1">Color</div>
+                      <div className="text-sm font-medium text-gray-900">{vehicle.color}</div>
+                    </div>
+                  )}
+                  {vehicle.modelActive !== undefined && (
+                    <div>
+                      <div className="text-xs text-gray-500 uppercase mb-1">Status</div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {vehicle.modelActive ? '✓ Active' : '✗ Inactive'}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
 
-            {/* Action Buttons */}
-            <div className="space-y-3 pt-4">
-              {actionButtons.map((button, index) => (
-                <button 
-                  key={index}
-                  onClick={() => {
-                    if (button.action === 'createOrder') {
-                      handleCreateOrder();
-                    } else if (button.action === 'scheduleTestDrive') {
-                      handleScheduleTestDrive();
-                    } else {
-                      console.log(`Button clicked: ${button.text} (${button.action})`);
-                    }
-                  }}
-                  className={`w-full py-3 px-6 rounded-lg font-medium transition-all duration-200 ${button.style}`}
-                >
-                  {button.text}
-                </button>
-              ))}
+              {/* Technical Information */}
+              <div className="pb-6 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Technical Information
+                </h3>
+                
+                <div className="space-y-3">
+                  {vehicle.modelId && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Model ID</span>
+                      <span className="text-sm font-medium text-gray-900">{vehicle.modelId}</span>
+                    </div>
+                  )}
+                  
+                  {vehicle.variantId && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Variant ID</span>
+                      <span className="text-sm font-medium text-gray-900">{vehicle.variantId}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Availability Status */}
+              <div className="pb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Availability
+                </h3>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Status</span>
+                  <span className={`text-sm font-semibold ${statusInfo.color} flex items-center gap-1.5`}>
+                    <span>{statusInfo.emoji}</span>
+                    <span>{statusInfo.label}</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-6 space-y-3">
+                {actionButtons.map((button, index) => (
+                  <button 
+                    key={index}
+                    onClick={() => {
+                      if (button.action === 'createOrder') {
+                        handleCreateOrder();
+                      } else if (button.action === 'scheduleTestDrive') {
+                        handleScheduleTestDrive();
+                      } else {
+                        // Handle other button actions
+                        console.log(`Button clicked: ${button.text} (${button.action})`);
+                      }
+                    }}
+                    className={`w-full py-3 px-6 rounded-lg font-medium transition-all duration-200 ${button.style}`}
+                  >
+                    {button.text}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>

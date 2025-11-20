@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Layout from '../layout/Layout';
-import { BarChart3, TrendingUp, Download, Calendar, RefreshCw, Users, ArrowDownToLine } from 'lucide-react';
+import { BarChart3, TrendingUp, Download, RefreshCw, Users, ArrowDownToLine } from 'lucide-react';
 import { getStaffSalesRecords } from '../services/salesService';
 
 const Reports = () => {
@@ -16,7 +16,6 @@ const Reports = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [salesRecords, setSalesRecords] = useState([]);
-  const [preset, setPreset] = useState('this_month'); // this_month, last_7, last_30, custom
   const [sortBy, setSortBy] = useState({ field: 'date', direction: 'desc' });
 
   // Fetch sales records when date range changes
@@ -66,27 +65,6 @@ const Reports = () => {
       currency: 'VND',
       minimumFractionDigits: 0,
     }).format(amount || 0);
-  };
-
-  const applyPreset = (key) => {
-    setPreset(key);
-    const now = new Date();
-    if (key === 'last_7') {
-      const d = new Date();
-      d.setDate(now.getDate() - 6);
-      setStartDate(d.toISOString().slice(0,10));
-      setEndDate(now.toISOString().slice(0,10));
-    } else if (key === 'last_30') {
-      const d = new Date();
-      d.setDate(now.getDate() - 29);
-      setStartDate(d.toISOString().slice(0,10));
-      setEndDate(now.toISOString().slice(0,10));
-    } else if (key === 'this_month') {
-      const m = String(now.getMonth() + 1).padStart(2, '0');
-      const y = now.getFullYear();
-      setStartDate(`${y}-${m}-01`);
-      setEndDate(now.toISOString().slice(0,10));
-    }
   };
 
   const sortedOrders = useMemo(() => {
@@ -155,16 +133,11 @@ const Reports = () => {
           </div>
         </div>
 
-        {/* Filters */}
+        {/* Date Range Filters */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div className="flex items-center space-x-3">
-              <Calendar className="w-4 h-4 text-gray-500" />
               <span className="text-xs font-medium text-gray-700">Date range:</span>
-              <button onClick={() => applyPreset('last_7')} className={`px-3 py-1.5 rounded text-xs font-medium ${preset==='last_7' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>Last 7 days</button>
-              <button onClick={() => applyPreset('last_30')} className={`px-3 py-1.5 rounded text-xs font-medium ${preset==='last_30' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>Last 30 days</button>
-              <button onClick={() => applyPreset('this_month')} className={`px-3 py-1.5 rounded text-xs font-medium ${preset==='this_month' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>This month</button>
-              <button onClick={() => setPreset('custom')} className={`px-3 py-1.5 rounded text-xs font-medium ${preset==='custom' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>Custom</button>
             </div>
             <div className="flex items-center space-x-2">
               <input type="date" className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" value={startDate} max={endDate} onChange={(e) => setStartDate(e.target.value)} />

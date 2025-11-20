@@ -395,6 +395,12 @@ export const getAllConfirmations = async () => {
         let isPending = item.isPending;
         let date = item.date;
 
+        // Check agreement from firstItem as well
+        const firstItemAgreement = item.firstItem?.agreement || item.firstItem?.status || '';
+        if (!agreement && firstItemAgreement) {
+          agreement = firstItemAgreement;
+        }
+
         if (approvedInfo) {
           agreement = 'Agree';
           isPending = false;
@@ -403,7 +409,19 @@ export const getAllConfirmations = async () => {
           }
         }
 
-        const agreementLower = agreement ? agreement.toString().toLowerCase() : '';
+        const agreementLower = agreement ? agreement.toString().toLowerCase().trim() : '';
+        
+        // Check if approved: either from approvedInfo or agreement is 'agree'/'approved'
+        const isApproved = Boolean(approvedInfo) || 
+                          agreementLower === 'agree' || 
+                          agreementLower === 'approved' || 
+                          agreementLower === 'approve';
+        
+        // If approved, ensure isPending is false
+        if (isApproved) {
+          isPending = false;
+        }
+        
         const isRejected = disallowedAgreements.has(agreementLower);
 
         const normalizedCustomerId =
@@ -421,8 +439,8 @@ export const getAllConfirmations = async () => {
           ...item,
           date,
           isPending,
-          agreement: agreement || (isPending ? 'Pending' : ''),
-          isApproved: Boolean(approvedInfo),
+          agreement: agreement || (isPending ? 'Pending' : (isApproved ? 'Agree' : '')),
+          isApproved,
           isRejected,
           isCustom: Boolean(normalizedIsCustom),
         };

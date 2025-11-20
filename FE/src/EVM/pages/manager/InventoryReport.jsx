@@ -1,10 +1,11 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react'
 import { AlertTriangle, TrendingUp } from 'lucide-react'
-import { fetchInventory } from '../../services/inventoryService'
+import { fetchInventory, fetchConsumptionRate } from '../../services/inventoryService'
 
 const InventoryReport = () => {
   const [model, setModel] = useState('All')
   const [rows, setRows] = useState([])
+  const [consumptionRates, setConsumptionRates] = useState([]) // Store consumption rates from BE
   const [loading, setLoading] = useState(false)
 
   // Fetch inventory data from API
@@ -82,19 +83,39 @@ const InventoryReport = () => {
     }
   }, [])
 
+  // Fetch consumption rate from BE - just get and display, no calculation
+  const fetchConsumptionRateData = useCallback(async () => {
+    try {
+      const result = await fetchConsumptionRate()
+      if (result.success && result.data) {
+        // Just set whatever BE returns, no filtering or validation
+        setConsumptionRates(result.data)
+        console.log('Consumption rate data from BE:', result.data)
+      } else {
+        console.log('No consumption rate data from BE:', result.message)
+        setConsumptionRates([])
+      }
+    } catch (error) {
+      console.error('Error fetching consumption rate:', error)
+      setConsumptionRates([])
+    }
+  }, [])
+
   useEffect(() => {
     fetchInventoryData()
-  }, [fetchInventoryData])
+    fetchConsumptionRateData()
+  }, [fetchInventoryData, fetchConsumptionRateData])
 
   const filtered = useMemo(() => rows.filter(r => model === 'All' || r.model === model), [rows, model])
 
   const totalStock = useMemo(() => filtered.reduce((s, r) => s + (r.stock || 0), 0), [filtered])
-  const totalSold = useMemo(() => filtered.reduce((s, r) => s + (r.sold || 0), 0), [filtered])
-  const rate = useMemo(() => {
-    const total = totalStock + totalSold
-    return total > 0 ? Math.round((totalSold / total) * 100) : 0
-  }, [totalStock, totalSold])
-  const forecast = useMemo(() => Math.round(totalSold * 1.1), [totalSold])
+  
+  // Consumption rate: Sum of all rates from BE (no calculation, just display BE data)
+  const totalConsumptionRate = useMemo(() => {
+    if (consumptionRates.length === 0) return null
+    const sum = consumptionRates.reduce((total, item) => total + (item.consumptionRate || 0), 0)
+    return sum > 0 ? sum : null
+  }, [consumptionRates])
 
   return (
     <div className="space-y-6">
@@ -121,22 +142,19 @@ const InventoryReport = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="text-sm text-gray-600 mb-2">Total Stock</div>
           <div className="text-3xl font-bold text-gray-900">{totalStock}</div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="text-sm text-gray-600 mb-2">Total Sold</div>
-          <div className="text-3xl font-bold text-gray-900">{totalSold}</div>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="text-sm text-gray-600 mb-2">Consumption Rate</div>
-          <div className="text-3xl font-bold text-gray-900">{rate}%</div>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="text-sm text-gray-600 mb-2">Forecast (next period)</div>
-          <div className="text-3xl font-bold text-gray-900">{forecast}</div>
+          <div className="text-3xl font-bold text-gray-900">
+            {totalConsumptionRate !== null ? totalConsumptionRate.toFixed(2) : 'N/A'}
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            {totalConsumptionRate !== null ? 'Total daily consumption' : 'No data available'}
+          </div>
         </div>
       </div>
 
@@ -153,11 +171,24 @@ const InventoryReport = () => {
               const total = (r.stock || 0) + (r.sold || 0)
               const soldPercentage = total > 0 ? ((r.sold || 0) / total) * 100 : 0
               
+              // Find consumption rate for this model from BE data
+              const modelConsumptionRate = consumptionRates.find(
+                item => item.modelName === r.model
+              )
+              const consumptionRateValue = modelConsumptionRate?.consumptionRate || null
+              
               return (
                 <div key={r.model}>
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-medium text-gray-900">{r.model}</span>
-                    <span className="text-sm text-gray-600">Stock {r.stock || 0} • Sold {r.sold || 0}</span>
+                    <span className="text-sm text-gray-600">
+                      Stock {r.stock || 0} • Sold {r.sold || 0}
+                      {consumptionRateValue !== null && consumptionRateValue > 0 && (
+                        <span className="ml-2 text-blue-600">
+                          • Rate: {consumptionRateValue.toFixed(2)}/day
+                        </span>
+                      )}
+                    </span>
                   </div>
                   <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div 
