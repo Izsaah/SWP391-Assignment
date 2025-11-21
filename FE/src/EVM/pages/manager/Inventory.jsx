@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react'
-import { RefreshCw, TrendingUp, Package, Building2, BarChart3, AlertTriangle, Clock } from 'lucide-react'
+import { RefreshCw, TrendingUp, Package, BarChart3, AlertTriangle, Clock } from 'lucide-react'
 import axios from 'axios'
 
 const API_URL = import.meta.env.VITE_API_URL

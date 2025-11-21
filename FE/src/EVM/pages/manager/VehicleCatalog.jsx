@@ -8,6 +8,26 @@ import SuccessModal from '../../components/SuccessModal'
 
 const API_URL = import.meta.env.VITE_API_URL
 
+// Helper function to fix image URL
+const fixImageUrl = (imageUrl) => {
+  if (!imageUrl) return null;
+  
+  // Nếu đã có http/https thì giữ nguyên
+  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+    return imageUrl;
+  }
+  
+  // Nếu là relative path (bắt đầu bằng /), thêm base URL
+  if (imageUrl.startsWith('/')) {
+    const baseUrl = API_URL.replace('/api', '');
+    return `${baseUrl}${imageUrl}`;
+  }
+  
+  // Nếu chỉ là filename, thêm base URL + /images/
+  const baseUrl = API_URL.replace('/api', '');
+  return `${baseUrl}/images/${imageUrl}`;
+};
+
 const VehicleCatalog = () => {
   const location = useLocation()
   const navigate = useNavigate()
@@ -112,15 +132,22 @@ const ModelsSection = () => {
       // Backend trả về {status: 'success', message: 'success', data: Array}
       if (response.data && response.data.status === 'success' && response.data.data) {
         // Transform backend data to frontend format
-        const models = (response.data.data || []).map(model => ({
-          id: model.modelId,
-          name: model.modelName,
-          description: model.description,
-          brand: 'EVM',
-          year: 2025,
-          variants: model.lists ? model.lists.length : 0,
-          active: model.isActive
-        }))
+        const models = (response.data.data || []).map(model => {
+          // Lấy image từ variant đầu tiên (nếu có)
+          const firstVariant = model.lists && model.lists.length > 0 ? model.lists[0] : null;
+          const imageUrl = firstVariant?.image ? fixImageUrl(firstVariant.image) : null;
+          
+          return {
+            id: model.modelId,
+            name: model.modelName,
+            description: model.description,
+            brand: 'EVM',
+            year: 2025,
+            variants: model.lists ? model.lists.length : 0,
+            active: model.isActive,
+            image: imageUrl
+          };
+        })
         setRows(models)
       }
     } catch (error) {
@@ -306,6 +333,9 @@ const ModelsSection = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onClick={() => toggleSort('id')}>
                   ID {sortKey === 'id' && (sortDir === 'asc' ? '▲' : '▼')}
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  PHOTO
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onClick={() => toggleSort('name')}>
                   Name {sortKey === 'name' && (sortDir === 'asc' ? '▲' : '▼')}
                 </th>
@@ -324,13 +354,13 @@ const ModelsSection = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan="7" className="px-6 py-4 text-center text-sm text-gray-500">
                     Loading...
                   </td>
                 </tr>
               ) : paged.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan="7" className="px-6 py-4 text-center text-sm text-gray-500">
                     No models found
                   </td>
                 </tr>
@@ -338,6 +368,22 @@ const ModelsSection = () => {
                 paged.map(row => (
                 <tr key={row.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.id}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {row.image ? (
+                      <img 
+                        src={row.image} 
+                        alt={row.name}
+                        className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                        onError={(e) => {
+                          e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"%3E%3Crect fill="%23e5e7eb" width="64" height="64"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%239ca3af" font-size="10"%3ENo Image%3C/text%3E%3C/svg%3E';
+                        }}
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
+                        <span className="text-xs text-gray-400">No Image</span>
+                      </div>
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">{row.name}</div>
                     <div className="text-xs text-gray-500">{row.description}</div>
@@ -641,7 +687,8 @@ const VariantsSection = () => {
                   version: variant.versionName || '',
                   color: normalizedColor,
                   price: variant.price || 0,
-                  active: variant.isActive !== undefined ? variant.isActive : true
+                  active: variant.isActive !== undefined ? variant.isActive : true,
+                  image: variant.image ? fixImageUrl(variant.image) : null
                 })
               })
             }
@@ -936,6 +983,7 @@ const VariantsSection = () => {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PHOTO</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Model</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Version</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Color</th>
@@ -947,13 +995,13 @@ const VariantsSection = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan="8" className="px-6 py-4 text-center text-sm text-gray-500">
                     Loading...
                   </td>
                 </tr>
               ) : paged.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan="8" className="px-6 py-4 text-center text-sm text-gray-500">
                     No variants found
                   </td>
                 </tr>
@@ -961,6 +1009,22 @@ const VariantsSection = () => {
                 paged.map(v => (
                 <tr key={v.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.id}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {v.image ? (
+                      <img 
+                        src={v.image} 
+                        alt={`${v.model} ${v.version}`}
+                        className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                        onError={(e) => {
+                          e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"%3E%3Crect fill="%23e5e7eb" width="64" height="64"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%239ca3af" font-size="10"%3ENo Image%3C/text%3E%3C/svg%3E';
+                        }}
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
+                        <span className="text-xs text-gray-400">No Image</span>
+                      </div>
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{v.model}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.version}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.color}</td>

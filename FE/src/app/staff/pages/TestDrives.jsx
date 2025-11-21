@@ -40,6 +40,99 @@ const TestDrives = () => {
   const [existingSchedule, setExistingSchedule] = useState(null);
   const [allowReplace, setAllowReplace] = useState(false);
   const [duplicateError, setDuplicateError] = useState('');
+
+  const parseStatus = useCallback((status) => {
+    if (!status) {
+      return { baseStatus: 'PENDING', encodedStatus: '', dealerId: null };
+    }
+    const statusStr = String(status).trim();
+    if (!statusStr.includes('_')) {
+      return {
+        baseStatus: statusStr.toUpperCase(),
+        encodedStatus: statusStr,
+        dealerId: null
+      };
+    }
+    const lastUnderscore = statusStr.lastIndexOf('_');
+    const baseStatus = statusStr.substring(0, lastUnderscore).toUpperCase();
+    const dealerIdPart = statusStr.substring(lastUnderscore + 1);
+    const dealerId = dealerIdPart && !Number.isNaN(Number(dealerIdPart)) ? Number(dealerIdPart) : null;
+    return {
+      baseStatus,
+      encodedStatus: statusStr,
+      dealerId
+    };
+  }, []);
+  
+  const fetchAllTestDrives = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const result = await getDealerTestDrives();
+      const items = Array.isArray(result.data) ? result.data : [];
+
+      const allTestDrives = items.map((entry) => {
+        if (!entry) return null;
+
+        let schedule = entry;
+        let customerId = entry.customerId || entry.customer_id;
+        let customerName = entry.customerName || entry.customer_name || entry.name;
+
+        if (entry.testDriveSchedule || entry.test_drive_schedule || entry.schedule) {
+          schedule = entry.testDriveSchedule || entry.test_drive_schedule || entry.schedule;
+          customerId = entry.customerId || entry.customer_id || entry.id || customerId;
+          customerName = entry.name || customerName;
+        }
+
+        if (!schedule) return null;
+
+        let resolvedName = customerName;
+        if (!resolvedName && customerId) {
+          const foundCustomer = customers.find(c => {
+            const id = c.customerId || c.customer_id || c.id;
+            return String(id) === String(customerId);
+          });
+          if (foundCustomer) {
+            resolvedName = foundCustomer.name || `Customer ${customerId}`;
+          }
+        }
+
+        if (!resolvedName) {
+          resolvedName = customerId ? `Customer ${customerId}` : 'Customer';
+        }
+
+        const serialId = schedule.serialId || schedule.serial_id;
+        const { baseStatus, encodedStatus, dealerId } = parseStatus(schedule.status || '');
+        const dateValue = schedule.date || schedule.scheduleDate || schedule.schedule_at || 'N/A';
+
+        return {
+          appointmentId: schedule.appointmentId || schedule.appointment_id || schedule.id,
+          customerId: customerId || 'N/A',
+          customerName: resolvedName,
+          serialId: serialId || 'N/A',
+          date: dateValue,
+          status: baseStatus || 'PENDING',
+          rawStatus: encodedStatus || schedule.status || 'PENDING',
+          dealerId,
+        };
+      }).filter(Boolean);
+
+      allTestDrives.sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return dateB - dateA;
+      });
+      
+      setTestDrives(allTestDrives);
+      console.log(`✅ Loaded ${allTestDrives.length} test drives from dealer endpoint`);
+    } catch (err) {
+      console.error('Error fetching test drives:', err);
+      setError('Failed to load test drives');
+    } finally {
+      setLoading(false);
+    }
+  }, [parseStatus, customers]);
   
   // Form state
   const [formData, setFormData] = useState({

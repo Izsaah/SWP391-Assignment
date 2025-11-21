@@ -73,9 +73,11 @@ const SalesReport = () => {
       } else {
         setRows([])
         setError(response.data?.message || 'Không lấy được dữ liệu doanh số.')
+        setError(response.data?.message || 'Không lấy được dữ liệu doanh số.')
       }
     } catch (error) {
       console.error('Error fetching sales data:', error)
+      setError(error.response?.data?.message || 'Không lấy được dữ liệu doanh số.')
       setError(error.response?.data?.message || 'Không lấy được dữ liệu doanh số.')
       setRows([])
     } finally {
@@ -217,14 +219,18 @@ const SalesReport = () => {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Tổng doanh số
+                  Tổng doanh số
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  Tổng đơn hàng
                   Tổng đơn hàng
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Số điện thoại
+                  Số điện thoại
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  Địa chỉ
                   Địa chỉ
                 </th>
               </tr>
@@ -234,11 +240,13 @@ const SalesReport = () => {
                 <tr>
                   <td colSpan="6" className="px-6 py-8 text-center text-sm text-gray-500">
                     Đang tải dữ liệu...
+                    Đang tải dữ liệu...
                   </td>
                 </tr>
               ) : filteredRows.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="px-6 py-8 text-center text-sm text-gray-500">
+                    Không có dữ liệu doanh số
                     Không có dữ liệu doanh số
                   </td>
                 </tr>

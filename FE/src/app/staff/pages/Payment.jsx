@@ -1119,6 +1119,7 @@ const Payment = () => {
                             <div className="text-sm font-medium text-gray-900">
                               {payment.currentTermMonth !== null && payment.currentTermMonth !== undefined 
                                 ? `${payment.currentTermMonth} tháng`
+                                ? `${payment.currentTermMonth} tháng`
                                 : 'N/A'}
                             </div>
                           </td>
@@ -1348,6 +1349,10 @@ const Payment = () => {
                         <span className="text-base font-semibold text-gray-900">#{selectedPayment.paymentId || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Payment ID</span>
+                        <span className="text-base font-semibold text-gray-900">#{selectedPayment.paymentId || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">Total Amount</span>
                         <span className="text-lg font-bold text-green-600">
                           {formatCurrency(selectedPayment.totalAmount || 0)}
@@ -1411,6 +1416,7 @@ const Payment = () => {
                         <span className="text-sm text-gray-600">Remaining Months</span>
                         <span className="text-base font-semibold text-gray-900">
                           {selectedPayment.currentTermMonth !== null && selectedPayment.currentTermMonth !== undefined 
+                            ? `${selectedPayment.currentTermMonth} tháng`
                             ? `${selectedPayment.currentTermMonth} tháng`
                             : 'N/A'}
                         </span>
@@ -1549,8 +1555,10 @@ const Payment = () => {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Số tháng còn lại:</span>
+                      <span className="text-sm text-gray-600">Số tháng còn lại:</span>
                       <span className="text-sm font-semibold text-gray-900">
                         {selectedPayment.currentTermMonth !== null && selectedPayment.currentTermMonth !== undefined 
+                          ? `${selectedPayment.currentTermMonth} tháng`
                           ? `${selectedPayment.currentTermMonth} tháng`
                           : 'N/A'}
                       </span>
@@ -1579,6 +1587,7 @@ const Payment = () => {
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Số tháng cần ghi nhận thanh toán <span className="text-red-500">*</span>
+                      Số tháng cần ghi nhận thanh toán <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="number"
@@ -1601,9 +1610,11 @@ const Payment = () => {
                       <div className="mt-2 space-y-1">
                         <p className="text-xs text-gray-500">
                           Tối đa: {selectedPayment.currentTermMonth} tháng
+                          Tối đa: {selectedPayment.currentTermMonth} tháng
                         </p>
                         {selectedPayment.monthlyPay && monthsToDeduct > 0 && (
                           <p className="text-xs font-semibold text-blue-600">
+                            Số tiền sẽ ghi nhận: {formatCurrency(selectedPayment.monthlyPay * monthsToDeduct)}
                             Số tiền sẽ ghi nhận: {formatCurrency(selectedPayment.monthlyPay * monthsToDeduct)}
                           </p>
                         )}
@@ -1800,6 +1811,7 @@ const Payment = () => {
                         {invoiceModal.data?.payment?.remainingMonths != null && (
                           <div>
                             <span className="font-medium text-gray-900">Remaining Months:</span>{' '}
+                            {invoiceModal.data?.payment?.remainingMonths} tháng
                             {invoiceModal.data?.payment?.remainingMonths} tháng
                           </div>
                         )}

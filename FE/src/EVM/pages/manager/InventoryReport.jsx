@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react'
 import { AlertTriangle, TrendingUp } from 'lucide-react'
 import axios from 'axios'
+import { fetchConsumptionRate } from '../../services/inventoryService'
 
 const API_URL = import.meta.env.VITE_API_URL
 
