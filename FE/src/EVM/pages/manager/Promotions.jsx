@@ -64,12 +64,12 @@ const Promotions = () => {
           if (promo.discountRate) {
             const rateValue = parseFloat(promo.discountRate)
             
-            // Data mới: PERCENTAGE + rate < 1 (ví dụ: 0.05 → 5%)
-            if (promo.type === 'PERCENTAGE' && rateValue < 1) {
+            // Data mới: PERCENTAGE + rate <= 1 (ví dụ: 0.05 → 5%, 1.0 → 100%)
+            if (promo.type === 'PERCENTAGE' && rateValue <= 1) {
               displayValue = `${(rateValue * 100).toFixed(0)}%`
             } 
             // Data cũ: số nguyên hoặc type không phải PERCENTAGE (ví dụ: 5, 3 → 5%, 3%)
-            // Hoặc data mới nhưng rate >= 1 (đã được convert sẵn)
+            // Hoặc data mới nhưng rate > 1 (đã được convert sẵn)
             else {
               displayValue = `${rateValue}%`
             }

@@ -374,19 +374,18 @@ export const getLastOrderDate = (orders) => {
 
 /**
  * Get test drive schedules by customer ID
- * Uses the same API as staff: /staff/getTestDriveScheduleByCustomer
- * Note: Backend returns only ONE test drive per customer (latest/first one)
+ * Uses the new getTestDrivesByCustomerId endpoint which returns ALL test drives for a customer
  * @param {number} customerId - Customer ID
- * @returns {Promise} - Promise containing test drive data (array with 0 or 1 item)
+ * @returns {Promise} - Promise containing test drive data
  */
 export const getTestDrivesByCustomerId = async (customerId) => {
   try {
     const token = localStorage.getItem('token');
     
-    // Use same endpoint as staff (backend now uses RequestUtils.extractParams which supports JSON)
+    // Use new endpoint that returns ALL test drives for the customer
     const response = await axios.post(
-      `${API_URL}/staff/getTestDriveScheduleByCustomer`,
-      { customer_id: String(customerId) },
+      `${API_URL}/staff/getTestDrivesByCustomerId`,
+      { customerId: customerId },
       {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -396,22 +395,12 @@ export const getTestDrivesByCustomerId = async (customerId) => {
     );
 
     if (response.data && response.data.status === 'success') {
-      // Backend returns a single test drive object, convert to array
-      const testDrive = response.data.data;
+      // Backend now returns a list of all test drives
+      const testDrives = response.data.data || [];
       
-      if (testDrive) {
-        return {
-          success: true,
-          data: [testDrive] // Return as array for consistency
-        };
-      }
-    }
-    
-    // If backend returns error with "not found" message, return empty array (not an error)
-    if (response.data?.message?.includes('not found') || response.data?.message?.includes('No test drive')) {
       return {
         success: true,
-        data: []
+        data: Array.isArray(testDrives) ? testDrives : []
       };
     }
     
@@ -420,15 +409,6 @@ export const getTestDrivesByCustomerId = async (customerId) => {
       data: []
     };
   } catch (error) {
-    // Handle 400/404 or error gracefully - customer may not have test drives
-    // Backend returns 400 when no test drive is found (this is expected for many customers)
-    if (error.response?.status === 400 || error.response?.status === 404) {
-      return {
-        success: true,
-        data: []
-      };
-    }
-    
     console.error('Error getting test drives by customer ID:', error);
     return {
       success: false,

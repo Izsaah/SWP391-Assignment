@@ -18,6 +18,9 @@ import {
 
 const DebtReport = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [paymentTypeFilter, setPaymentTypeFilter] = useState('all');
+  const [agingFilter, setAgingFilter] = useState('all');
+  const [staffFilter, setStaffFilter] = useState('all');
   const [selectedContract, setSelectedContract] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
@@ -43,6 +46,9 @@ const DebtReport = () => {
     load();
   }, []);
 
+  // Get unique staff list
+  const staffList = [...new Set(debtData.map(d => d.assignedStaff))];
+
   // Helper functions
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -62,6 +68,23 @@ const DebtReport = () => {
     return `${day}/${month}/${year}`;
   };
 
+  const getAgingBadge = (aging) => {
+    const configs = {
+      'Paid Off': { color: 'bg-green-100 text-green-800 border-green-200', label: 'Paid Off' },
+      '< 30 days': { color: 'bg-blue-100 text-blue-800 border-blue-200', label: '< 30 days' },
+      '30-60 days': { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', label: '30-60 days' },
+      '60-90 days': { color: 'bg-orange-100 text-orange-800 border-orange-200', label: '60-90 days' },
+      '90+ days': { color: 'bg-red-100 text-red-800 border-red-200', label: '90+ days' }
+    };
+    const config = configs[aging] || configs['< 30 days'];
+
+    return (
+      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${config.color}`}>
+        {config.label}
+      </span>
+    );
+  };
+
   const getPaymentTypeLabel = (type, months) => {
     if (type === 'Full Payment') return 'Full Payment';
     return `Installment ${months} mo`;
@@ -77,6 +100,24 @@ const DebtReport = () => {
         debt.contractId.toLowerCase().includes(query);
       if (!matches) return false;
     }
+
+    // Payment type filter
+    if (paymentTypeFilter !== 'all') {
+      if (paymentTypeFilter === 'Full' && debt.paymentType !== 'Full Payment') return false;
+      if (paymentTypeFilter === 'Installment' && debt.paymentType === 'Full Payment') return false;
+    }
+
+    // Aging filter
+    if (agingFilter !== 'all') {
+      if (agingFilter === 'paid-off' && debt.aging !== 'Paid Off') return false;
+      if (agingFilter === 'lt30' && debt.aging !== '< 30 days') return false;
+      if (agingFilter === '30-60' && debt.aging !== '30-60 days') return false;
+      if (agingFilter === '60-90' && debt.aging !== '60-90 days') return false;
+      if (agingFilter === '90plus' && debt.aging !== '90+ days') return false;
+    }
+
+    // Staff filter
+    if (staffFilter !== 'all' && debt.assignedStaff !== staffFilter) return false;
 
     return true;
   });
@@ -97,6 +138,12 @@ const DebtReport = () => {
   const handleExportCSV = () => {
     // In real app, would generate CSV
     alert('CSV export functionality coming soon!');
+  };
+
+  // Handle export PDF (optional)
+  const handleExportPDF = () => {
+    // In real app, would generate PDF
+    alert('PDF export functionality coming soon!');
   };
 
   // Handle flag customer
@@ -138,7 +185,7 @@ const DebtReport = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Search */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Search</label>
@@ -153,18 +200,58 @@ const DebtReport = () => {
                 />
               </div>
             </div>
+
+            {/* Payment Type */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Payment Type</label>
+              <select
+                value={paymentTypeFilter}
+                onChange={(e) => setPaymentTypeFilter(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">Both</option>
+                <option value="Full">Full Payment</option>
+                <option value="Installment">Installment</option>
+              </select>
+            </div>
+
+            {/* Aging Filter */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Aging</label>
+              <select
+                value={agingFilter}
+                onChange={(e) => setAgingFilter(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All</option>
+                <option value="paid-off">Paid Off</option>
+                <option value="lt30">&lt; 30 days</option>
+                <option value="30-60">30-60 days</option>
+                <option value="60-90">60-90 days</option>
+                <option value="90plus">90+ days</option>
+              </select>
+            </div>
+
+            {/* Staff Filter */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Assigned Staff</label>
+              <select
+                value={staffFilter}
+                onChange={(e) => setStaffFilter(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All</option>
+                {staffList.map(staff => (
+                  <option key={staff} value={staff}>{staff}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
         {/* Table */}
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           {error && <div className="p-3 text-sm text-red-700 bg-red-50 border-b border-red-200">{error}</div>}
-          {loading && (
-            <div className="p-8 text-center">
-              <p className="text-gray-600">Loading debt data...</p>
-            </div>
-          )}
-          {!loading && (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
@@ -213,7 +300,6 @@ const DebtReport = () => {
               </tbody>
             </table>
           </div>
-          )}
         </div>
       </div>
 

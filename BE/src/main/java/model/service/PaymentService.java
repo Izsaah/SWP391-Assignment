@@ -2,9 +2,11 @@ package model.service;
 
 import java.math.BigDecimal;
 import java.sql.SQLException;
+import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import model.dao.*;
 import model.dto.*;
@@ -23,7 +25,7 @@ public class PaymentService {
     private final VehicleVariantDAO variantDAO = new VehicleVariantDAO();
     private final VehicleSerialDAO serialDAO = new VehicleSerialDAO();
 
-    public PaymentDTO processPayment(int orderId, String method, InstallmentPlanDTO plan) throws ClassNotFoundException, SQLException {
+    public PaymentDTO processPayment(int orderId, String method, InstallmentPlanDTO plan, Integer promoId) throws ClassNotFoundException, SQLException {
         System.out.println("DEBUG: Starting payment processing for order_id = " + orderId);
 
         OrderDTO order = orderDAO.getById(orderId);
@@ -66,39 +68,90 @@ public class PaymentService {
             }
         }
 
-        // Apply promotions
-        UserAccountDTO staff = userAccountDAO.getUserById(order.getDealerStaffId());
-        if (staff != null) {
-            DealerDTO dealer = dealerDAO.GetDealerById(staff.getDealerId());
-            if (dealer != null) {
-                List<PromotionDTO> promotions = dealerPromoDAO.getPromotionsByDealerId(dealer.getDealerId());
-                LocalDate now = LocalDate.now();
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        // Apply promotion if promoId is provided
+        if (promoId != null && promoId > 0) {
+            System.out.println("DEBUG: Promotion ID provided: " + promoId);
 
-                for (PromotionDTO promo : promotions) {
-                    try {
-                        if (promo.getStartDate() == null || promo.getEndDate() == null) {
-                            continue;
-                        }
-                        LocalDate start = LocalDate.parse(promo.getStartDate(), formatter);
-                        LocalDate end = LocalDate.parse(promo.getEndDate(), formatter);
+            // Get dealer information from order
+            UserAccountDTO staff = userAccountDAO.getUserById(order.getDealerStaffId());
+            if (staff != null) {
+                DealerDTO dealer = dealerDAO.GetDealerById(staff.getDealerId());
+                if (dealer != null) {
+                    System.out.println("DEBUG: Dealer found - dealer_id = " + dealer.getDealerId());
 
-                        if ((now.isEqual(start) || now.isAfter(start)) && (now.isEqual(end) || now.isBefore(end))) {
-                            String discountStr = promo.getDiscountRate();
-                            if (discountStr != null && !discountStr.trim().isEmpty()) {
-                                discountStr = discountStr.replace("%", "").trim();
-                                double discount = Double.parseDouble(discountStr);
-                                if (discount > 0 && discount < 1) {
-                                    discount = discount * 100;
-                                }
-                                totalAmount = totalAmount * (1 - discount / 100.0);
-                            }
+                    // Get all promotions for this dealer
+                    List<PromotionDTO> dealerPromotions = dealerPromoDAO.getPromotionsByDealerId(dealer.getDealerId());
+
+                    // Find the specific promotion and validate it belongs to this dealer
+                    PromotionDTO selectedPromo = null;
+                    for (PromotionDTO promo : dealerPromotions) {
+                        if (promo.getPromoId() == promoId) {
+                            selectedPromo = promo;
+                            break;
                         }
-                    } catch (Exception ex) {
-                        ex.printStackTrace();
                     }
+
+                    if (selectedPromo == null) {
+                        System.err.println("ERROR: Promotion ID " + promoId + " not found for dealer " + dealer.getDealerId());
+                        throw new IllegalArgumentException("Invalid promotion: Promotion does not belong to this dealer");
+                    }
+
+                    System.out.println("DEBUG: Valid promotion found for dealer");
+
+                    // Check if promotion is currently active
+                    LocalDate now = LocalDate.now();
+                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+                    try {
+                        if (selectedPromo.getStartDate() == null || selectedPromo.getEndDate() == null) {
+                            System.err.println("ERROR: Promotion has invalid dates");
+                            throw new IllegalArgumentException("Promotion has invalid date range");
+                        }
+
+                        LocalDate start = LocalDate.parse(selectedPromo.getStartDate(), formatter);
+                        LocalDate end = LocalDate.parse(selectedPromo.getEndDate(), formatter);
+
+                        if (!((now.isEqual(start) || now.isAfter(start)) && (now.isEqual(end) || now.isBefore(end)))) {
+                            System.err.println("ERROR: Promotion is not active during current date");
+                            throw new IllegalArgumentException("Promotion is not currently active");
+                        }
+
+                        // Apply discount
+                        String discountStr = selectedPromo.getDiscountRate();
+                        if (discountStr != null && !discountStr.trim().isEmpty()) {
+                            discountStr = discountStr.replace("%", "").trim();
+                            double discount = Double.parseDouble(discountStr);
+
+                            // Normalize discount to percentage (0-100)
+                            if (discount > 0 && discount < 1) {
+                                discount = discount * 100;
+                            }
+
+                            double discountAmount = totalAmount * (discount / 100.0);
+                            totalAmount = totalAmount - discountAmount;
+
+                            System.out.println("DEBUG: Discount applied - " + discount + "%, Amount saved: " + discountAmount);
+                            System.out.println("DEBUG: New total amount: " + totalAmount);
+                        }
+
+                    } catch (DateTimeParseException ex) {
+                        System.err.println("ERROR: Failed to parse promotion dates");
+                        throw new IllegalArgumentException("Invalid promotion date format");
+                    } catch (NumberFormatException ex) {
+                        System.err.println("ERROR: Failed to parse discount rate");
+                        throw new IllegalArgumentException("Invalid discount rate format");
+                    }
+
+                } else {
+                    System.err.println("ERROR: Dealer not found for staff");
+                    throw new IllegalArgumentException("Dealer information not found");
                 }
+            } else {
+                System.err.println("ERROR: Staff not found for order");
+                throw new IllegalArgumentException("Staff information not found");
             }
+        } else {
+            System.out.println("DEBUG: No promotion applied");
         }
 
         PaymentDTO payment = new PaymentDTO();
@@ -190,10 +243,9 @@ public class PaymentService {
                 }
 
                 // Check if order belongs to the dealer
-                // Get dealer staff who processed this order
                 UserAccountDTO dealerStaff = userAccountDAO.getUserById(order.getDealerStaffId());
                 if (dealerStaff == null || dealerStaff.getDealerId() != dealerId) {
-                    continue; // Skip orders not from this dealer
+                    continue;
                 }
 
                 // Get dealer name
@@ -231,7 +283,6 @@ public class PaymentService {
                 if (detail != null) {
                     serialId = detail.getSerialId();
 
-                    // Get variant info from serial_id
                     if (serialId != null && !serialId.trim().isEmpty()) {
                         VehicleSerialDTO vehicleSerial = serialDAO.getSerialBySerialId(serialId);
                         if (vehicleSerial != null && vehicleSerial.getVariantId() > 0) {
@@ -260,29 +311,22 @@ public class PaymentService {
                     System.err.println("Invalid termMonth for plan " + plan.getPlanId());
                 }
 
-                // Get the original payment amount (this is the principal)
-                double originalPrincipal = payment.getAmount();
-
-                // Calculate original term months from principal and monthly payment
+                // ===== CORRECTED CALCULATION LOGIC =====
+                // Calculate original term from payment.getAmount() (total with interest)
+                // payment.getAmount() should contain the full installment amount
                 int originalTermMonth = 0;
                 if (monthlyPay > 0) {
-                    originalTermMonth = (int) Math.round(originalPrincipal / monthlyPay);
-                } else {
-                    originalTermMonth = remainingTermMonth; // Fallback
+                    originalTermMonth = (int) Math.round(payment.getAmount() / monthlyPay);
                 }
 
-                // Ensure originalTermMonth is at least remainingTermMonth
-                if (originalTermMonth < remainingTermMonth) {
+                // Fallback: if calculation gives unreasonable result, use remaining term
+                if (originalTermMonth <= 0 || originalTermMonth < remainingTermMonth) {
                     originalTermMonth = remainingTermMonth;
                 }
 
-                // Calculate total amount (total commitment)
+                // Calculate amounts based on monthly payment schedule
                 double totalAmountWithInterest = monthlyPay * originalTermMonth;
-
-                // Calculate outstanding (what's left to pay)
                 double outstanding = monthlyPay * remainingTermMonth;
-
-                // Calculate paid amount (what's been paid so far)
                 int paidMonths = originalTermMonth - remainingTermMonth;
                 double paidAmount = monthlyPay * paidMonths;
 
@@ -296,7 +340,14 @@ public class PaymentService {
                     paidAmount = totalAmountWithInterest;
                 }
 
+                // Format numbers to avoid scientific notation
+                DecimalFormat df = new DecimalFormat("0.00");
+                df.setMaximumFractionDigits(2);
+                df.setMinimumFractionDigits(0);
+                df.setGroupingUsed(false);
+
                 Map<String, Object> map = new LinkedHashMap<>();
+
                 // Customer info
                 map.put("customerId", customer.getCustomerId());
                 map.put("name", customer.getName());
@@ -318,18 +369,20 @@ public class PaymentService {
                 // Installment plan info
                 map.put("planId", plan.getPlanId());
                 map.put("interestRate", plan.getInterestRate());
-                map.put("termMonth", plan.getTermMonth());
-                map.put("monthlyPay", plan.getMonthlyPay());
+                map.put("originalTermMonth", originalTermMonth);  // Add this
+                map.put("remainingTermMonth", remainingTermMonth); // Rename for clarity
+                map.put("paidMonths", paidMonths);                // Add this
+                map.put("monthlyPay", Double.parseDouble(df.format(monthlyPay)));
                 map.put("status", plan.getStatus());
 
-                // Payment info
+                // Payment info - format to avoid scientific notation
                 map.put("paymentId", payment.getPaymentId());
                 map.put("orderId", payment.getOrderId());
-                map.put("totalAmount", totalAmountWithInterest);
+                map.put("totalAmount", Double.parseDouble(df.format(totalAmountWithInterest)));
                 map.put("paymentDate", payment.getPaymentDate());
                 map.put("method", payment.getMethod());
-                map.put("outstandingAmount", outstanding);
-                map.put("paidAmount", paidAmount);
+                map.put("outstandingAmount", Double.parseDouble(df.format(outstanding)));
+                map.put("paidAmount", Double.parseDouble(df.format(paidAmount)));
 
                 responseList.add(map);
             }

@@ -24,27 +24,67 @@ public class SaleRecordService {
     private final SaleRecordDAO saleDAO = new SaleRecordDAO();
 
     // ------------------ Dealer Sales Summary ------------------
-    public List<Map<String, Object>> getDealerSalesSummary() throws ClassNotFoundException, SQLException {
+    public List<Map<String, Object>> getDealerSalesSummary(String startDate, String endDate) throws ClassNotFoundException, SQLException {
         List<DealerDTO> dealerList = dealerDAO.retrieve("1=1"); // Get all dealers
         List<Map<String, Object>> responseList = new ArrayList<>();
         Set<Integer> addedDealerIds = new HashSet<>();
 
         for (DealerDTO dealer : dealerList) {
-            if (addedDealerIds.contains(dealer.getDealerId())) continue;
+            if (addedDealerIds.contains(dealer.getDealerId())) {
+                continue;
+            }
 
             BigDecimal totalSales = BigDecimal.ZERO;
             int totalOrders = 0;
 
-            List<UserAccountDTO> staffList = userDAO.findUserByDealerId(dealer.getDealerId());
-            if (staffList != null) {
-                for (UserAccountDTO staff : staffList) {
-                    List<SaleRecordDTO> sales = saleDAO.findSaleRecordByDealerStaffId(staff.getUserId());
-                    if (sales != null) {
-                        for (SaleRecordDTO sale : sales) {
-                            totalSales = totalSales.add(sale.getSaleAmount());
+            // Get all staff for this dealer
+            List<Integer> staffIds = userDAO.getStaffIdsByDealer(dealer.getDealerId());
+            if (staffIds != null && !staffIds.isEmpty()) {
+
+                // Process orders for each staff member
+                for (Integer staffId : staffIds) {
+                    try {
+                        List<OrderDTO> allOrders = orderDAO.getByStaffId(staffId);
+                        if (allOrders == null || allOrders.isEmpty()) {
+                            continue;
                         }
+
+                        for (OrderDTO order : allOrders) {
+                            // Filter by date range if provided
+                            if (startDate != null && endDate != null) {
+                                if (!isOrderInRange(order, startDate, endDate)) {
+                                    continue;
+                                }
+                            }
+
+                            try {
+                                OrderDetailDTO detail = orderDetailDAO.getOrderDetailByOrderId(order.getOrderId());
+                                if (detail == null) {
+                                    continue;
+                                }
+
+                                String quantityStr = detail.getQuantity();
+                                if (quantityStr == null || quantityStr.trim().isEmpty()) {
+                                    continue;
+                                }
+
+                                int quantity = Integer.parseInt(quantityStr.trim());
+                                BigDecimal saleAmount = BigDecimal.valueOf(detail.getUnitPrice())
+                                        .multiply(BigDecimal.valueOf(quantity));
+
+                                totalSales = totalSales.add(saleAmount);
+                                totalOrders++;
+
+                            } catch (NumberFormatException e) {
+                                System.err.println("Invalid quantity format for order ID " + order.getOrderId());
+                            } catch (Exception e) {
+                                System.err.println("Error processing order ID " + order.getOrderId() + ": " + e.getMessage());
+                            }
+                        }
+
+                    } catch (Exception e) {
+                        System.err.println("Error processing staff ID " + staffId + ": " + e.getMessage());
                     }
-                    totalOrders += orderDAO.countOrdersByDealerStaffId(staff.getUserId());
                 }
             }
 
@@ -67,7 +107,9 @@ public class SaleRecordService {
     public List<OrderDTO> getOrdersByDealer(int dealerId) {
         try {
             List<Integer> staffIds = userDAO.getStaffIdsByDealer(dealerId);
-            if (staffIds == null || staffIds.isEmpty()) return new ArrayList<>();
+            if (staffIds == null || staffIds.isEmpty()) {
+                return new ArrayList<>();
+            }
             return orderDAO.getOrdersByDealerStaffIds(staffIds);
         } catch (Exception e) {
             e.printStackTrace();
@@ -80,7 +122,9 @@ public class SaleRecordService {
             int dealerId, String startDate, String endDate) {
         try {
             List<Integer> staffIds = userDAO.getStaffIdsByDealer(dealerId);
-            if (staffIds == null || staffIds.isEmpty()) return Collections.emptyList();
+            if (staffIds == null || staffIds.isEmpty()) {
+                return Collections.emptyList();
+            }
 
             List<SaleRecordDTO> allSales = new ArrayList<>();
             for (Integer staffId : staffIds) {
@@ -112,7 +156,9 @@ public class SaleRecordService {
             Map<Integer, String> latestOrderDateByCustomer = new HashMap<>();
 
             for (OrderDTO order : allOrders) {
-                if (!isOrderInRange(order, startDate, endDate)) continue;
+                if (!isOrderInRange(order, startDate, endDate)) {
+                    continue;
+                }
                 processOrder(order, totalSalesByCustomer, totalOrdersByCustomer, latestOrderDateByCustomer);
             }
 
@@ -132,16 +178,20 @@ public class SaleRecordService {
 
     // ------------------ Helper: Process Single Order ------------------
     private void processOrder(OrderDTO order,
-                              Map<Integer, BigDecimal> totalSalesByCustomer,
-                              Map<Integer, Integer> totalOrdersByCustomer,
-                              Map<Integer, String> latestOrderDateByCustomer) {
+            Map<Integer, BigDecimal> totalSalesByCustomer,
+            Map<Integer, Integer> totalOrdersByCustomer,
+            Map<Integer, String> latestOrderDateByCustomer) {
 
         try {
             OrderDetailDTO detail = orderDetailDAO.getOrderDetailByOrderId(order.getOrderId());
-            if (detail == null) return;
+            if (detail == null) {
+                return;
+            }
 
             String quantityStr = detail.getQuantity();
-            if (quantityStr == null || quantityStr.trim().isEmpty()) return;
+            if (quantityStr == null || quantityStr.trim().isEmpty()) {
+                return;
+            }
 
             int quantity = Integer.parseInt(quantityStr.trim());
             BigDecimal saleAmount = BigDecimal.valueOf(detail.getUnitPrice()).multiply(BigDecimal.valueOf(quantity));
@@ -167,9 +217,9 @@ public class SaleRecordService {
 
     // ------------------ Helper: Build SaleRecordDTO List ------------------
     private List<SaleRecordDTO> buildSaleRecordList(Map<Integer, BigDecimal> totalSalesByCustomer,
-                                                    Map<Integer, Integer> totalOrdersByCustomer,
-                                                    Map<Integer, String> latestOrderDateByCustomer,
-                                                    int dealerStaffId) throws ClassNotFoundException {
+            Map<Integer, Integer> totalOrdersByCustomer,
+            Map<Integer, String> latestOrderDateByCustomer,
+            int dealerStaffId) throws ClassNotFoundException {
 
         List<SaleRecordDTO> combinedSales = new ArrayList<>();
         UserAccountDTO staff = userDAO.getUserById(dealerStaffId);

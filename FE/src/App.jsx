@@ -15,6 +15,7 @@ import Customers from './app/staff/pages/Customers';
 import CustomerDetail from './app/staff/pages/CustomerDetail';
 import TestDrives from './app/staff/pages/TestDrives';
 import Reports from './app/staff/pages/Reports';
+import Settings from './app/staff/pages/Settings';
 
 // Manager imports
 import { Dashboard as ManagerDashboard } from './app/manager/Dashboard';
@@ -160,6 +161,14 @@ function App() {
           element={
             <ProtectedRoute allowRoles={['STAFF']}>
               <Reports />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/staff/settings" 
+          element={
+            <ProtectedRoute allowRoles={['STAFF']}>
+              <Settings />
             </ProtectedRoute>
           } 
         />
@@ -327,7 +336,7 @@ function App() {
         <Route path="/customers/list" element={<Navigate to="/staff/customers/list" />} />
         <Route path="/customers/:customerId" element={<Navigate to="/staff/customers/:customerId" />} />
         <Route path="/reports" element={<Navigate to="/staff/reports" />} />
-        <Route path="/settings" element={<Navigate to="/staff/dashboard" />} />
+        <Route path="/settings" element={<Navigate to="/staff/settings" />} />
 
         {/* 404 - Not Found */}
         <Route path="*" element={<div className="flex items-center justify-center h-screen"><h1 className="text-2xl font-bold text-gray-800">404 - Page Not Found</h1></div>} />

@@ -52,13 +52,14 @@ const Payment = () => {
         console.log(`✅ Received ${result.data.length} customers with active installments`);
         
         // Transform backend data to frontend format
-        // ✅ Backend returns ALL needed data: planId, interestRate, termMonth, monthlyPay, status, paymentId, orderId, totalAmount, paymentDate, method
+        // ✅ Backend returns ALL needed data: planId, interestRate, remainingTermMonth, monthlyPay, status, paymentId, orderId, totalAmount, paymentDate, method
         // ✅ Backend calculation logic (PaymentService.java):
         //    1. originalPrincipal = payment.getAmount() (from Payment table)
-        //    2. originalTermMonth = round(originalPrincipal / monthlyPay)
+        //    2. originalTermMonth = round(originalPrincipal / monthlyPay) - tổng số tháng ban đầu
         //    3. totalAmountWithInterest = monthlyPay * originalTermMonth (total commitment)
-        //    4. outstandingAmount = monthlyPay * remainingTermMonth (remaining to pay)
-        //    5. paidAmount = monthlyPay * (originalTermMonth - remainingTermMonth) (already paid)
+        //    4. remainingTermMonth = plan.getTermMonth() (tháng còn lại từ database)
+        //    5. outstandingAmount = monthlyPay * remainingTermMonth (remaining to pay)
+        //    6. paidAmount = monthlyPay * (originalTermMonth - remainingTermMonth) (already paid)
         // ✅ We use backend's calculated values directly - no recalculation needed
         const transformed = result.data.map((customer) => {
           // ✅ Use backend data directly - no need to fetch from orders API anymore!
@@ -69,7 +70,10 @@ const Payment = () => {
             const rateStr = String(customer.interestRate).replace('%', '').trim();
             interestRate = parseFloat(rateStr) || 0;
           }
-          const termMonth = customer.termMonth ? parseInt(customer.termMonth) : null;
+          // ✅ Backend returns remainingTermMonth (tháng còn lại) - use this field
+          const remainingTermMonth = customer.remainingTermMonth !== undefined && customer.remainingTermMonth !== null
+            ? parseInt(customer.remainingTermMonth)
+            : (customer.termMonth ? parseInt(customer.termMonth) : null); // Fallback to termMonth for backward compatibility
           const monthlyPay = parseFloat(customer.monthlyPay || 0);
           const status = customer.status || 'ACTIVE';
           
@@ -92,7 +96,7 @@ const Payment = () => {
               paidAmount: paidAmount,
               totalAmount: totalAmount,
               monthlyPay: monthlyPay,
-              remainingTermMonth: termMonth,
+              remainingTermMonth: remainingTermMonth,
               interestRate: interestRate
             });
           }
@@ -118,15 +122,6 @@ const Payment = () => {
             customerPhone: customer.phoneNumber || 'N/A',
             customerAddress: customer.address || 'N/A',
             
-            // Vehicle info (from backend) ✅
-            modelId: customer.modelId || null,
-            modelName: customer.modelName || 'N/A',
-            variantId: customer.variantId || null,
-            variantName: customer.variantName || 'N/A',
-            color: customer.color || 'N/A',
-            serialId: customer.serialId || 'N/A',
-            quantity: customer.quantity || '1',
-            
             // Payment info (from backend - calculated values) ✅
             paymentId: paymentId || null,
             orderId: orderId || null,
@@ -138,7 +133,7 @@ const Payment = () => {
             
             // InstallmentPlan info (from backend) ✅
             planId: planId,
-            currentTermMonth: termMonth,
+            currentTermMonth: remainingTermMonth, // ✅ Use remainingTermMonth (tháng còn lại)
             monthlyPay: monthlyPay,
             interestRate: interestRate,
             status: status
@@ -453,15 +448,7 @@ const Payment = () => {
              // Additional fields from backend response
              phone: payment.phoneNumber || payment.phone || payment.customerPhone || 'N/A',
              email: payment.email || payment.customerEmail || 'N/A',
-             vehicle: vehicleName, // Vehicle name from backend
-             // Vehicle info (from backend) ✅
-             modelId: payment.modelId || null,
-             modelName: payment.modelName || vehicleName || 'N/A',
-             variantId: payment.variantId || null,
-             variantName: payment.variantName || 'N/A',
-             color: payment.color || 'N/A',
-             serialId: payment.serialId || 'N/A',
-             quantity: payment.quantity || '1'
+             vehicle: vehicleName // Vehicle name from backend
            };
          });
          setCompletedPayments(transformedData);
@@ -504,28 +491,57 @@ const Payment = () => {
   const handleViewInvoice = async (payment, paymentType = 'installment') => {
     setInvoiceModal({ open: true, loading: true, error: '', data: null });
     try {
-      // ✅ Get all information directly from payment object (from backend API)
-      const vehicleInfo = {
-        model: payment.modelName || payment.vehicle || 'N/A',
-        variant: payment.variantName || 'N/A',
-        color: payment.color || 'N/A',
-        serial: payment.serialId || 'N/A',
-        quantity: payment.quantity || '1',
-        unitPrice: payment.unitPrice || (payment.totalAmount ? payment.totalAmount / parseFloat(payment.quantity || '1') : 0),
-      };
+      let order = null;
+      if (payment.customerId) {
+        const ordersResult = await viewOrdersByCustomerId(payment.customerId);
+        if (ordersResult.success && Array.isArray(ordersResult.data) && ordersResult.data.length > 0) {
+          if (payment.orderId) {
+            order =
+              ordersResult.data.find((o) => {
+                const oid =
+                  o.orderId ??
+                  o.order_id ??
+                  o.OrderId ??
+                  null;
+                return oid && Number(oid) === Number(payment.orderId);
+              }) ?? ordersResult.data[0];
+          } else {
+            order = ordersResult.data[0];
+          }
+        }
+      }
+
+      const detail = order?.detail || null;
+      const vehicleInfo = detail
+        ? {
+            model: detail.vehicleName || detail.modelName || (order?.modelName ?? (order?.modelId ? `Model ${order.modelId}` : 'N/A')),
+            variant: detail.variantName || detail.versionName || 'N/A',
+            color: detail.color || 'N/A',
+            serial: detail.serialId || 'N/A',
+            quantity: detail.quantity || '1',
+            unitPrice: detail.unitPrice || 0,
+          }
+        : {
+            model: payment.vehicle || (order?.modelName ?? (order?.modelId ? `Model ${order.modelId}` : 'N/A')),
+            variant: 'N/A',
+            color: payment.color || 'N/A',
+            serial: payment.serialId || 'N/A',
+            quantity: payment.quantity || '1',
+            unitPrice: payment.unitPrice || payment.amount || 0,
+          };
 
       const invoiceData = {
         paymentType,
         customer: {
-          name: payment.customerName || payment.name || 'N/A',
-          email: payment.customerEmail || payment.email || 'N/A',
-          phone: payment.customerPhone || payment.phone || payment.phoneNumber || 'N/A',
-          address: payment.customerAddress || payment.address || 'N/A',
+          name: payment.customerName || order?.customerName || 'N/A',
+          email: payment.customerEmail || payment.email || order?.customerEmail || 'N/A',
+          phone: payment.customerPhone || payment.phone || order?.customerPhone || 'N/A',
+          address: payment.customerAddress || order?.customerAddress || 'N/A',
         },
         order: {
-          orderId: payment.orderId || 'N/A',
-          orderDate: payment.paymentDate || null,
-          salesperson: 'N/A',
+          orderId: payment.orderId || order?.orderId || order?.order_id || 'N/A',
+          orderDate: order?.orderDate || null,
+          salesperson: order?.dealerStaffName || 'N/A',
         },
         payment: {
           total: payment.totalAmount ?? payment.amount ?? 0,
@@ -535,7 +551,7 @@ const Payment = () => {
           remainingMonths: payment.currentTermMonth ?? null,
           interestRate: payment.interestRate ?? null,
           status: payment.status || 'ACTIVE',
-          paymentDate: payment.paymentDate || null,
+          paymentDate: payment.paymentDate || order?.orderDate || null,
           method: payment.method || (paymentType === 'installment' ? 'TG' : 'TT'),
           planId: payment.planId ?? null,
         },
@@ -1103,6 +1119,7 @@ const Payment = () => {
                             <div className="text-sm font-medium text-gray-900">
                               {payment.currentTermMonth !== null && payment.currentTermMonth !== undefined 
                                 ? `${payment.currentTermMonth} tháng`
+                                ? `${payment.currentTermMonth} tháng`
                                 : 'N/A'}
                             </div>
                           </td>
@@ -1332,6 +1349,10 @@ const Payment = () => {
                         <span className="text-base font-semibold text-gray-900">#{selectedPayment.paymentId || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Payment ID</span>
+                        <span className="text-base font-semibold text-gray-900">#{selectedPayment.paymentId || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">Total Amount</span>
                         <span className="text-lg font-bold text-green-600">
                           {formatCurrency(selectedPayment.totalAmount || 0)}
@@ -1395,6 +1416,7 @@ const Payment = () => {
                         <span className="text-sm text-gray-600">Remaining Months</span>
                         <span className="text-base font-semibold text-gray-900">
                           {selectedPayment.currentTermMonth !== null && selectedPayment.currentTermMonth !== undefined 
+                            ? `${selectedPayment.currentTermMonth} tháng`
                             ? `${selectedPayment.currentTermMonth} tháng`
                             : 'N/A'}
                         </span>
@@ -1533,8 +1555,10 @@ const Payment = () => {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Số tháng còn lại:</span>
+                      <span className="text-sm text-gray-600">Số tháng còn lại:</span>
                       <span className="text-sm font-semibold text-gray-900">
                         {selectedPayment.currentTermMonth !== null && selectedPayment.currentTermMonth !== undefined 
+                          ? `${selectedPayment.currentTermMonth} tháng`
                           ? `${selectedPayment.currentTermMonth} tháng`
                           : 'N/A'}
                       </span>
@@ -1563,6 +1587,7 @@ const Payment = () => {
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Số tháng cần ghi nhận thanh toán <span className="text-red-500">*</span>
+                      Số tháng cần ghi nhận thanh toán <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="number"
@@ -1585,9 +1610,11 @@ const Payment = () => {
                       <div className="mt-2 space-y-1">
                         <p className="text-xs text-gray-500">
                           Tối đa: {selectedPayment.currentTermMonth} tháng
+                          Tối đa: {selectedPayment.currentTermMonth} tháng
                         </p>
                         {selectedPayment.monthlyPay && monthsToDeduct > 0 && (
                           <p className="text-xs font-semibold text-blue-600">
+                            Số tiền sẽ ghi nhận: {formatCurrency(selectedPayment.monthlyPay * monthsToDeduct)}
                             Số tiền sẽ ghi nhận: {formatCurrency(selectedPayment.monthlyPay * monthsToDeduct)}
                           </p>
                         )}
@@ -1712,6 +1739,10 @@ const Payment = () => {
                           {invoiceModal.data?.vehicle?.variant || 'N/A'}
                         </div>
                         <div>
+                          <span className="font-medium text-gray-900">Color:</span>{' '}
+                          {invoiceModal.data?.vehicle?.color || 'N/A'}
+                        </div>
+                        <div>
                           <span className="font-medium text-gray-900">Serial / VIN:</span>{' '}
                           {invoiceModal.data?.vehicle?.serial || 'N/A'}
                         </div>
@@ -1780,6 +1811,7 @@ const Payment = () => {
                         {invoiceModal.data?.payment?.remainingMonths != null && (
                           <div>
                             <span className="font-medium text-gray-900">Remaining Months:</span>{' '}
+                            {invoiceModal.data?.payment?.remainingMonths} tháng
                             {invoiceModal.data?.payment?.remainingMonths} tháng
                           </div>
                         )}

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '../layout/Layout';
-import { CreditCard, DollarSign, Edit2, TrendingDown, Users, TrendingUp, BarChart3, Search, AlertCircle, Loader2, Info, Minus, ChevronLeft, ChevronRight, Receipt } from 'lucide-react';
+import { CreditCard, DollarSign, Edit2, TrendingDown, Users, TrendingUp, BarChart3, Search, AlertCircle, Loader2, Info, Minus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getCustomersWithActiveInstallments, getCompletedPayments, updateInstallmentPlan } from '../services/paymentService';
 import { viewAllOrders } from '../services/orderService';
 import axios from 'axios';
@@ -27,12 +27,6 @@ const Payment = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [updating, setUpdating] = useState(false);
-  const [invoiceModal, setInvoiceModal] = useState({
-    open: false,
-    loading: false,
-    error: '',
-    data: null,
-  });
   
   // Map for orderId -> staff info (dealerStaffId, staffName)
   const [orderStaffMap, setOrderStaffMap] = useState(new Map());
@@ -103,7 +97,6 @@ const Payment = () => {
       await fetchCompletedPaymentsWithMap(map);
     };
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load order-staff mapping from orders and staff accounts
@@ -214,13 +207,6 @@ const Payment = () => {
             customerEmail: customer.email || 'N/A',
             customerPhone: customer.phoneNumber || 'N/A',
             customerAddress: customer.address || 'N/A',
-            // Vehicle info (from backend) ✅
-            modelId: customer.modelId || null,
-            modelName: customer.modelName || 'N/A',
-            variantId: customer.variantId || null,
-            variantName: customer.variantName || 'N/A',
-            serialId: customer.serialId || 'N/A',
-            quantity: customer.quantity || '1',
             paymentId: paymentId || null,
             orderId: orderId || null,
             totalAmount: totalAmount || 0,
@@ -262,6 +248,10 @@ const Payment = () => {
   // Wrapper functions for backward compatibility
   const fetchActiveInstallments = async () => {
     await fetchActiveInstallmentsWithMap(orderStaffMap);
+  };
+
+  const fetchCompletedPayments = async () => {
+    await fetchCompletedPaymentsWithMap(orderStaffMap);
   };
 
   const fetchCompletedPaymentsWithMap = async (staffMap) => {
@@ -322,13 +312,6 @@ const Payment = () => {
             phone: payment.phoneNumber || payment.phone || payment.customerPhone || 'N/A',
             email: payment.email || payment.customerEmail || 'N/A',
             vehicle: vehicle,
-            // Vehicle info (from backend) ✅
-            modelId: payment.modelId || null,
-            modelName: payment.modelName || vehicle || 'N/A',
-            variantId: payment.variantId || null,
-            variantName: payment.variantName || 'N/A',
-            serialId: payment.serialId || 'N/A',
-            quantity: payment.quantity || '1',
             salesperson: salesperson,
             salespersonId: salespersonId,
             interestRate: interestRate
@@ -418,147 +401,6 @@ const Payment = () => {
     setSelectedPayment(payment);
     setMonthsToDeduct(1);
     setIsEditPaymentModalOpen(true);
-  };
-
-  const handleViewInvoice = async (payment, paymentType = 'installment') => {
-    setInvoiceModal({ open: true, loading: true, error: '', data: null });
-    try {
-      let quantity = payment.quantity || '1';
-      let color = payment.color || 'N/A';
-      
-      // If quantity or color is missing, fetch from backend
-      if ((!payment.quantity || payment.quantity === '1') && payment.orderId) {
-        try {
-          const token = localStorage.getItem('token');
-          const isNgrokUrl = API_URL?.includes('ngrok');
-          const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          };
-          if (isNgrokUrl) {
-            headers['ngrok-skip-browser-warning'] = 'true';
-          }
-          
-          // Fetch order details to get quantity
-          const ordersResult = await viewAllOrders();
-          if (ordersResult.success && ordersResult.data) {
-            const order = ordersResult.data.find(o => 
-              (o.orderId || o.order_id) === payment.orderId
-            );
-            if (order) {
-              // Try to get quantity from order detail
-              if (order.detail && order.detail.quantity) {
-                quantity = order.detail.quantity;
-              } else if (order.details && order.details.length > 0) {
-                quantity = order.details[0].quantity || '1';
-              } else if (order.quantity) {
-                quantity = order.quantity;
-              }
-            }
-          }
-        } catch (err) {
-          console.warn('⚠️ Could not fetch order details for quantity:', err);
-        }
-      }
-      
-      // If color is missing and we have variantId, fetch variant details
-      if ((!payment.color || payment.color === 'N/A') && payment.variantId) {
-        try {
-          const token = localStorage.getItem('token');
-          const isNgrokUrl = API_URL?.includes('ngrok');
-          const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          };
-          if (isNgrokUrl) {
-            headers['ngrok-skip-browser-warning'] = 'true';
-          }
-          
-          // Fetch variant details to get color
-          const variantResponse = await axios.post(
-            `${API_URL}/EVM/viewVehicleVariant`,
-            { id: payment.variantId },
-            { headers }
-          );
-          
-          if (variantResponse.data && variantResponse.data.status === 'success' && variantResponse.data.data) {
-            const variants = Array.isArray(variantResponse.data.data) 
-              ? variantResponse.data.data 
-              : variantResponse.data.data.variants || [];
-            const variant = variants.find(v => 
-              (v.variantId || v.variant_id) === payment.variantId
-            );
-            if (variant && variant.color) {
-              color = variant.color;
-            }
-          }
-        } catch (err) {
-          console.warn('⚠️ Could not fetch variant details for color:', err);
-        }
-      }
-      
-      // ✅ Get all information directly from payment object (from backend API)
-      const vehicleInfo = {
-        model: payment.modelName || payment.vehicle || 'N/A',
-        variant: payment.variantName || 'N/A',
-        color: color,
-        serial: payment.serialId || 'N/A',
-        quantity: quantity,
-        unitPrice: payment.unitPrice || (payment.totalAmount ? payment.totalAmount / parseFloat(quantity || '1') : 0),
-      };
-
-      const invoiceData = {
-        paymentType,
-        customer: {
-          name: payment.customerName || payment.name || 'N/A',
-          email: payment.customerEmail || payment.email || 'N/A',
-          phone: payment.customerPhone || payment.phone || payment.phoneNumber || 'N/A',
-          address: payment.customerAddress || payment.address || 'N/A',
-        },
-        order: {
-          orderId: payment.orderId || 'N/A',
-          orderDate: payment.paymentDate || null,
-          salesperson: payment.salesperson || 'N/A',
-        },
-        payment: {
-          total: payment.totalAmount ?? payment.amount ?? 0,
-          paid: payment.paidAmount ?? payment.amount ?? 0,
-          outstanding: payment.outstandingAmount ?? 0,
-          monthlyPay: payment.monthlyPay ?? null,
-          remainingMonths: payment.currentTermMonth ?? null,
-          interestRate: payment.interestRate ?? null,
-          status: payment.status || 'ACTIVE',
-          paymentDate: payment.paymentDate || null,
-          method: payment.method || (paymentType === 'installment' ? 'TG' : 'TT'),
-          planId: payment.planId ?? null,
-        },
-        vehicle: vehicleInfo,
-      };
-
-      setInvoiceModal({
-        open: true,
-        loading: false,
-        error: '',
-        data: invoiceData,
-      });
-    } catch (err) {
-      console.error('❌ Failed to load invoice details', err);
-      setInvoiceModal({
-        open: true,
-        loading: false,
-        error: err.message || 'Failed to load invoice details',
-        data: null,
-      });
-    }
-  };
-
-  const closeInvoiceModal = () => {
-    setInvoiceModal({
-      open: false,
-      loading: false,
-      error: '',
-      data: null,
-    });
   };
 
   // Handle reduce 1 month (quick action from details modal)
@@ -1145,16 +987,6 @@ const Payment = () => {
                               >
                                 <Edit2 className="w-4 h-4" />
                               </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleViewInvoice(payment, 'installment');
-                                }}
-                                className="text-purple-600 hover:text-purple-900 flex items-center space-x-1"
-                                title="View invoice"
-                              >
-                                <Receipt className="w-4 h-4" />
-                              </button>
                             </div>
                           </td>
                         </tr>
@@ -1228,9 +1060,6 @@ const Payment = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Method
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -1279,20 +1108,6 @@ const Payment = () => {
                             <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                               {payment.method || 'TT'}
                             </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleViewInvoice(payment, 'completed');
-                                }}
-                                className="text-purple-600 hover:text-purple-900 flex items-center space-x-1"
-                                title="View invoice"
-                              >
-                                <Receipt className="w-4 h-4" />
-                              </button>
-                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1513,16 +1328,6 @@ const Payment = () => {
                     className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition-colors"
                   >
                     Close
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsDetailsModalOpen(false);
-                      handleViewInvoice(selectedPayment, selectedPayment.method === 'TT' ? 'full' : 'installment');
-                    }}
-                    className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
-                  >
-                    <Receipt className="w-4 h-4" />
-                    <span>View Invoice</span>
                   </button>
                   {selectedPayment.planId && (
                     <button

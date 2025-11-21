@@ -9,11 +9,9 @@ const ConfirmModal = ({
   onConfirm,
   confirmText = 'Confirm',
   tone = 'red', // 'red' | 'yellow' | 'blue'
-  Icon,
+  Icon = AlertTriangle,
 }) => {
   if (!open) return null
-
-  const IconComponent = Icon || AlertTriangle
 
   const toneClasses = {
     red: {
@@ -44,7 +42,7 @@ const ConfirmModal = ({
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center space-x-3">
             <div className={`w-10 h-10 ${toneClasses.bg} rounded-lg flex items-center justify-center`}>
-              <IconComponent className={`w-5 h-5 ${toneClasses.icon}`} />
+              <Icon className={`w-5 h-5 ${toneClasses.icon}`} />
             </div>
             <h2 className="text-xl font-bold text-gray-900">{title}</h2>
           </div>

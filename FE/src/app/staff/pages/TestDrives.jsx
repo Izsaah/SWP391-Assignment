@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '../layout/Layout';
 import {
   Calendar,
@@ -22,7 +22,6 @@ import { createTestDrive, updateTestDriveStatus, getTestDrivesByCustomerId, getD
 const TestDrives = () => {
   const location = useLocation();
   const vehicleData = location.state?.vehicleData;
-  const customerData = location.state?.customerData;
   const [testDrives, setTestDrives] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -174,59 +173,66 @@ const TestDrives = () => {
       if (vehicles.length > 0) await fetchAllTestDrives();
     };
     loadTestDrives();
-  }, [vehicles.length, fetchAllTestDrives]);
+  }, [vehicles.length]);
 
-  // Auto-open create modal and pre-fill data when coming from Inventory or Customer Detail
+  // Auto-open create modal and pre-fill vehicle data when coming from Inventory
   useEffect(() => {
-    if (customers.length > 0) {
-      if (customerData) {
-        // Pre-select customer when coming from Customer Detail
-        const customerId = customerData.customerId;
-        if (customerId) {
-          setFormData(prev => ({
-            ...prev,
-            customerId: String(customerId),
-            customerName: customerData.name || ''
-          }));
-          
-          // Check for existing schedule
-          (async () => {
-            try {
-              const res = await getTestDrivesByCustomerId(parseInt(customerId));
-              const scheduleData = res.success && res.data && res.data.length > 0 ? res.data[0] : null;
-              if (scheduleData) {
-                const parsed = parseStatus(scheduleData.status || '');
-                setExistingSchedule({
-                  ...scheduleData,
-                  status: parsed.baseStatus || scheduleData.status,
-                  rawStatus: parsed.encodedStatus || scheduleData.status,
-                  dealerId: parsed.dealerId
-                });
-              } else {
-                setExistingSchedule(null);
-              }
-              setAllowReplace(false);
-            } catch {
-              setExistingSchedule(null);
-              setAllowReplace(false);
-            }
-          })();
-        }
-        // Auto-open the create modal
-        setShowCreateModal(true);
-      } else if (vehicleData) {
-        // Pre-fill form with vehicle data when coming from Inventory
-        if (vehicleData.serialId) {
-          setFormData(prev => ({
-            ...prev,
-            serialId: vehicleData.serialId,
-          }));
-        }
-        // Auto-open the create modal
-        setShowCreateModal(true);
+    if (vehicleData && customers.length > 0) {
+      // Pre-fill form with vehicle data
+      if (vehicleData.serialId) {
+        setFormData(prev => ({
+          ...prev,
+          serialId: vehicleData.serialId,
+        }));
       }
+      // Auto-open the create modal
+      setShowCreateModal(true);
     }
-  }, [vehicleData, customerData, customers, parseStatus]);
+  }, [vehicleData, customers]);
+
+  const fetchAllTestDrives = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const result = await getDealerTestDrives();
+      const items = Array.isArray(result.data) ? result.data : [];
+
+      const allTestDrives = items.map((customer) => {
+        const schedule = customer.testDriveSchedule || customer.test_drive_schedule || customer.schedule;
+        if (!schedule) return null;
+        const customerId = customer.customerId || customer.customer_id || customer.id;
+        const customerName = customer.name || `Customer ${customerId}`;
+        const serialId = schedule.serialId || schedule.serial_id;
+
+        // No model/variant mapping required anymore
+
+        return {
+          appointmentId: schedule.appointmentId || schedule.appointment_id || schedule.id,
+          customerId,
+          customerName,
+          serialId: serialId || 'N/A',
+          date: schedule.date || schedule.scheduleDate || schedule.schedule_at || 'N/A',
+          status: schedule.status || 'PENDING',
+        };
+      }).filter(Boolean);
+
+      // Sort by date (most recent first)
+      allTestDrives.sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return dateB - dateA;
+      });
+      
+      setTestDrives(allTestDrives);
+      console.log(`✅ Loaded ${allTestDrives.length} test drives from dealer endpoint`);
+    } catch (err) {
+      console.error('Error fetching test drives:', err);
+      setError('Failed to load test drives');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Filter test drives
   const filteredTestDrives = testDrives.filter(drive => {
@@ -278,18 +284,8 @@ const TestDrives = () => {
       (async () => {
         try {
           const res = await getTestDrivesByCustomerId(parseInt(value));
-          const scheduleData = res.success && res.data && res.data.length > 0 ? res.data[0] : null;
-          if (scheduleData) {
-            const parsed = parseStatus(scheduleData.status || '');
-            setExistingSchedule({
-              ...scheduleData,
-              status: parsed.baseStatus || scheduleData.status,
-              rawStatus: parsed.encodedStatus || scheduleData.status,
-              dealerId: parsed.dealerId
-            });
-          } else {
-            setExistingSchedule(null);
-          }
+          const schedule = res.success && res.data && res.data.length > 0 ? res.data[0] : null;
+          setExistingSchedule(schedule);
           setAllowReplace(false);
         } catch {
           setExistingSchedule(null);
