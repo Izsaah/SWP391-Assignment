@@ -279,7 +279,7 @@ const CreateManufacturerRequestModal = ({ isOpen, onClose, onSuccess }) => {
     if (!value) return '';
     const numValue = parseFloat(value);
     if (isNaN(numValue)) return '';
-    return numValue.toLocaleString('vi-VN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    return numValue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   };
 
   // Validate form
@@ -492,7 +492,7 @@ const CreateManufacturerRequestModal = ({ isOpen, onClose, onSuccess }) => {
             {/* Price Field with $ symbol */}
             <div>
               <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-2">
-                Price per Unit (VND)
+                Price per Unit (USD)
               </label>
               <div className="relative">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">

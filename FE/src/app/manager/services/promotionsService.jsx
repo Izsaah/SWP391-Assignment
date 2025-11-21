@@ -27,26 +27,14 @@ export async function fetchDealerPromotions() {
     const list = dealer?.promotion || [];
 
     // Normalize
-    const rows = list
-      .map((p) => {
-        const promoId = p?.promoId ?? p?.promo_id ?? p?.id;
-        if (promoId === undefined || promoId === null) return null;
-
-        const rawRate = p?.discountRate ?? p?.discount_rate ?? 0;
-        const numericRate = Number(rawRate);
-
-        return {
-          id: String(promoId),
-          promoId: Number(promoId),
-          description: p?.description || '',
-          startDate: p?.startDate || p?.start_date || null,
-          endDate: p?.endDate || p?.end_date || null,
-          discountRate: Number.isFinite(numericRate) ? numericRate : 0,
-          type: p?.type || '',
-          raw: p,
-        };
-      })
-      .filter(Boolean);
+    const rows = list.map((p) => ({
+      promoId: p?.promoId ?? p?.promo_id ?? p?.id,
+      description: p?.description || '',
+      startDate: p?.startDate || p?.start_date || null,
+      endDate: p?.endDate || p?.end_date || null,
+      discountRate: Number(p?.discountRate ?? p?.discount_rate ?? 0),
+      type: p?.type || '',
+    }));
 
     return { success: true, data: rows };
   } catch (error) {

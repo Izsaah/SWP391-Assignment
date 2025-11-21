@@ -1,28 +1,41 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react'
 import { AlertTriangle, TrendingUp } from 'lucide-react'
-import { fetchInventory, fetchConsumptionRate } from '../../services/inventoryService'
+import axios from 'axios'
+
+const API_URL = import.meta.env.VITE_API_URL
 
 const InventoryReport = () => {
   const [model, setModel] = useState('All')
+  const [period, setPeriod] = useState('Last 30 days')
   const [rows, setRows] = useState([])
-  const [consumptionRates, setConsumptionRates] = useState([]) // Store consumption rates from BE
   const [loading, setLoading] = useState(false)
 
   // Fetch inventory data from API
   const fetchInventoryData = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await fetchInventory()
-      
-      if (!result.success) {
-        alert(result.message || 'No authentication token found. Please login again.')
+      const token = localStorage.getItem('token')
+      if (!token) {
+        alert('No authentication token found. Please login again.')
         return
       }
 
+      const response = await axios.post(
+        `${API_URL}/EVM/viewInventory`,
+        { _empty: true },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true'
+          }
+        }
+      )
+
       // Backend trả về {status: 'success', message: 'success', data: Array}
       // handleViewActiveInventory() trả về List<InventoryDTO>
-      if (result.data) {
-        const backendData = result.data || []
+      if (response.data && response.data.status === 'success' && response.data.data) {
+        const backendData = response.data.data || []
         const inventoryList = []
 
         backendData.forEach((inventory) => {
@@ -71,51 +84,38 @@ const InventoryReport = () => {
         const groupedData = Array.from(modelMap.values())
         setRows(groupedData)
       } else {
-        console.log('Response not successful or no data')
+        console.log('Response not successful or no data:', response.data)
         setRows([])
       }
     } catch (error) {
       console.error('Error fetching inventory data:', error)
-      alert(error.message || 'Failed to fetch inventory data')
+      console.error('Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: `${API_URL}/EVM/viewInventory`,
+        message: error.message
+      })
+      alert(error.response?.data?.message || 'Failed to fetch inventory data')
       setRows([])
     } finally {
       setLoading(false)
     }
   }, [])
 
-  // Fetch consumption rate from BE - just get and display, no calculation
-  const fetchConsumptionRateData = useCallback(async () => {
-    try {
-      const result = await fetchConsumptionRate()
-      if (result.success && result.data) {
-        // Just set whatever BE returns, no filtering or validation
-        setConsumptionRates(result.data)
-        console.log('Consumption rate data from BE:', result.data)
-      } else {
-        console.log('No consumption rate data from BE:', result.message)
-        setConsumptionRates([])
-      }
-    } catch (error) {
-      console.error('Error fetching consumption rate:', error)
-      setConsumptionRates([])
-    }
-  }, [])
-
   useEffect(() => {
     fetchInventoryData()
-    fetchConsumptionRateData()
-  }, [fetchInventoryData, fetchConsumptionRateData])
+  }, [fetchInventoryData])
 
   const filtered = useMemo(() => rows.filter(r => model === 'All' || r.model === model), [rows, model])
 
   const totalStock = useMemo(() => filtered.reduce((s, r) => s + (r.stock || 0), 0), [filtered])
-  
-  // Consumption rate: Sum of all rates from BE (no calculation, just display BE data)
-  const totalConsumptionRate = useMemo(() => {
-    if (consumptionRates.length === 0) return null
-    const sum = consumptionRates.reduce((total, item) => total + (item.consumptionRate || 0), 0)
-    return sum > 0 ? sum : null
-  }, [consumptionRates])
+  const totalSold = useMemo(() => filtered.reduce((s, r) => s + (r.sold || 0), 0), [filtered])
+  const rate = useMemo(() => {
+    const total = totalStock + totalSold
+    return total > 0 ? Math.round((totalSold / total) * 100) : 0
+  }, [totalStock, totalSold])
+  const forecast = useMemo(() => Math.round(totalSold * 1.1), [totalSold])
 
   return (
     <div className="space-y-6">
@@ -127,6 +127,15 @@ const InventoryReport = () => {
             <p className="text-sm text-gray-600 mt-1">Track stock levels and sell-through rate</p>
           </div>
           <div className="flex items-center gap-3">
+            <select 
+              value={period} 
+              onChange={(e) => setPeriod(e.target.value)} 
+              className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option>Last 7 days</option>
+              <option>Last 30 days</option>
+              <option>Last 90 days</option>
+            </select>
             <select 
               value={model} 
               onChange={(e) => setModel(e.target.value)} 
@@ -142,19 +151,22 @@ const InventoryReport = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="text-sm text-gray-600 mb-2">Total Stock</div>
           <div className="text-3xl font-bold text-gray-900">{totalStock}</div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="text-sm text-gray-600 mb-2">Total Sold</div>
+          <div className="text-3xl font-bold text-gray-900">{totalSold}</div>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="text-sm text-gray-600 mb-2">Consumption Rate</div>
-          <div className="text-3xl font-bold text-gray-900">
-            {totalConsumptionRate !== null ? totalConsumptionRate.toFixed(2) : 'N/A'}
-          </div>
-          <div className="text-xs text-gray-500 mt-1">
-            {totalConsumptionRate !== null ? 'Total daily consumption' : 'No data available'}
-          </div>
+          <div className="text-3xl font-bold text-gray-900">{rate}%</div>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="text-sm text-gray-600 mb-2">Forecast (next period)</div>
+          <div className="text-3xl font-bold text-gray-900">{forecast}</div>
         </div>
       </div>
 
@@ -171,24 +183,11 @@ const InventoryReport = () => {
               const total = (r.stock || 0) + (r.sold || 0)
               const soldPercentage = total > 0 ? ((r.sold || 0) / total) * 100 : 0
               
-              // Find consumption rate for this model from BE data
-              const modelConsumptionRate = consumptionRates.find(
-                item => item.modelName === r.model
-              )
-              const consumptionRateValue = modelConsumptionRate?.consumptionRate || null
-              
               return (
                 <div key={r.model}>
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-medium text-gray-900">{r.model}</span>
-                    <span className="text-sm text-gray-600">
-                      Stock {r.stock || 0} • Sold {r.sold || 0}
-                      {consumptionRateValue !== null && consumptionRateValue > 0 && (
-                        <span className="ml-2 text-blue-600">
-                          • Rate: {consumptionRateValue.toFixed(2)}/day
-                        </span>
-                      )}
-                    </span>
+                    <span className="text-sm text-gray-600">Stock {r.stock || 0} • Sold {r.sold || 0}</span>
                   </div>
                   <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div 

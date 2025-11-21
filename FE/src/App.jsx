@@ -15,8 +15,10 @@ import Customers from './app/staff/pages/Customers';
 import CustomerDetail from './app/staff/pages/CustomerDetail';
 import TestDrives from './app/staff/pages/TestDrives';
 import Reports from './app/staff/pages/Reports';
+import Settings from './app/staff/pages/Settings';
 
 // Manager imports
+import { Dashboard as ManagerDashboard } from './app/manager/Dashboard';
 import ManagerVehicleList from './app/manager/inventory/VehicleList';
 import StockOverview from './app/manager/inventory/StockOverview';
 import ModelDetail from './app/manager/inventory/ModelDetail';
@@ -55,7 +57,7 @@ const RoleRedirect = () => {
       const user = JSON.parse(savedUser);
       const role = user?.roles?.[0]?.roleName;
       const normalized = role === 'Dealer Manager' ? 'MANAGER' : role === 'Dealer Staff' ? 'STAFF' : (role ? role.toUpperCase() : role);
-      if (normalized === 'MANAGER') return <Navigate to="/manager/inventory/vehicles" />;
+      if (normalized === 'MANAGER') return <Navigate to="/manager/dashboard" />;
       if (normalized === 'STAFF') return <Navigate to="/staff/dashboard" />;
       if (normalized === 'EVM' || normalized === 'ADMIN') return <Navigate to="/evm" />;
     }
@@ -162,8 +164,24 @@ function App() {
             </ProtectedRoute>
           } 
         />
+        <Route 
+          path="/staff/settings" 
+          element={
+            <ProtectedRoute allowRoles={['STAFF']}>
+              <Settings />
+            </ProtectedRoute>
+          } 
+        />
 
         {/* Manager Routes - Only accessible by MANAGER role */}
+        <Route 
+          path="/manager/dashboard" 
+          element={
+            <ProtectedRoute allowRoles={['MANAGER']}>
+              <ManagerDashboard />
+            </ProtectedRoute>
+          } 
+        />
         <Route 
           path="/manager/inventory/vehicles" 
           element={
@@ -318,7 +336,7 @@ function App() {
         <Route path="/customers/list" element={<Navigate to="/staff/customers/list" />} />
         <Route path="/customers/:customerId" element={<Navigate to="/staff/customers/:customerId" />} />
         <Route path="/reports" element={<Navigate to="/staff/reports" />} />
-        <Route path="/settings" element={<Navigate to="/staff/dashboard" />} />
+        <Route path="/settings" element={<Navigate to="/staff/settings" />} />
 
         {/* 404 - Not Found */}
         <Route path="*" element={<div className="flex items-center justify-center h-screen"><h1 className="text-2xl font-bold text-gray-800">404 - Page Not Found</h1></div>} />

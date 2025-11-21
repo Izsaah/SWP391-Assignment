@@ -3,8 +3,6 @@ import Layout from '../layout/Layout';
 import { CreditCard, DollarSign, Edit2, TrendingDown, AlertCircle, Loader2, Info, Minus, Receipt } from 'lucide-react';
 import { getCustomersWithActiveInstallments, getCompletedPayments, updateInstallmentPlan } from '../services/paymentService';
 import { viewOrdersByCustomerId } from '../services/orderService';
-import { fetchDealerPromotions } from '../services/promotionService';
-import { fetchAllVariants } from '../services/inventoryService';
 
 const Payment = () => {
   const [activeTab, setActiveTab] = useState('installments'); // 'installments' or 'completed'
@@ -54,13 +52,14 @@ const Payment = () => {
         console.log(`✅ Received ${result.data.length} customers with active installments`);
         
         // Transform backend data to frontend format
-        // ✅ Backend returns ALL needed data: planId, interestRate, termMonth, monthlyPay, status, paymentId, orderId, totalAmount, paymentDate, method
+        // ✅ Backend returns ALL needed data: planId, interestRate, remainingTermMonth, monthlyPay, status, paymentId, orderId, totalAmount, paymentDate, method
         // ✅ Backend calculation logic (PaymentService.java):
         //    1. originalPrincipal = payment.getAmount() (from Payment table)
-        //    2. originalTermMonth = round(originalPrincipal / monthlyPay)
+        //    2. originalTermMonth = round(originalPrincipal / monthlyPay) - tổng số tháng ban đầu
         //    3. totalAmountWithInterest = monthlyPay * originalTermMonth (total commitment)
-        //    4. outstandingAmount = monthlyPay * remainingTermMonth (remaining to pay)
-        //    5. paidAmount = monthlyPay * (originalTermMonth - remainingTermMonth) (already paid)
+        //    4. remainingTermMonth = plan.getTermMonth() (tháng còn lại từ database)
+        //    5. outstandingAmount = monthlyPay * remainingTermMonth (remaining to pay)
+        //    6. paidAmount = monthlyPay * (originalTermMonth - remainingTermMonth) (already paid)
         // ✅ We use backend's calculated values directly - no recalculation needed
         const transformed = result.data.map((customer) => {
           // ✅ Use backend data directly - no need to fetch from orders API anymore!
@@ -71,7 +70,10 @@ const Payment = () => {
             const rateStr = String(customer.interestRate).replace('%', '').trim();
             interestRate = parseFloat(rateStr) || 0;
           }
-          const termMonth = customer.termMonth ? parseInt(customer.termMonth) : null;
+          // ✅ Backend returns remainingTermMonth (tháng còn lại) - use this field
+          const remainingTermMonth = customer.remainingTermMonth !== undefined && customer.remainingTermMonth !== null
+            ? parseInt(customer.remainingTermMonth)
+            : (customer.termMonth ? parseInt(customer.termMonth) : null); // Fallback to termMonth for backward compatibility
           const monthlyPay = parseFloat(customer.monthlyPay || 0);
           const status = customer.status || 'ACTIVE';
           
@@ -94,7 +96,7 @@ const Payment = () => {
               paidAmount: paidAmount,
               totalAmount: totalAmount,
               monthlyPay: monthlyPay,
-              remainingTermMonth: termMonth,
+              remainingTermMonth: remainingTermMonth,
               interestRate: interestRate
             });
           }
@@ -120,15 +122,6 @@ const Payment = () => {
             customerPhone: customer.phoneNumber || 'N/A',
             customerAddress: customer.address || 'N/A',
             
-            // Vehicle info (from backend) ✅
-            modelId: customer.modelId || null,
-            modelName: customer.modelName || 'N/A',
-            variantId: customer.variantId || null,
-            variantName: customer.variantName || 'N/A',
-            color: customer.color || 'N/A',
-            serialId: customer.serialId || 'N/A',
-            quantity: customer.quantity || '1',
-            
             // Payment info (from backend - calculated values) ✅
             paymentId: paymentId || null,
             orderId: orderId || null,
@@ -140,7 +133,7 @@ const Payment = () => {
             
             // InstallmentPlan info (from backend) ✅
             planId: planId,
-            currentTermMonth: termMonth,
+            currentTermMonth: remainingTermMonth, // ✅ Use remainingTermMonth (tháng còn lại)
             monthlyPay: monthlyPay,
             interestRate: interestRate,
             status: status
@@ -455,15 +448,7 @@ const Payment = () => {
              // Additional fields from backend response
              phone: payment.phoneNumber || payment.phone || payment.customerPhone || 'N/A',
              email: payment.email || payment.customerEmail || 'N/A',
-             vehicle: vehicleName, // Vehicle name from backend
-             // Vehicle info (from backend) ✅
-             modelId: payment.modelId || null,
-             modelName: payment.modelName || vehicleName || 'N/A',
-             variantId: payment.variantId || null,
-             variantName: payment.variantName || 'N/A',
-             color: payment.color || 'N/A',
-             serialId: payment.serialId || 'N/A',
-             quantity: payment.quantity || '1'
+             vehicle: vehicleName // Vehicle name from backend
            };
          });
          setCompletedPayments(transformedData);
@@ -506,136 +491,57 @@ const Payment = () => {
   const handleViewInvoice = async (payment, paymentType = 'installment') => {
     setInvoiceModal({ open: true, loading: true, error: '', data: null });
     try {
-      // ✅ Get all information directly from payment object (from backend API)
-      const vehicleInfo = {
-        model: payment.modelName || payment.vehicle || 'N/A',
-        variant: payment.variantName || 'N/A',
-        color: payment.color || 'N/A',
-        serial: payment.serialId || 'N/A',
-        quantity: payment.quantity || '1',
-        unitPrice: payment.unitPrice || (payment.totalAmount ? payment.totalAmount / parseFloat(payment.quantity || '1') : 0),
-      };
-
-      // Try to fetch order to get promotion info (for Full Payment only)
-      let promotionInfo = null;
-      if (paymentType === 'completed' && payment.orderId) {
-        try {
-          // Fetch order, promotions, and variants in parallel
-          const [ordersResult, promotionsResult, variantsResult] = await Promise.all([
-            viewOrdersByCustomerId(payment.customerId),
-            fetchDealerPromotions(),
-            fetchAllVariants()
-          ]);
-
-          if (ordersResult.success && ordersResult.data) {
-            const order = ordersResult.data.find(o => 
-              (o.orderId || o.order_id) === payment.orderId
-            );
-            
-            if (order && order.detail) {
-              const unitPrice = parseFloat(order.detail.unitPrice || 0);
-              const variantId = order.variantId || order.variant_id;
-              const orderDate = order.orderDate || order.order_date || payment.paymentDate;
-              
-              // If unitPrice is 0 and we have variantId, likely promotion 100% was applied
-              if (unitPrice === 0 && variantId) {
-                promotionInfo = {
-                  applied: true,
-                  description: '100% Promotion Applied',
-                  discount: '100%'
-                };
-              } else if (Array.isArray(variantsResult) && variantsResult.length > 0 && variantId) {
-                // Find variant to get base price
-                const variant = variantsResult.find(v => 
-                  (v.variantId || v.variant_id) === Number(variantId)
-                );
-                
-                if (variant) {
-                  const basePrice = parseFloat(variant.price || 0);
-                  
-                  // If unitPrice < basePrice, a promotion was likely applied
-                  if (basePrice > 0 && unitPrice < basePrice) {
-                    const discountAmount = basePrice - unitPrice;
-                    const discountPercent = ((discountAmount / basePrice) * 100).toFixed(0);
-                    
-                    // Try to match with promotion list
-                    if (promotionsResult.success && promotionsResult.data && Array.isArray(promotionsResult.data)) {
-                      const orderDateObj = orderDate ? new Date(orderDate) : null;
-                      
-                      // Find matching promotion based on discount rate and date range
-                      const matchingPromo = promotionsResult.data.find(promo => {
-                        if (!promo) return false;
-                        
-                        const startDate = promo.startDate ? new Date(promo.startDate) : null;
-                        const endDate = promo.endDate ? new Date(promo.endDate) : null;
-                        
-                        // Check if order date is within promotion date range
-                        const isInDateRange = (!startDate || !orderDateObj || orderDateObj >= startDate) &&
-                                             (!endDate || !orderDateObj || orderDateObj <= endDate);
-                        
-                        if (!isInDateRange) return false;
-                        
-                        // Check if discount matches
-                        if (promo.type === 'PERCENTAGE') {
-                          const promoDiscountPercent = (promo.discountRate * 100).toFixed(0);
-                          return Math.abs(parseFloat(promoDiscountPercent) - parseFloat(discountPercent)) < 1; // Allow 1% tolerance
-                        } else if (promo.type === 'FIXED') {
-                          const promoDiscountAmount = promo.discountRate || 0;
-                          return Math.abs(promoDiscountAmount - discountAmount) < 1000; // Allow 1000 VND tolerance
-                        }
-                        
-                        return false;
-                      });
-                      
-                      if (matchingPromo) {
-                        const discountDisplay = matchingPromo.type === 'PERCENTAGE' 
-                          ? `${(matchingPromo.discountRate * 100).toFixed(0)}%`
-                          : `${formatCurrency(matchingPromo.discountRate)}`;
-                        
-                        promotionInfo = {
-                          applied: true,
-                          promotionId: matchingPromo.promoId,
-                          description: matchingPromo.description || 'Promotion Applied',
-                          discount: discountDisplay
-                        };
-                      } else {
-                        // No matching promotion found, but discount was applied
-                        promotionInfo = {
-                          applied: true,
-                          description: 'Promotion Applied',
-                          discount: `${discountPercent}%`
-                        };
-                      }
-                    } else {
-                      // No promotions list available, but discount was applied
-                      promotionInfo = {
-                        applied: true,
-                        description: 'Promotion Applied',
-                        discount: `${discountPercent}%`
-                      };
-                    }
-                  }
-                }
-              }
-            }
+      let order = null;
+      if (payment.customerId) {
+        const ordersResult = await viewOrdersByCustomerId(payment.customerId);
+        if (ordersResult.success && Array.isArray(ordersResult.data) && ordersResult.data.length > 0) {
+          if (payment.orderId) {
+            order =
+              ordersResult.data.find((o) => {
+                const oid =
+                  o.orderId ??
+                  o.order_id ??
+                  o.OrderId ??
+                  null;
+                return oid && Number(oid) === Number(payment.orderId);
+              }) ?? ordersResult.data[0];
+          } else {
+            order = ordersResult.data[0];
           }
-        } catch (err) {
-          console.warn('Could not fetch promotion info:', err);
         }
       }
+
+      const detail = order?.detail || null;
+      const vehicleInfo = detail
+        ? {
+            model: detail.vehicleName || detail.modelName || (order?.modelName ?? (order?.modelId ? `Model ${order.modelId}` : 'N/A')),
+            variant: detail.variantName || detail.versionName || 'N/A',
+            color: detail.color || 'N/A',
+            serial: detail.serialId || 'N/A',
+            quantity: detail.quantity || '1',
+            unitPrice: detail.unitPrice || 0,
+          }
+        : {
+            model: payment.vehicle || (order?.modelName ?? (order?.modelId ? `Model ${order.modelId}` : 'N/A')),
+            variant: 'N/A',
+            color: payment.color || 'N/A',
+            serial: payment.serialId || 'N/A',
+            quantity: payment.quantity || '1',
+            unitPrice: payment.unitPrice || payment.amount || 0,
+          };
 
       const invoiceData = {
         paymentType,
         customer: {
-          name: payment.customerName || payment.name || 'N/A',
-          email: payment.customerEmail || payment.email || 'N/A',
-          phone: payment.customerPhone || payment.phone || payment.phoneNumber || 'N/A',
-          address: payment.customerAddress || payment.address || 'N/A',
+          name: payment.customerName || order?.customerName || 'N/A',
+          email: payment.customerEmail || payment.email || order?.customerEmail || 'N/A',
+          phone: payment.customerPhone || payment.phone || order?.customerPhone || 'N/A',
+          address: payment.customerAddress || order?.customerAddress || 'N/A',
         },
         order: {
-          orderId: payment.orderId || 'N/A',
-          orderDate: payment.paymentDate || null,
-          salesperson: 'N/A',
+          orderId: payment.orderId || order?.orderId || order?.order_id || 'N/A',
+          orderDate: order?.orderDate || null,
+          salesperson: order?.dealerStaffName || 'N/A',
         },
         payment: {
           total: payment.totalAmount ?? payment.amount ?? 0,
@@ -645,10 +551,9 @@ const Payment = () => {
           remainingMonths: payment.currentTermMonth ?? null,
           interestRate: payment.interestRate ?? null,
           status: payment.status || 'ACTIVE',
-          paymentDate: payment.paymentDate || null,
+          paymentDate: payment.paymentDate || order?.orderDate || null,
           method: payment.method || (paymentType === 'installment' ? 'TG' : 'TT'),
           planId: payment.planId ?? null,
-          promotion: promotionInfo, // Add promotion info
         },
         vehicle: vehicleInfo,
       };
@@ -1213,7 +1118,7 @@ const Payment = () => {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
                               {payment.currentTermMonth !== null && payment.currentTermMonth !== undefined 
-                                ? `${payment.currentTermMonth} months`
+                                ? `${payment.currentTermMonth} tháng`
                                 : 'N/A'}
                             </div>
                           </td>
@@ -1439,6 +1344,10 @@ const Payment = () => {
                         <span className="text-base font-semibold text-gray-900">#{selectedPayment.orderId || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Payment ID</span>
+                        <span className="text-base font-semibold text-gray-900">#{selectedPayment.paymentId || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">Total Amount</span>
                         <span className="text-lg font-bold text-green-600">
                           {formatCurrency(selectedPayment.totalAmount || 0)}
@@ -1502,7 +1411,7 @@ const Payment = () => {
                         <span className="text-sm text-gray-600">Remaining Months</span>
                         <span className="text-base font-semibold text-gray-900">
                           {selectedPayment.currentTermMonth !== null && selectedPayment.currentTermMonth !== undefined 
-                            ? `${selectedPayment.currentTermMonth} months`
+                            ? `${selectedPayment.currentTermMonth} tháng`
                             : 'N/A'}
                         </span>
                       </div>
@@ -1639,10 +1548,10 @@ const Payment = () => {
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Remaining Months:</span>
+                      <span className="text-sm text-gray-600">Số tháng còn lại:</span>
                       <span className="text-sm font-semibold text-gray-900">
                         {selectedPayment.currentTermMonth !== null && selectedPayment.currentTermMonth !== undefined 
-                          ? `${selectedPayment.currentTermMonth} months`
+                          ? `${selectedPayment.currentTermMonth} tháng`
                           : 'N/A'}
                       </span>
                     </div>
@@ -1669,7 +1578,7 @@ const Payment = () => {
                   {/* Record Payment Input */}
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Number of months to record payment <span className="text-red-500">*</span>
+                      Số tháng cần ghi nhận thanh toán <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="number"
@@ -1691,11 +1600,11 @@ const Payment = () => {
                     {selectedPayment.currentTermMonth && selectedPayment.currentTermMonth > 0 ? (
                       <div className="mt-2 space-y-1">
                         <p className="text-xs text-gray-500">
-                          Maximum: {selectedPayment.currentTermMonth} months
+                          Tối đa: {selectedPayment.currentTermMonth} tháng
                         </p>
                         {selectedPayment.monthlyPay && monthsToDeduct > 0 && (
                           <p className="text-xs font-semibold text-blue-600">
-                            Amount to be recorded: {formatCurrency(selectedPayment.monthlyPay * monthsToDeduct)}
+                            Số tiền sẽ ghi nhận: {formatCurrency(selectedPayment.monthlyPay * monthsToDeduct)}
                           </p>
                         )}
                       </div>
@@ -1819,6 +1728,10 @@ const Payment = () => {
                           {invoiceModal.data?.vehicle?.variant || 'N/A'}
                         </div>
                         <div>
+                          <span className="font-medium text-gray-900">Color:</span>{' '}
+                          {invoiceModal.data?.vehicle?.color || 'N/A'}
+                        </div>
+                        <div>
                           <span className="font-medium text-gray-900">Serial / VIN:</span>{' '}
                           {invoiceModal.data?.vehicle?.serial || 'N/A'}
                         </div>
@@ -1887,27 +1800,13 @@ const Payment = () => {
                         {invoiceModal.data?.payment?.remainingMonths != null && (
                           <div>
                             <span className="font-medium text-gray-900">Remaining Months:</span>{' '}
-                            {invoiceModal.data?.payment?.remainingMonths} months
+                            {invoiceModal.data?.payment?.remainingMonths} tháng
                           </div>
                         )}
                         {invoiceModal.data?.payment?.interestRate != null && (
                           <div>
                             <span className="font-medium text-gray-900">Interest Rate:</span>{' '}
                             {invoiceModal.data?.payment?.interestRate}%
-                          </div>
-                        )}
-                        {/* Promotion Info - Only show for Full Payment */}
-                        {invoiceModal.data?.paymentType === 'completed' && invoiceModal.data?.payment?.promotion && (
-                          <div className="mt-2 pt-2 border-t border-gray-200">
-                            <span className="font-medium text-gray-900">Promotion:</span>{' '}
-                            <span className="font-semibold text-green-600">
-                              {invoiceModal.data.payment.promotion.description || 'Applied'}
-                            </span>
-                            {invoiceModal.data.payment.promotion.discount && (
-                              <span className="text-xs text-gray-500 ml-1">
-                                ({invoiceModal.data.payment.promotion.discount})
-                              </span>
-                            )}
                           </div>
                         )}
                         <div>

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '../layout/Layout';
-import { CreditCard, DollarSign, Edit2, TrendingDown, Users, TrendingUp, BarChart3, Search, AlertCircle, Loader2, Info, Minus, ChevronLeft, ChevronRight, Receipt } from 'lucide-react';
+import { CreditCard, DollarSign, Edit2, TrendingDown, Users, TrendingUp, BarChart3, Search, AlertCircle, Loader2, Info, Minus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getCustomersWithActiveInstallments, getCompletedPayments, updateInstallmentPlan } from '../services/paymentService';
 import { viewAllOrders } from '../services/orderService';
 import axios from 'axios';
@@ -27,12 +27,6 @@ const Payment = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [updating, setUpdating] = useState(false);
-  const [invoiceModal, setInvoiceModal] = useState({
-    open: false,
-    loading: false,
-    error: '',
-    data: null,
-  });
   
   // Map for orderId -> staff info (dealerStaffId, staffName)
   const [orderStaffMap, setOrderStaffMap] = useState(new Map());
@@ -103,7 +97,6 @@ const Payment = () => {
       await fetchCompletedPaymentsWithMap(map);
     };
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load order-staff mapping from orders and staff accounts
@@ -214,13 +207,6 @@ const Payment = () => {
             customerEmail: customer.email || 'N/A',
             customerPhone: customer.phoneNumber || 'N/A',
             customerAddress: customer.address || 'N/A',
-            // Vehicle info (from backend) ✅
-            modelId: customer.modelId || null,
-            modelName: customer.modelName || 'N/A',
-            variantId: customer.variantId || null,
-            variantName: customer.variantName || 'N/A',
-            serialId: customer.serialId || 'N/A',
-            quantity: customer.quantity || '1',
             paymentId: paymentId || null,
             orderId: orderId || null,
             totalAmount: totalAmount || 0,
@@ -262,6 +248,10 @@ const Payment = () => {
   // Wrapper functions for backward compatibility
   const fetchActiveInstallments = async () => {
     await fetchActiveInstallmentsWithMap(orderStaffMap);
+  };
+
+  const fetchCompletedPayments = async () => {
+    await fetchCompletedPaymentsWithMap(orderStaffMap);
   };
 
   const fetchCompletedPaymentsWithMap = async (staffMap) => {
@@ -322,13 +312,6 @@ const Payment = () => {
             phone: payment.phoneNumber || payment.phone || payment.customerPhone || 'N/A',
             email: payment.email || payment.customerEmail || 'N/A',
             vehicle: vehicle,
-            // Vehicle info (from backend) ✅
-            modelId: payment.modelId || null,
-            modelName: payment.modelName || vehicle || 'N/A',
-            variantId: payment.variantId || null,
-            variantName: payment.variantName || 'N/A',
-            serialId: payment.serialId || 'N/A',
-            quantity: payment.quantity || '1',
             salesperson: salesperson,
             salespersonId: salespersonId,
             interestRate: interestRate
@@ -418,147 +401,6 @@ const Payment = () => {
     setSelectedPayment(payment);
     setMonthsToDeduct(1);
     setIsEditPaymentModalOpen(true);
-  };
-
-  const handleViewInvoice = async (payment, paymentType = 'installment') => {
-    setInvoiceModal({ open: true, loading: true, error: '', data: null });
-    try {
-      let quantity = payment.quantity || '1';
-      let color = payment.color || 'N/A';
-      
-      // If quantity or color is missing, fetch from backend
-      if ((!payment.quantity || payment.quantity === '1') && payment.orderId) {
-        try {
-          const token = localStorage.getItem('token');
-          const isNgrokUrl = API_URL?.includes('ngrok');
-          const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          };
-          if (isNgrokUrl) {
-            headers['ngrok-skip-browser-warning'] = 'true';
-          }
-          
-          // Fetch order details to get quantity
-          const ordersResult = await viewAllOrders();
-          if (ordersResult.success && ordersResult.data) {
-            const order = ordersResult.data.find(o => 
-              (o.orderId || o.order_id) === payment.orderId
-            );
-            if (order) {
-              // Try to get quantity from order detail
-              if (order.detail && order.detail.quantity) {
-                quantity = order.detail.quantity;
-              } else if (order.details && order.details.length > 0) {
-                quantity = order.details[0].quantity || '1';
-              } else if (order.quantity) {
-                quantity = order.quantity;
-              }
-            }
-          }
-        } catch (err) {
-          console.warn('⚠️ Could not fetch order details for quantity:', err);
-        }
-      }
-      
-      // If color is missing and we have variantId, fetch variant details
-      if ((!payment.color || payment.color === 'N/A') && payment.variantId) {
-        try {
-          const token = localStorage.getItem('token');
-          const isNgrokUrl = API_URL?.includes('ngrok');
-          const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          };
-          if (isNgrokUrl) {
-            headers['ngrok-skip-browser-warning'] = 'true';
-          }
-          
-          // Fetch variant details to get color
-          const variantResponse = await axios.post(
-            `${API_URL}/EVM/viewVehicleVariant`,
-            { id: payment.variantId },
-            { headers }
-          );
-          
-          if (variantResponse.data && variantResponse.data.status === 'success' && variantResponse.data.data) {
-            const variants = Array.isArray(variantResponse.data.data) 
-              ? variantResponse.data.data 
-              : variantResponse.data.data.variants || [];
-            const variant = variants.find(v => 
-              (v.variantId || v.variant_id) === payment.variantId
-            );
-            if (variant && variant.color) {
-              color = variant.color;
-            }
-          }
-        } catch (err) {
-          console.warn('⚠️ Could not fetch variant details for color:', err);
-        }
-      }
-      
-      // ✅ Get all information directly from payment object (from backend API)
-      const vehicleInfo = {
-        model: payment.modelName || payment.vehicle || 'N/A',
-        variant: payment.variantName || 'N/A',
-        color: color,
-        serial: payment.serialId || 'N/A',
-        quantity: quantity,
-        unitPrice: payment.unitPrice || (payment.totalAmount ? payment.totalAmount / parseFloat(quantity || '1') : 0),
-      };
-
-      const invoiceData = {
-        paymentType,
-        customer: {
-          name: payment.customerName || payment.name || 'N/A',
-          email: payment.customerEmail || payment.email || 'N/A',
-          phone: payment.customerPhone || payment.phone || payment.phoneNumber || 'N/A',
-          address: payment.customerAddress || payment.address || 'N/A',
-        },
-        order: {
-          orderId: payment.orderId || 'N/A',
-          orderDate: payment.paymentDate || null,
-          salesperson: payment.salesperson || 'N/A',
-        },
-        payment: {
-          total: payment.totalAmount ?? payment.amount ?? 0,
-          paid: payment.paidAmount ?? payment.amount ?? 0,
-          outstanding: payment.outstandingAmount ?? 0,
-          monthlyPay: payment.monthlyPay ?? null,
-          remainingMonths: payment.currentTermMonth ?? null,
-          interestRate: payment.interestRate ?? null,
-          status: payment.status || 'ACTIVE',
-          paymentDate: payment.paymentDate || null,
-          method: payment.method || (paymentType === 'installment' ? 'TG' : 'TT'),
-          planId: payment.planId ?? null,
-        },
-        vehicle: vehicleInfo,
-      };
-
-      setInvoiceModal({
-        open: true,
-        loading: false,
-        error: '',
-        data: invoiceData,
-      });
-    } catch (err) {
-      console.error('❌ Failed to load invoice details', err);
-      setInvoiceModal({
-        open: true,
-        loading: false,
-        error: err.message || 'Failed to load invoice details',
-        data: null,
-      });
-    }
-  };
-
-  const closeInvoiceModal = () => {
-    setInvoiceModal({
-      open: false,
-      loading: false,
-      error: '',
-      data: null,
-    });
   };
 
   // Handle reduce 1 month (quick action from details modal)
@@ -1103,7 +945,7 @@ const Payment = () => {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
                               {payment.currentTermMonth !== null && payment.currentTermMonth !== undefined 
-                                ? `${payment.currentTermMonth} months`
+                                ? `${payment.currentTermMonth} tháng`
                                 : 'N/A'}
                             </div>
                           </td>
@@ -1144,16 +986,6 @@ const Payment = () => {
                                 title="Edit payment"
                               >
                                 <Edit2 className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleViewInvoice(payment, 'installment');
-                                }}
-                                className="text-purple-600 hover:text-purple-900 flex items-center space-x-1"
-                                title="View invoice"
-                              >
-                                <Receipt className="w-4 h-4" />
                               </button>
                             </div>
                           </td>
@@ -1228,9 +1060,6 @@ const Payment = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Method
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -1279,20 +1108,6 @@ const Payment = () => {
                             <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                               {payment.method || 'TT'}
                             </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleViewInvoice(payment, 'completed');
-                                }}
-                                className="text-purple-600 hover:text-purple-900 flex items-center space-x-1"
-                                title="View invoice"
-                              >
-                                <Receipt className="w-4 h-4" />
-                              </button>
-                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1382,6 +1197,10 @@ const Payment = () => {
                         <span className="text-base font-semibold text-gray-900">#{selectedPayment.orderId || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Payment ID</span>
+                        <span className="text-base font-semibold text-gray-900">#{selectedPayment.paymentId || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">Total Amount</span>
                         <span className="text-lg font-bold text-green-600">
                           {formatCurrency(selectedPayment.totalAmount || 0)}
@@ -1446,7 +1265,7 @@ const Payment = () => {
                           <span className="text-sm text-gray-600">Remaining Months</span>
                           <span className="text-base font-semibold text-gray-900">
                             {selectedPayment.currentTermMonth !== null && selectedPayment.currentTermMonth !== undefined 
-                              ? `${selectedPayment.currentTermMonth} months`
+                              ? `${selectedPayment.currentTermMonth} tháng`
                               : 'N/A'}
                           </span>
                         </div>
@@ -1509,16 +1328,6 @@ const Payment = () => {
                     className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition-colors"
                   >
                     Close
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsDetailsModalOpen(false);
-                      handleViewInvoice(selectedPayment, selectedPayment.method === 'TT' ? 'full' : 'installment');
-                    }}
-                    className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
-                  >
-                    <Receipt className="w-4 h-4" />
-                    <span>View Invoice</span>
                   </button>
                   {selectedPayment.planId && (
                     <button
@@ -1594,10 +1403,10 @@ const Payment = () => {
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Remaining Months:</span>
+                      <span className="text-sm text-gray-600">Số tháng còn lại:</span>
                       <span className="text-sm font-semibold text-gray-900">
                         {selectedPayment.currentTermMonth !== null && selectedPayment.currentTermMonth !== undefined 
-                          ? `${selectedPayment.currentTermMonth} months`
+                          ? `${selectedPayment.currentTermMonth} tháng`
                           : 'N/A'}
                       </span>
                     </div>
@@ -1624,7 +1433,7 @@ const Payment = () => {
                   {/* Record Payment Input */}
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Number of months to record payment <span className="text-red-500">*</span>
+                      Số tháng cần ghi nhận thanh toán <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="number"
@@ -1646,11 +1455,11 @@ const Payment = () => {
                     {selectedPayment.currentTermMonth && selectedPayment.currentTermMonth > 0 ? (
                       <div className="mt-2 space-y-1">
                         <p className="text-xs text-gray-500">
-                          Maximum: {selectedPayment.currentTermMonth} months
+                          Tối đa: {selectedPayment.currentTermMonth} tháng
                         </p>
                         {selectedPayment.monthlyPay && monthsToDeduct > 0 && (
                           <p className="text-xs font-semibold text-blue-600">
-                            Amount to be recorded: {formatCurrency(selectedPayment.monthlyPay * monthsToDeduct)}
+                            Số tiền sẽ ghi nhận: {formatCurrency(selectedPayment.monthlyPay * monthsToDeduct)}
                           </p>
                         )}
                       </div>
@@ -1685,206 +1494,6 @@ const Payment = () => {
                     <span>Record Payment</span>
                   </button>
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Invoice Modal */}
-        {invoiceModal.open && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-300">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                    <Receipt className="w-6 h-6 text-purple-600" />
-                    Payment Invoice
-                  </h2>
-                  {invoiceModal.data?.order?.orderId && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      Order ID: #{invoiceModal.data.order.orderId}
-                    </p>
-                  )}
-                </div>
-                <button
-                  onClick={closeInvoiceModal}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {invoiceModal.loading ? (
-                <div className="py-16 flex flex-col items-center justify-center">
-                  <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
-                  <p className="text-sm text-gray-500 mt-3">Loading invoice details...</p>
-                </div>
-              ) : invoiceModal.error ? (
-                <div className="py-16 px-6 flex flex-col items-center justify-center space-y-3">
-                  <AlertCircle className="w-10 h-10 text-red-500" />
-                  <p className="text-sm text-red-600 text-center max-w-sm">{invoiceModal.error}</p>
-                  <button
-                    onClick={closeInvoiceModal}
-                    className="px-4 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition-colors text-sm font-medium"
-                  >
-                    Close
-                  </button>
-                </div>
-              ) : (
-                <div className="px-6 py-6 space-y-6">
-                  {/* Customer & Order Info */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-                      <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-2">
-                        Customer Information
-                      </h3>
-                      <div className="space-y-2 text-sm text-gray-700">
-                        <div>
-                          <span className="font-medium text-gray-900">Name:</span>{' '}
-                          {invoiceModal.data?.customer?.name || 'N/A'}
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-900">Email:</span>{' '}
-                          {invoiceModal.data?.customer?.email || 'N/A'}
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-900">Phone:</span>{' '}
-                          {invoiceModal.data?.customer?.phone || 'N/A'}
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-900">Address:</span>{' '}
-                          {invoiceModal.data?.customer?.address || 'N/A'}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-4">
-                      <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-2">
-                        Vehicle Information
-                      </h3>
-                      <div className="space-y-2 text-sm text-gray-700">
-                        <div>
-                          <span className="font-medium text-gray-900">Vehicle:</span>{' '}
-                          {invoiceModal.data?.vehicle?.model || 'N/A'}
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-900">Variant:</span>{' '}
-                          {invoiceModal.data?.vehicle?.variant || 'N/A'}
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-900">Serial / VIN:</span>{' '}
-                          {invoiceModal.data?.vehicle?.serial || 'N/A'}
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-900">Quantity:</span>{' '}
-                          {invoiceModal.data?.vehicle?.quantity || '1'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Payment Summary */}
-                  <div className="bg-white border border-gray-200 rounded-lg">
-                    <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                        Payment Summary
-                      </h3>
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        (invoiceModal.data?.payment?.status || '').toUpperCase() === 'ACTIVE'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-green-100 text-green-800'
-                      }`}>
-                        {invoiceModal.data?.payment?.status || 'ACTIVE'}
-                      </span>
-                    </div>
-                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
-                      <div>
-                        <div className="flex justify-between py-2 border-b border-dashed border-gray-200">
-                          <span className="font-medium text-gray-900">Total Amount</span>
-                          <span className="font-semibold text-gray-900">
-                            {formatCurrency(invoiceModal.data?.payment?.total || 0)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between py-2 border-b border-dashed border-gray-200">
-                          <span>Paid Amount</span>
-                          <span className="font-semibold text-green-600">
-                            {formatCurrency(invoiceModal.data?.payment?.paid || 0)}
-                          </span>
-                        </div>
-                        {invoiceModal.data?.payment?.outstanding !== undefined && (
-                          <div className="flex justify-between py-2">
-                            <span>Outstanding</span>
-                            <span className="font-semibold text-red-600">
-                              {formatCurrency(invoiceModal.data?.payment?.outstanding || 0)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="space-y-2">
-                        <div>
-                          <span className="font-medium text-gray-900">Payment Method:</span>{' '}
-                          {invoiceModal.data?.payment?.method || (invoiceModal.data?.paymentType === 'installment' ? 'TG' : 'TT')}
-                        </div>
-                        {invoiceModal.data?.payment?.planId && (
-                          <div>
-                            <span className="font-medium text-gray-900">Plan ID:</span>{' '}
-                            {invoiceModal.data?.payment?.planId}
-                          </div>
-                        )}
-                        {invoiceModal.data?.payment?.monthlyPay != null && (
-                          <div>
-                            <span className="font-medium text-gray-900">Monthly Pay:</span>{' '}
-                            {formatCurrency(invoiceModal.data?.payment?.monthlyPay)}
-                          </div>
-                        )}
-                        {invoiceModal.data?.payment?.remainingMonths != null && (
-                          <div>
-                            <span className="font-medium text-gray-900">Remaining Months:</span>{' '}
-                            {invoiceModal.data?.payment?.remainingMonths} months
-                          </div>
-                        )}
-                        {invoiceModal.data?.payment?.interestRate != null && (
-                          <div>
-                            <span className="font-medium text-gray-900">Interest Rate:</span>{' '}
-                            {invoiceModal.data?.payment?.interestRate}%
-                          </div>
-                        )}
-                        <div>
-                          <span className="font-medium text-gray-900">Payment Date:</span>{' '}
-                          {invoiceModal.data?.payment?.paymentDate
-                            ? new Date(invoiceModal.data.payment.paymentDate).toLocaleDateString('vi-VN')
-                            : 'N/A'}
-                        </div>
-                        {invoiceModal.data?.order?.salesperson && (
-                          <div>
-                            <span className="font-medium text-gray-900">Salesperson:</span>{' '}
-                            {invoiceModal.data.order.salesperson}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Notes */}
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-600">
-                    <p>
-                      This invoice summarises the customer payment details and vehicle information.
-                      Please keep a copy for dealership and customer records. For any discrepancies,
-                      contact the finance department.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3 bg-gray-50">
-                <button
-                  onClick={closeInvoiceModal}
-                  className="px-5 py-2 rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors text-sm font-medium"
-                >
-                  Close
-                </button>
               </div>
             </div>
           </div>

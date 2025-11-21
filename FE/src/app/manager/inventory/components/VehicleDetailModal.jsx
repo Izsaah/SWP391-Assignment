@@ -5,8 +5,11 @@ const VehicleDetailModal = ({ vehicle, isOpen, onClose }) => {
   if (!isOpen || !vehicle) return null;
 
   const formatPrice = (price) => {
-    if (!price || price === 0) return '0 ₫';
-    return new Intl.NumberFormat('vi-VN').format(price) + ' ₫';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+    }).format(price);
   };
 
   const getStatusInfo = (isActive) => {
@@ -53,7 +56,27 @@ const VehicleDetailModal = ({ vehicle, isOpen, onClose }) => {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Side - Image */}
+            <div className="space-y-4">
+              <div className="bg-gray-50 rounded-lg p-8 flex items-center justify-center h-64">
+                {vehicle.img ? (
+                  <img 
+                    src={vehicle.img} 
+                    alt={vehicle.model}
+                    className="max-w-full max-h-full object-contain rounded-lg"
+                  />
+                ) : (
+                  <div className="text-center text-gray-400">
+                    <div className="text-6xl mb-4">🚗</div>
+                    <div className="text-lg">No Image Available</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Side - Details */}
+            <div className="space-y-6">
               {/* Model Name & Price */}
               <div className="pb-4 border-b border-gray-200">
                 <h1 className="text-3xl font-bold text-gray-900 mb-4">
@@ -134,6 +157,7 @@ const VehicleDetailModal = ({ vehicle, isOpen, onClose }) => {
                   )}
                 </div>
               </div>
+            </div>
           </div>
         </div>
 

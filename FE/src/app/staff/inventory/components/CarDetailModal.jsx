@@ -14,6 +14,22 @@ const CarDetailModal = ({ vehicle, isOpen, onClose }) => {
         emoji: '🟢', 
         label: 'Available for Order', 
         color: 'text-green-600',
+        bgColor: 'bg-green-50',
+        borderColor: 'border-green-200'
+      },
+      reserved: { 
+        emoji: '🟡', 
+        label: 'Reserved by Le Minh Tuan', 
+        color: 'text-yellow-600',
+        bgColor: 'bg-yellow-50',
+        borderColor: 'border-yellow-200'
+      },
+      sold: { 
+        emoji: '🔴', 
+        label: 'Sold — Delivered on 15/10/2025', 
+        color: 'text-red-600',
+        bgColor: 'bg-red-50',
+        borderColor: 'border-red-200'
       },
     };
     return statusMap[status] || statusMap.available;
@@ -28,6 +44,16 @@ const CarDetailModal = ({ vehicle, isOpen, onClose }) => {
         return [
           { text: 'Create Order', style: 'bg-blue-600 hover:bg-blue-700 text-white', action: 'createOrder' },
           { text: 'Schedule Test Drive', style: 'bg-gray-100 hover:bg-gray-200 text-gray-700', action: 'scheduleTestDrive' }
+        ];
+      case 'reserved':
+        return [
+          { text: 'View Quotation / Contract', style: 'bg-blue-600 hover:bg-blue-700 text-white', action: 'viewContract' },
+          { text: 'Contact Customer', style: 'bg-gray-100 hover:bg-gray-200 text-gray-700', action: 'contactCustomer' }
+        ];
+      case 'sold':
+        return [
+          { text: 'Track Delivery', style: 'bg-blue-600 hover:bg-blue-700 text-white', action: 'trackDelivery' },
+          { text: 'View Contract', style: 'bg-gray-100 hover:bg-gray-200 text-gray-700', action: 'viewContract' }
         ];
       default:
         return [
@@ -104,10 +130,41 @@ const CarDetailModal = ({ vehicle, isOpen, onClose }) => {
           </button>
         </div>
 
-        {/* Content */}
-        <div className="h-[calc(95vh-100px)]">
-          {/* Vehicle Status */}
-          <div className="w-full bg-white overflow-y-auto">
+        {/* Content - Tesla Style Layout */}
+        <div className="flex h-[calc(95vh-100px)]">
+          {/* Left Side - Car Image (60% width) */}
+          <div className="w-3/5 bg-white flex items-center justify-center relative">
+            <div className="w-full h-full flex items-center justify-center p-8">
+              {vehicle.imageUrl ? (
+                <div className="relative w-full max-w-lg">
+                  <img 
+                    src={vehicle.imageUrl} 
+                    alt={vehicle.title}
+                    className="w-full h-auto object-contain"
+                  />
+                  {/* Image navigation arrows */}
+                  <button className="absolute left-4 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all border border-gray-200">
+                    <span className="text-gray-600 text-lg">‹</span>
+                  </button>
+                  <button className="absolute right-4 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all border border-gray-200">
+                    <span className="text-gray-600 text-lg">›</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center text-gray-400">
+                  <div className="text-6xl mb-4">🚗</div>
+                  <div className="text-lg">No Image Available</div>
+                </div>
+              )}
+            </div>
+            {/* Image label */}
+            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded text-sm backdrop-blur-sm">
+              Front View of {vehicle.title}
+            </div>
+          </div>
+
+          {/* Right Side - Vehicle Status (40% width) */}
+          <div className="w-2/5 bg-white overflow-y-auto">
             <div className="p-8 space-y-8">
               {/* Model Name & Price */}
               <div className="pb-6 border-b border-gray-200">
@@ -119,7 +176,7 @@ const CarDetailModal = ({ vehicle, isOpen, onClose }) => {
                 <div className="mb-6">
                   <div className="text-sm text-gray-500 mb-1">Price</div>
                   <div className="text-4xl font-bold text-gray-900">
-                    {vehicle.priceUsd ? new Intl.NumberFormat('vi-VN').format(vehicle.priceUsd) + ' ₫' : '0 ₫'}
+                    ${vehicle.priceUsd?.toLocaleString() || 'N/A'}
                   </div>
                 </div>
 

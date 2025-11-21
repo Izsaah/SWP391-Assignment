@@ -1,16 +1,10 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react'
 import { Plus, Search, X, ChevronLeft, ChevronDown, CheckCircle } from 'lucide-react'
-import Modal from '../../modals/Modal'
-import ConfirmModal from '../../modals/ConfirmModal'
-import SuccessModal from '../../modals/SuccessModal'
-import {
-  fetchPromotions as fetchPromotionsService,
-  fetchAllDealers,
-  createPromotion,
-  applyPromotionToDealer,
-  deletePromotion,
-  unassignPromotionFromDealer
-} from '../../services/promotionsService'
+import axios from 'axios'
+import Modal from '../../components/Modal'
+import ConfirmModal from '../../components/ConfirmModal'
+
+const API_URL = import.meta.env.VITE_API_URL
 
 const Promotions = () => {
   const [rows, setRows] = useState([])
@@ -30,19 +24,26 @@ const Promotions = () => {
   const [deletingPromotion, setDeletingPromotion] = useState(null)
   const [loading, setLoading] = useState(false)
   const [applying, setApplying] = useState(false)
-  const [showSuccessModal, setShowSuccessModal] = useState(false)
-  const [successModalData, setSuccessModalData] = useState(null)
 
   // Fetch promotions from API
   const fetchPromotions = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await fetchPromotionsService()
-      
-      if (result.success && result.data) {
+      const token = localStorage.getItem('token')
+      const response = await axios.post(`${API_URL}/EVM/viewPromotionDealerCount`, { _empty: true }, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        }
+      })
+
+      // Backend trả về {status: 'success', message: 'success', data: Array}
+      // getAllPromotionsWithDealers() trả về List<Map> với: promoId, description, startDate, endDate, discountRate, type, dealers[]
+      if (response.data && response.data.status === 'success' && response.data.data) {
         // Transform backend data to frontend format
         const promotions = []
-        const backendData = result.data || []
+        const backendData = response.data.data || []
         const now = new Date()
         
         backendData.forEach(promo => {
@@ -63,12 +64,12 @@ const Promotions = () => {
           if (promo.discountRate) {
             const rateValue = parseFloat(promo.discountRate)
             
-            // Data mới: PERCENTAGE + rate < 1 (ví dụ: 0.05 → 5%)
-            if (promo.type === 'PERCENTAGE' && rateValue < 1) {
+            // Data mới: PERCENTAGE + rate <= 1 (ví dụ: 0.05 → 5%, 1.0 → 100%)
+            if (promo.type === 'PERCENTAGE' && rateValue <= 1) {
               displayValue = `${(rateValue * 100).toFixed(0)}%`
             } 
             // Data cũ: số nguyên hoặc type không phải PERCENTAGE (ví dụ: 5, 3 → 5%, 3%)
-            // Hoặc data mới nhưng rate >= 1 (đã được convert sẵn)
+            // Hoặc data mới nhưng rate > 1 (đã được convert sẵn)
             else {
               displayValue = `${rateValue}%`
             }
@@ -79,7 +80,7 @@ const Promotions = () => {
           const endDate = promo.endDate ? new Date(promo.endDate) : null
           const isActive = (!startDate || startDate <= now) && (!endDate || now <= endDate)
           
-          // If there are dealers, create an entry for each dealer
+          // Nếu có dealers, tạo một entry cho mỗi dealer
           if (dealers.length > 0) {
             dealers.forEach(dealer => {
               promotions.push({
@@ -96,11 +97,11 @@ const Promotions = () => {
               })
             })
           } else {
-            // If there are no dealers, create a general entry (promotion not yet applied)
+            // Nếu không có dealers, tạo một entry chung (promotion chưa được apply)
             promotions.push({
               id: promo.promoId || promo.id,
               promoId: promo.promoId || promo.id,
-              dealer: '-', // Not yet applied to any dealer
+              dealer: '-', // Chưa được apply cho dealer nào
               dealerId: null,
               name: promo.description || 'Promotion',
               type: displayType,
@@ -116,7 +117,7 @@ const Promotions = () => {
       }
     } catch (error) {
       console.error('Error fetching promotions:', error)
-      alert(error.message || 'Failed to fetch promotions')
+      alert(error.response?.data?.message || 'Failed to fetch promotions')
     } finally {
       setLoading(false)
     }
@@ -125,9 +126,17 @@ const Promotions = () => {
   // Fetch dealers list
   const fetchDealers = useCallback(async () => {
     try {
-      const result = await fetchAllDealers()
-      if (result.success && result.data) {
-        setDealers(result.data || [])
+      const token = localStorage.getItem('token')
+      const response = await axios.post(`${API_URL}/EVM/viewAllDealer`, {}, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        }
+      })
+
+      if (response.data && response.data.status === 'success' && response.data.data) {
+        setDealers(response.data.data || [])
       }
     } catch (error) {
       console.error('Error fetching dealers:', error)
@@ -208,20 +217,37 @@ const Promotions = () => {
       }
 
       // Call apply promotion endpoint
-      const result = await applyPromotionToDealer(parseInt(promoId), parseInt(selectedDealerId))
+      const response = await axios.post(
+        `${API_URL}/EVM/createDealerPromotions`,
+        {
+          promoId: parseInt(promoId),
+          dealerId: parseInt(selectedDealerId)
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true'
+          }
+        }
+      )
       
-      if (result.success) {
+      if (response.data && response.data.status === 'success') {
         await fetchPromotions()
         setShowApplyModal(false)
         setApplyingPromotion(null)
         setSelectedDealerId('')
-        alert(result.message || 'Promotion applied to dealer successfully')
+        alert('Promotion applied to dealer successfully')
       } else {
-        alert(result.message || 'Failed to apply promotion to dealer')
+        alert(response.data?.message || 'Failed to apply promotion to dealer')
       }
     } catch (error) {
       console.error('Error applying promotion:', error)
-      alert(error.message || 'Failed to apply promotion to dealer')
+      if (error.response?.status === 400 || error.response?.status === 409) {
+        alert(error.response?.data?.message || 'Promotion may already be assigned to this dealer')
+      } else {
+        alert(error.response?.data?.message || 'Failed to apply promotion to dealer')
+      }
     } finally {
       setApplying(false)
     }
@@ -275,20 +301,35 @@ const Promotions = () => {
         return
       }
 
-      // Call delete promotion endpoint
-      const result = await deletePromotion(parseInt(promoId))
+      // Call delete promotion endpoint (matches BE: /api/EVM/deletePromotion)
+      const response = await axios.post(
+        `${API_URL}/EVM/deletePromotion`,
+        { promoId: parseInt(promoId) },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true'
+          }
+        }
+      )
       
-      if (result.success) {
+      if (response.data && response.data.status === 'success') {
         await fetchPromotions()
         setShowDeleteModal(false)
         setDeletingPromotion(null)
-        alert(result.message || 'Promotion deleted successfully')
+        alert('Promotion deleted successfully')
       } else {
-        alert(result.message || 'Failed to delete promotion')
+        alert(response.data?.message || 'Failed to delete promotion')
       }
     } catch (error) {
       console.error('Error deleting promotion:', error)
-      alert(error.message || 'Failed to delete promotion')
+      // Nếu endpoint chưa tồn tại, thử hard delete hoặc show message
+      if (error.response?.status === 404) {
+        alert('Delete endpoint chưa được implement. Vui lòng liên hệ admin.')
+      } else {
+        alert(error.response?.data?.message || 'Failed to delete promotion')
+      }
     }
   }, [deletingPromotion, fetchPromotions])
 
@@ -520,46 +561,36 @@ const Promotions = () => {
             }
             
             // Create promotion với đúng format mà backend validation expect
-            const result = await createPromotion({
-              description: form.name.trim(),
-              startDate: form.from.trim(),
-              endDate: form.to.trim(),
-              discountRate: discountRate,
-              type: backendType
-            })
+            const response = await axios.post(
+              `${API_URL}/EVM/createPromotion`,
+              {
+                description: form.name.trim(),        // description (required)
+                startDate: form.from.trim(),          // startDate (required)
+                endDate: form.to.trim(),              // endDate (required)
+                discountRate: discountRate,           // discountRate (0.05 cho PERCENTAGE, hoặc số nguyên cho FIXED)
+                type: backendType                     // type (PERCENTAGE hoặc FIXED)
+              },
+              {
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                  'ngrok-skip-browser-warning': 'true'
+                }
+              }
+            )
             
-            if (result.success) {
-              // Promotion created successfully, not yet applied to any dealer
-              // Dealer will be applied after clicking the Apply button
-              const promoId = result.data?.promoId || result.data?.id || 'N/A';
-              const displayValue = form.type === 'PERCENTAGE' 
-                ? `${form.value}` 
-                : `${form.value} VND`;
-              
-              setSuccessModalData({
-                title: 'Promotion Created Successfully!',
-                message: 'Promotion created successfully!',
-                details: {
-                  'Promotion ID': String(promoId),
-                  'Description': form.name || 'N/A',
-                  'Type': form.type || 'N/A',
-                  'Discount': displayValue,
-                  'Valid From': form.from || 'N/A',
-                  'Valid To': form.to || 'N/A'
-                },
-                footerMessage: 'You can apply it to dealers using the Apply button.'
-              });
-              setShowSuccessModal(true);
+            if (response.data && response.data.status === 'success') {
+              // Promotion được tạo thành công, chưa apply cho dealer nào
+              // Dealer sẽ được apply sau khi click nút Apply
               await fetchPromotions()
               setShowCreate(false)
-              // Reset form
-              setForm({ name: '', type: 'PERCENTAGE', value: '5%', from: '2025-10-01', to: '2025-12-31' })
+              alert('Promotion created successfully. You can apply it to dealers using the Apply button.')
             } else {
-              alert(result.message || 'Failed to create promotion')
+              alert(response.data?.message || 'Failed to create promotion')
             }
           } catch (error) {
             console.error('Error creating promotion:', error)
-            alert(error.message || 'Failed to create promotion')
+            alert(error.response?.data?.message || 'Failed to create promotion')
           }
         }}
       >
@@ -653,20 +684,6 @@ const Promotions = () => {
         </div>
       </Modal>
 
-      {/* Success Modal */}
-      {successModalData && (
-        <SuccessModal
-          open={showSuccessModal}
-          onClose={() => {
-            setShowSuccessModal(false);
-            setSuccessModalData(null);
-          }}
-          title={successModalData.title}
-          message={successModalData.message}
-          details={successModalData.details}
-          footerMessage={successModalData.footerMessage}
-        />
-      )}
     </div>
   )
 }

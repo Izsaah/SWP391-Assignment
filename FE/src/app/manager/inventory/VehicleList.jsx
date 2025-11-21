@@ -2,10 +2,10 @@ import React, { useMemo, useState, useEffect } from 'react';
 import Layout from '../layout/Layout';
 import { useNavigate } from 'react-router';
 import { 
-  Search, Car as CarIcon, ArrowUpDown, ArrowUpRight, ArrowDownRight
+  Search, Car as CarIcon, ArrowUpDown, BarChart3, ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
 import { getVehicles, getStockOverview } from '../services/inventoryService';
-import VehicleDetailModal from '../modals/VehicleDetailModal';
+import VehicleDetailModal from './components/VehicleDetailModal';
 
 const ManagerVehicleList = () => {
   const navigate = useNavigate();
@@ -21,8 +21,11 @@ const ManagerVehicleList = () => {
   const [error, setError] = useState(null);
   
   const formatPrice = (price) => {
-    if (!price || price === 0) return '0 ₫';
-    return new Intl.NumberFormat('vi-VN').format(price) + ' ₫';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+    }).format(price);
   };
 
   const handleVehicleClick = (vehicle) => {
@@ -101,6 +104,13 @@ const ManagerVehicleList = () => {
             <h1 className="text-3xl font-bold text-gray-900">Vehicle List</h1>
             <p className="text-sm text-gray-600 mt-1">Vehicle models and variants inventory</p>
           </div>
+          <button
+            onClick={() => navigate('/manager/inventory/stock')}
+            className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span>View Stock Overview</span>
+          </button>
         </div>
 
         {/* Loading State */}
@@ -194,6 +204,7 @@ const ManagerVehicleList = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Photo</th>
                   <th onClick={()=>toggleSort('model')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">Model <ArrowUpDown className="inline w-3 h-3 ml-1"/></th>
                   <th onClick={()=>toggleSort('versionName')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">Version <ArrowUpDown className="inline w-3 h-3 ml-1"/></th>
                   <th onClick={()=>toggleSort('color')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">Color <ArrowUpDown className="inline w-3 h-3 ml-1"/></th>
@@ -207,6 +218,13 @@ const ManagerVehicleList = () => {
                     onClick={() => handleVehicleClick(v)}
                     className="hover:bg-gray-50 cursor-pointer transition-colors"
                   >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {v.img ? (
+                        <img src={v.img} alt={v.model} className="w-24 h-14 object-cover rounded-md border"/>
+                      ) : (
+                        <div className="w-24 h-14 bg-gray-200 rounded-md border flex items-center justify-center text-xs text-gray-400">No Image</div>
+                      )}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{v.modelName || v.model}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{v.versionName || 'Standard'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -229,6 +247,11 @@ const ManagerVehicleList = () => {
                 onClick={() => handleVehicleClick(v)}
                 className="bg-white border border-[#DEE2E6] rounded-lg shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
               >
+                {v.img ? (
+                  <img src={v.img} alt={v.model} className="w-full h-40 object-cover" />
+                ) : (
+                  <div className="w-full h-40 bg-gray-200 flex items-center justify-center text-sm text-gray-400">No Image</div>
+                )}
                 <div className="p-4 space-y-2">
                   <div>
                     <h4 className="font-semibold text-gray-900">{v.modelName || v.model}</h4>

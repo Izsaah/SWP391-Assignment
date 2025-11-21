@@ -1,21 +1,12 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { Car, Palette, Plus, Search, Edit2, Trash2, Power, PowerOff, ChevronLeft, ChevronDown } from 'lucide-react'
-import Modal from '../../modals/Modal'
-import ConfirmModal from '../../modals/ConfirmModal'
-import SuccessModal from '../../modals/SuccessModal'
-import {
-  fetchVehicleModels,
-  createVehicleModel,
-  updateVehicleModel,
-  enableVehicleModel,
-  disableVehicleModel,
-  fetchVehicleVariants,
-  createVehicleVariant,
-  updateVehicleVariant,
-  enableVehicleVariant,
-  disableVehicleVariant
-} from '../../services/vehicleCatalogService'
+import axios from 'axios'
+import Modal from '../../components/Modal'
+import ConfirmModal from '../../components/ConfirmModal'
+import SuccessModal from '../../components/SuccessModal'
+
+const API_URL = import.meta.env.VITE_API_URL
 
 const VehicleCatalog = () => {
   const location = useLocation()
@@ -90,6 +81,7 @@ export default VehicleCatalog
 const ModelsSection = () => {
   const [rows, setRows] = useState([])
   const [query, setQuery] = useState('')
+  const [brand, setBrand] = useState('All')
   const [sortKey, setSortKey] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
   const [page, setPage] = useState(1)
@@ -97,7 +89,7 @@ const ModelsSection = () => {
   const [showAdd, setShowAdd] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [form, setForm] = useState({ name: '', year: 2025, description: '' })
+  const [form, setForm] = useState({ name: '', brand: 'EVM', year: 2025, description: '' })
   const [editing, setEditing] = useState(null)
   const [deletingModel, setDeletingModel] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -108,25 +100,32 @@ const ModelsSection = () => {
   const fetchModels = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await fetchVehicleModels()
-      
-      if (result.success && result.data) {
+      const token = localStorage.getItem('token')
+      const response = await axios.post(`${API_URL}/EVM/viewVehicleForEVM`, { _empty: true }, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        }
+      })
+
+      // Backend trả về {status: 'success', message: 'success', data: Array}
+      if (response.data && response.data.status === 'success' && response.data.data) {
         // Transform backend data to frontend format
-        const models = (result.data || []).map(model => {
-          return {
-            id: model.modelId,
-            name: model.modelName,
-            description: model.description,
-            year: 2025,
-            variants: model.lists ? model.lists.length : 0,
-            active: model.isActive
-          };
-        })
+        const models = (response.data.data || []).map(model => ({
+          id: model.modelId,
+          name: model.modelName,
+          description: model.description,
+          brand: 'EVM',
+          year: 2025,
+          variants: model.lists ? model.lists.length : 0,
+          active: model.isActive
+        }))
         setRows(models)
       }
     } catch (error) {
       console.error('Error fetching models:', error)
-      alert(error.message || 'Failed to fetch models')
+      alert(error.response?.data?.message || 'Failed to fetch models')
     } finally {
       setLoading(false)
     }
@@ -138,8 +137,9 @@ const ModelsSection = () => {
 
 
   const filtered = useMemo(() => rows.filter(m =>
+    (brand === 'All' || m.brand === brand) &&
     (!query || m.name.toLowerCase().includes(query.toLowerCase()))
-  ), [rows, query])
+  ), [rows, query, brand])
 
   const sorted = useMemo(() => {
     const copy = [...filtered]
@@ -157,35 +157,46 @@ const ModelsSection = () => {
   const paged = useMemo(() => sorted.slice((page - 1) * pageSize, page * pageSize), [sorted, page])
   const toggleSort = (key) => { if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortKey(key); setSortDir('asc') } }
 
-  const handleAdd = () => { setForm({ name: '', year: 2025, description: '' }); setShowAdd(true) }
-  const handleEdit = (row) => { setEditing(row); setForm({ name: row.name, year: row.year, description: row.description || '' }); setShowEdit(true) }
+  const handleAdd = () => { setForm({ name: '', brand: 'EVM', year: 2025, description: '' }); setShowAdd(true) }
+  const handleEdit = (row) => { setEditing(row); setForm({ name: row.name, brand: row.brand, year: row.year, description: row.description || '' }); setShowEdit(true) }
   const handleDelete = (row) => { setDeletingModel(row); setShowDeleteModal(true) }
   const handleToggleStatus = async (row) => {
     try {
+      const token = localStorage.getItem('token')
       const modelId = parseInt(row.id, 10)
       
       if (isNaN(modelId)) {
-        setSuccessMessage('Invalid model ID')
+        setSuccessMessage('ID model không hợp lệ')
         setShowSuccessModal(true)
         return
       }
       
-      const result = row.active 
-        ? await disableVehicleModel(modelId)
-        : await enableVehicleModel(modelId)
+      const endpoint = row.active 
+        ? `${API_URL}/EVM/disableVehicleModel`
+        : `${API_URL}/EVM/enableVehicleModel`
       
-      if (result.success) {
+      const response = await axios.post(endpoint, {
+        model_id: modelId
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        }
+      })
+      
+      if (response.data && response.data.status === 'success') {
         // Fetch lại models sau khi toggle thành công
         await fetchModels()
-        setSuccessMessage(result.message || (row.active ? 'Deactivated successfully' : 'Activated successfully'))
+        setSuccessMessage(row.active ? 'Đã vô hiệu hóa' : 'Đã kích hoạt')
         setShowSuccessModal(true)
       } else {
-        setSuccessMessage(result.message || 'Failed to change status')
+        setSuccessMessage(response.data?.message || 'Thay đổi trạng thái thất bại')
         setShowSuccessModal(true)
       }
     } catch (error) {
       console.error('Error toggling model status:', error)
-      setSuccessMessage(error.message || 'Failed to change status')
+      setSuccessMessage(error.response?.data?.message || 'Thay đổi trạng thái thất bại')
       setShowSuccessModal(true)
     }
   }
@@ -193,39 +204,68 @@ const ModelsSection = () => {
     if (!deletingModel) return
     
     try {
+      const token = localStorage.getItem('token')
       const modelId = parseInt(deletingModel.id, 10)
       
       if (isNaN(modelId)) {
-        setSuccessMessage('Invalid model ID')
+        setSuccessMessage('ID model không hợp lệ')
         setShowSuccessModal(true)
         return
       }
       
-      const result = await disableVehicleModel(modelId)
+      console.log('Deleting model with ID:', modelId)
       
-      if (result.success) {
+      const response = await axios.post(`${API_URL}/EVM/disableVehicleModel`, {
+        model_id: modelId
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        }
+      })
+      
+      console.log('Delete response:', response.data)
+      
+      // Backend trả về 400 với error response, nhưng vẫn có thể là success nếu đã disabled
+      // Hoặc có thể là lỗi thật sự
+      if (response.data && response.data.status === 'success') {
         // Fetch lại models sau khi delete thành công
         await fetchModels()
         setShowDeleteModal(false)
         setDeletingModel(null)
-        setSuccessMessage(result.message || 'Deleted successfully')
+        setSuccessMessage('Xóa thành công')
         setShowSuccessModal(true)
-      } else {
-        setSuccessMessage(result.message || 'Failed to delete')
+      } else if (response.status === 200 && response.data && response.data.status === 'error') {
+        // Backend trả về 200 với error status (có thể model đã disabled hoặc không tồn tại)
+        const errorMsg = response.data.message || 'Không thể xóa model này. Có thể model đã bị xóa hoặc không tồn tại.'
+        setSuccessMessage(errorMsg)
         setShowSuccessModal(true)
         // Vẫn fetch lại để refresh UI
         await fetchModels()
         setShowDeleteModal(false)
         setDeletingModel(null)
+      } else {
+        setSuccessMessage(response.data?.message || 'Xóa thất bại')
+        setShowSuccessModal(true)
       }
     } catch (error) {
       console.error('Error deleting model:', error)
-      setSuccessMessage(error.message || 'Failed to delete')
+      console.error('Error response:', error.response?.data)
+      
+      // Backend trả về 400 với error response
+      if (error.response?.status === 400 && error.response?.data) {
+        const errorMsg = error.response.data.message || 'Không thể xóa model này'
+        setSuccessMessage(errorMsg)
+        // Vẫn fetch lại để refresh UI (có thể model đã bị xóa bởi người khác)
+        await fetchModels()
+      } else {
+        setSuccessMessage(error.response?.data?.message || error.message || 'Xóa thất bại')
+      }
+      
       setShowDeleteModal(false)
       setDeletingModel(null)
       setShowSuccessModal(true)
-      // Vẫn fetch lại để refresh UI
-      await fetchModels()
     }
   }
 
@@ -250,6 +290,11 @@ const ModelsSection = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input placeholder="Search models..." value={query} onChange={(e) => { setQuery(e.target.value); setPage(1) }} className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
           </div>
+          <select value={brand} onChange={(e) => setBrand(e.target.value)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <option>All</option>
+            <option>EVM</option>
+            <option>Neo</option>
+          </select>
         </div>
       </div>
 
@@ -264,6 +309,9 @@ const ModelsSection = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onClick={() => toggleSort('name')}>
                   Name {sortKey === 'name' && (sortDir === 'asc' ? '▲' : '▼')}
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onClick={() => toggleSort('brand')}>
+                  Brand
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onClick={() => toggleSort('variants')}>
                   Variants
                 </th>
@@ -276,13 +324,13 @@ const ModelsSection = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">
                     Loading...
                   </td>
                 </tr>
               ) : paged.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">
                     No models found
                   </td>
                 </tr>
@@ -294,6 +342,7 @@ const ModelsSection = () => {
                     <div className="text-sm font-medium text-gray-900">{row.name}</div>
                     <div className="text-xs text-gray-500">{row.description}</div>
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.brand}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.variants}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${row.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
@@ -340,30 +389,37 @@ const ModelsSection = () => {
         onClose={() => setShowAdd(false)} 
         onSubmit={async () => {
           if (!form.name || !form.description) {
-            setSuccessMessage('Please fill in all required fields')
+            setSuccessMessage('Vui lòng điền đầy đủ thông tin')
             setShowSuccessModal(true)
             return
           }
           
           try {
-            const result = await createVehicleModel({
+            const token = localStorage.getItem('token')
+            const response = await axios.post(`${API_URL}/EVM/createVehicleModel`, {
               model_name: form.name,
               description: form.description || ''
+            }, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'ngrok-skip-browser-warning': 'true'
+              }
             })
             
-            if (result.success) {
+            if (response.data && response.data.status === 'success') {
               // Fetch lại models sau khi create thành công
               await fetchModels()
               setShowAdd(false)
-              setSuccessMessage(result.message || 'Created successfully')
+              setSuccessMessage('Tạo mới thành công')
               setShowSuccessModal(true)
             } else {
-              setSuccessMessage(result.message || 'Failed to create')
+              setSuccessMessage(response.data?.message || 'Tạo mới thất bại')
               setShowSuccessModal(true)
             }
           } catch (error) {
             console.error('Error creating model:', error)
-            setSuccessMessage(error.message || 'Failed to create')
+            setSuccessMessage(error.response?.data?.message || 'Tạo mới thất bại')
             setShowSuccessModal(true)
           }
         }}
@@ -378,6 +434,8 @@ const ModelsSection = () => {
             <textarea className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Description" rows="3" value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} />
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Brand</label>
+            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Brand" value={form.brand} onChange={(e) => setForm(f => ({ ...f, brand: e.target.value }))} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
@@ -394,25 +452,32 @@ const ModelsSection = () => {
           if (!editing) return
           
           try {
-            const result = await updateVehicleModel({
+            const token = localStorage.getItem('token')
+            const response = await axios.post(`${API_URL}/EVM/updateVehicleModel`, {
               model_id: editing.id,
               model_name: form.name,
               description: form.description || ''
+            }, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'ngrok-skip-browser-warning': 'true'
+              }
             })
             
-            if (result.success) {
+            if (response.data && response.data.status === 'success') {
               // Fetch lại models sau khi update thành công
               await fetchModels()
               setShowEdit(false)
-              setSuccessMessage(result.message || 'Updated successfully')
+              setSuccessMessage('Cập nhật thành công')
               setShowSuccessModal(true)
             } else {
-              setSuccessMessage(result.message || 'Failed to update')
+              setSuccessMessage(response.data?.message || 'Cập nhật thất bại')
               setShowSuccessModal(true)
             }
           } catch (error) {
             console.error('Error updating model:', error)
-            setSuccessMessage(error.message || 'Failed to update')
+            setSuccessMessage(error.response?.data?.message || 'Cập nhật thất bại')
             setShowSuccessModal(true)
           }
         }}
@@ -427,6 +492,8 @@ const ModelsSection = () => {
             <textarea className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Description" rows="3" value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} />
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Brand</label>
+            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Brand" value={form.brand} onChange={(e) => setForm(f => ({ ...f, brand: e.target.value }))} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
@@ -531,7 +598,7 @@ const VariantsSection = () => {
         const modelsMap = new Map()
         const allVariants = []
         
-        // Create map model_id -> modelName and update state models
+        // Tạo map model_id -> modelName và cập nhật state models
         const modelsList = modelsData.map(model => ({
           id: model.modelId,
           name: model.modelName,
@@ -567,13 +634,10 @@ const VariantsSection = () => {
                   normalizedColor = normalizedColor.charAt(0).toUpperCase() + normalizedColor.slice(1).toLowerCase()
                 }
                 
-                const modelId = variant.modelId || model.modelId;
-                const variantId = variant.variantId;
-                
                 allVariants.push({
                   id: variant.variantId,
-                  modelId: modelId,
-                  model: modelsMap.get(modelId) || 'N/A',
+                  modelId: variant.modelId || model.modelId,
+                  model: modelsMap.get(variant.modelId || model.modelId) || 'N/A',
                   version: variant.versionName || '',
                   color: normalizedColor,
                   price: variant.price || 0,
@@ -607,34 +671,15 @@ const VariantsSection = () => {
     fetchVariants()
   }, [fetchModels, fetchVariants])
 
-  // Mapping: Vietnamese (from DB) -> English (for display)
-  const colorToEnglish = useMemo(() => ({
-    'Trắng': 'White',
-    'Xanh dương': 'Blue',
-    'Đỏ': 'Red',
-    'Đen': 'Black',
-    'Bạc': 'Silver',
-    'trắng': 'White',
-    'xanh dương': 'Blue',
-    'đỏ': 'Red',
-    'đen': 'Black',
-    'bạc': 'Silver'
-  }), [])
-
-  // Mapping: English (from filter) -> Vietnamese (for DB query)
-  const colorToVietnamese = useMemo(() => ({
+  // Mapping giữa filter (tiếng Anh) và dữ liệu (tiếng Việt)
+  const colorMapping = useMemo(() => ({
+    'All': 'All',
     'White': 'Trắng',
     'Blue': 'Xanh dương',
     'Red': 'Đỏ',
     'Black': 'Đen',
     'Silver': 'Bạc'
   }), [])
-  
-  // Convert color from Vietnamese (DB) to English (display)
-  const getDisplayColor = (color) => {
-    if (!color) return color
-    return colorToEnglish[color] || color
-  }
   
   // Lấy danh sách màu động từ data (bao gồm cả màu mới được thêm vào)
   const availableColors = useMemo(() => {
@@ -645,20 +690,34 @@ const VariantsSection = () => {
       }
     })
     
-    // Sort and return color list
+    // Sắp xếp và trả về danh sách màu
     const colors = Array.from(colorSet).sort()
     
-    // Map known colors to English, keep new colors as is
+    // Tạo mapping ngược: tiếng Việt -> tiếng Anh để hiển thị trong dropdown
+    const reverseMapping = {
+      'Trắng': 'White',
+      'Xanh dương': 'Blue',
+      'Đỏ': 'Red',
+      'Đen': 'Black',
+      'Bạc': 'Silver'
+    }
+    
+    // Map các màu đã biết sang tiếng Anh, giữ nguyên màu mới
     const mappedColors = colors.map(c => {
-      const english = colorToEnglish[c] || c
-      return { vietnamese: c, english: english }
+      // Tìm trong colorMapping values (tiếng Việt)
+      const foundKey = Object.keys(colorMapping).find(key => colorMapping[key] === c)
+      if (foundKey) {
+        return { vietnamese: c, english: foundKey }
+      }
+      // Nếu không tìm thấy, giữ nguyên (màu mới)
+      return { vietnamese: c, english: c }
     })
     
     return mappedColors
-  }, [rows, colorToEnglish])
+  }, [rows, colorMapping])
 
   const filtered = useMemo(() => {
-    // Create reverse mapping: Vietnamese -> English for search
+    // Tạo reverse mapping: tiếng Việt -> tiếng Anh để search
     const reverseColorMapping = {
       'trắng': 'white',
       'xanh dương': 'blue',
@@ -702,14 +761,14 @@ const VariantsSection = () => {
         const variantColor = (v.color || '').trim().toLowerCase()
         const filterColor = (color || '').trim().toLowerCase()
         
-        // Check if color filter is English, convert to Vietnamese for comparison
-        const mappedColor = colorToVietnamese[color] // Get Vietnamese color from English filter
+        // Kiểm tra nếu color là một trong các màu đã mapping (tiếng Anh)
+        const mappedColor = colorMapping[color] // Lấy màu tiếng Việt từ mapping
         const mappedColorLower = mappedColor ? (mappedColor || '').trim().toLowerCase() : null
         
-        // Compare with:
-        // 1. Mapped color (Vietnamese) if exists
-        // 2. Original color (English) from filter
-        // 3. Directly with variant color (for new colors not in mapping)
+        // So sánh với:
+        // 1. Mapped color (tiếng Việt) nếu có
+        // 2. Original color (tiếng Anh) từ filter
+        // 3. Trực tiếp với variant color (cho màu mới không có trong mapping)
         colorMatch = variantColor === mappedColorLower || 
                     variantColor === filterColor ||
                     variantColor.includes(filterColor) ||
@@ -718,15 +777,14 @@ const VariantsSection = () => {
       
       return queryMatch && colorMatch
     })
-  }, [rows, query, color, colorToVietnamese])
+  }, [rows, query, color, colorMapping])
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page])
 
   const handleAdd = async () => {
     // Fetch models trước khi mở modal để đảm bảo có danh sách models mới nhất
     const modelsList = await fetchModels()
-    const activeModels = modelsList.filter(m => m.isActive)
-    setForm({ modelId: activeModels.length > 0 ? activeModels[0].id.toString() : '', version: '', color: 'White', price: 30000 })
+    setForm({ modelId: modelsList.length > 0 ? modelsList[0].id.toString() : '', version: '', color: 'White', price: 30000 })
     setShowAdd(true)
   }
   const handleEdit = async (row) => {
@@ -737,7 +795,7 @@ const VariantsSection = () => {
       modelId: row.modelId ? row.modelId.toString() : '', 
       version: row.version || '', 
       color: row.color || '', 
-      price: row.price || 0
+      price: row.price || 0 
     })
     setShowEdit(true)
   }
@@ -748,7 +806,7 @@ const VariantsSection = () => {
       const variantId = parseInt(row.id, 10)
       
       if (isNaN(variantId)) {
-        setSuccessMessage('Invalid variant ID')
+        setSuccessMessage('ID variant không hợp lệ')
         setShowSuccessModal(true)
         return
       }
@@ -770,10 +828,10 @@ const VariantsSection = () => {
       if (response.data && response.data.status === 'success') {
         // Fetch lại variants sau khi toggle thành công
         await fetchVariants()
-        setSuccessMessage(row.active ? 'Deactivated successfully' : 'Activated successfully')
+        setSuccessMessage(row.active ? 'Đã vô hiệu hóa' : 'Đã kích hoạt')
         setShowSuccessModal(true)
       } else {
-        setSuccessMessage(response.data?.message || 'Failed to change status')
+        setSuccessMessage(response.data?.message || 'Thay đổi trạng thái thất bại')
         setShowSuccessModal(true)
       }
     } catch (error) {
@@ -790,7 +848,7 @@ const VariantsSection = () => {
       const variantId = parseInt(deletingVariant.id, 10)
       
       if (isNaN(variantId)) {
-        setSuccessMessage('Invalid variant ID')
+        setSuccessMessage('ID variant không hợp lệ')
         setShowSuccessModal(true)
         return
       }
@@ -814,10 +872,10 @@ const VariantsSection = () => {
         await fetchVariants()
         setShowDeleteModal(false)
         setDeletingVariant(null)
-        setSuccessMessage('Deleted successfully')
+        setSuccessMessage('Xóa thành công')
         setShowSuccessModal(true)
       } else {
-        setSuccessMessage(response.data?.message || 'Failed to delete')
+        setSuccessMessage(response.data?.message || 'Xóa thất bại')
         setShowSuccessModal(true)
       }
     } catch (error) {
@@ -826,12 +884,12 @@ const VariantsSection = () => {
       
       // Backend trả về 400 với error response
       if (error.response?.status === 400 && error.response?.data) {
-        const errorMsg = error.response.data.message || 'Cannot delete this variant'
+        const errorMsg = error.response.data.message || 'Không thể xóa variant này'
         setSuccessMessage(errorMsg)
         // Vẫn fetch lại để refresh UI (có thể variant đã bị xóa bởi người khác)
         await fetchVariants()
       } else {
-        setSuccessMessage(error.response?.data?.message || error.message || 'Failed to delete')
+        setSuccessMessage(error.response?.data?.message || error.message || 'Xóa thất bại')
       }
       
       setShowDeleteModal(false)
@@ -865,7 +923,7 @@ const VariantsSection = () => {
             <option value="All">All</option>
             {availableColors.map(colorOption => (
               <option key={colorOption.vietnamese} value={colorOption.english}>
-                {colorOption.english}
+                {colorOption.vietnamese} {colorOption.vietnamese !== colorOption.english ? `(${colorOption.english})` : ''}
               </option>
             ))}
           </select>
@@ -905,10 +963,8 @@ const VariantsSection = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.id}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{v.model}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.version}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{getDisplayColor(v.color)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {v.price ? new Intl.NumberFormat('vi-VN').format(v.price) + ' ₫' : '0 ₫'}
-                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.color}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${v.price.toLocaleString()}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${v.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                       {v.active ? 'Active' : 'Inactive'}
@@ -954,14 +1010,14 @@ const VariantsSection = () => {
         onClose={() => setShowAdd(false)} 
         onSubmit={async () => {
           if (!form.modelId || !form.version || !form.color || !form.price) {
-            setSuccessMessage('Please fill in all required fields')
+            setSuccessMessage('Vui lòng điền đầy đủ thông tin')
             setShowSuccessModal(true)
             return
           }
           
           const modelIdInt = parseInt(form.modelId, 10)
           if (isNaN(modelIdInt) || modelIdInt <= 0) {
-            setSuccessMessage('Please select a valid model')
+            setSuccessMessage('Vui lòng chọn model hợp lệ')
             setShowSuccessModal(true)
             return
           }
@@ -972,7 +1028,7 @@ const VariantsSection = () => {
               model_id: modelIdInt,
               version_name: form.version,
               color: form.color,
-              image: '', // Image field removed
+              image: '', // Image không có trong form, để trống
               price: parseFloat(form.price)
             }, {
               headers: {
@@ -987,34 +1043,23 @@ const VariantsSection = () => {
               await fetchModels()
               await fetchVariants()
               setShowAdd(false)
-              setSuccessMessage('Created successfully')
+              setSuccessMessage('Tạo mới thành công')
               setShowSuccessModal(true)
             } else {
-              setSuccessMessage(response.data?.message || 'Failed to create')
+              setSuccessMessage(response.data?.message || 'Tạo mới thất bại')
               setShowSuccessModal(true)
             }
           } catch (error) {
             console.error('Error creating variant:', error)
-            setSuccessMessage(error.response?.data?.message || 'Failed to create')
+            setSuccessMessage(error.response?.data?.message || 'Tạo mới thất bại')
             setShowSuccessModal(true)
           }
         }}
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Model <span className="text-red-500">*</span></label>
-            <select 
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
-              value={form.modelId} 
-              onChange={(e) => setForm(f => ({ ...f, modelId: e.target.value }))}
-            >
-              <option value="">Select a model</option>
-              {models.filter(m => m.isActive).map(model => (
-                <option key={model.id} value={model.id}>
-                  {model.name}
-                </option>
-              ))}
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Model ID <span className="text-red-500">*</span></label>
+            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Model ID" type="number" value={form.modelId} onChange={(e) => setForm(f => ({ ...f, modelId: parseInt(e.target.value, 10) }))} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Version <span className="text-red-500">*</span></label>
@@ -1039,14 +1084,14 @@ const VariantsSection = () => {
           if (!editing) return
           
           if (!form.modelId || !form.version || !form.color || !form.price) {
-            setSuccessMessage('Please fill in all required fields')
+            setSuccessMessage('Vui lòng điền đầy đủ thông tin')
             setShowSuccessModal(true)
             return
           }
           
           const modelIdInt = parseInt(form.modelId, 10)
           if (isNaN(modelIdInt) || modelIdInt <= 0) {
-            setSuccessMessage('Please select a valid model')
+            setSuccessMessage('Vui lòng chọn model hợp lệ')
             setShowSuccessModal(true)
             return
           }
@@ -1058,7 +1103,7 @@ const VariantsSection = () => {
               model_id: modelIdInt,
               version_name: form.version,
               color: form.color,
-              image: '', // Image field removed
+              image: '', // Image không có trong form, để trống
               price: parseFloat(form.price)
             }, {
               headers: {
@@ -1118,12 +1163,12 @@ const VariantsSection = () => {
 
       {/* Modal để tạo Model mới */}
       <Modal 
-        title="Create New Model" 
+        title="Tạo Model Mới" 
         open={showAddModel} 
         onClose={() => { setShowAddModel(false); setNewModelForm({ name: '', description: '' }) }} 
         onSubmit={async () => {
           if (!newModelForm.name || !newModelForm.description) {
-            setSuccessMessage('Please fill in all required fields')
+            setSuccessMessage('Vui lòng điền đầy đủ thông tin')
             setShowSuccessModal(true)
             return
           }
@@ -1146,7 +1191,7 @@ const VariantsSection = () => {
               await fetchModels()
               setShowAddModel(false)
               setNewModelForm({ name: '', description: '' })
-              setSuccessMessage('Model created successfully')
+              setSuccessMessage('Tạo model mới thành công')
               setShowSuccessModal(true)
               
               // Tự động chọn model vừa tạo trong form Add Variant (nếu có modelId trong response)
@@ -1160,12 +1205,12 @@ const VariantsSection = () => {
                 }
               }
             } else {
-              setSuccessMessage(response.data?.message || 'Failed to create model')
+              setSuccessMessage(response.data?.message || 'Tạo model thất bại')
               setShowSuccessModal(true)
             }
           } catch (error) {
             console.error('Error creating model:', error)
-            setSuccessMessage(error.response?.data?.message || 'Failed to create model')
+            setSuccessMessage(error.response?.data?.message || 'Tạo model thất bại')
             setShowSuccessModal(true)
           }
         }}

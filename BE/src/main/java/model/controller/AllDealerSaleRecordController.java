@@ -30,9 +30,16 @@ public class AllDealerSaleRecordController extends HttpServlet {
             throws ServletException, IOException {
         try {
             Map<String, Object> params = RequestUtils.extractParams(request);
-            List<Map<String, Object>> summaryList = saleService.getDealerSalesSummary();
+            
+            // Extract optional date range parameters
+            String startDate = params.containsKey("startDate") ? params.get("startDate").toString() : null;
+            String endDate = params.containsKey("endDate") ? params.get("endDate").toString() : null;
+            
+            // Get dealer sales summary with optional date filtering
+            List<Map<String, Object>> summaryList = saleService.getDealerSalesSummary(startDate, endDate);
+            
             ResponseUtils.success(response, "Dealer sales summary retrieved successfully", summaryList);
-
+            
         } catch (Exception e) {
             e.printStackTrace();
             ResponseUtils.error(response, "Failed to retrieve dealer sales summary: " + e.getMessage());
